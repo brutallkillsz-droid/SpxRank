@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logistics Elite | HUB LMG-13</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
+
+    <style>
+        /* =========================================================
+           1. TEMA GLOBAL (GLASSMORPHISM 2.0)
+           ========================================================= */
+        :root {
+            --bg-deep: #060608;
+            --bg-card: rgba(20, 20, 26, 0.6);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --primary: #6366f1; 
+            --accent: #a855f7;
+            --gold: #fbbf24;
+            --silver: #94a3b8;
+            --bronze: #cd7f32;
+            --success: #10b981;
+            --danger: #ef4444;
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --font-main: 'Outfit', sans-serif;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; outline: none; }
+
+        body {
+            background-color: var(--bg-deep);
+            color: var(--text-main);
+            min-height: 100vh;
+            font-family: var(--font-main);
+            background-image: 
+                radial-gradient(circle at 0% 0%, rgba(99, 102, 241, 0.12) 0%, transparent 35%),
+                radial-gradient(circle at 100% 100%, rgba(168, 85, 247, 0.08) 0%, transparent 35%);
+            overflow-x: hidden;
+            display: flex; flex-direction: column;
+        }
+
+        .toast { position: fixed; bottom: 30px; right: 30px; z-index: 10000; background: #111; border: 1px solid var(--primary); color: white; padding: 16px 32px; border-radius: 16px; transform: translateY(100px); transition: 0.4s; }
+        .toast.show { transform: translateY(0); }
+        .hidden { display: none !important; }
+        .admin-only { display: none !important; }
+        .btn-ghost { color: var(--text-muted); border: 1px solid var(--glass-border); padding: 10px 20px; border-radius: 12px; cursor: pointer; background: transparent; transition: 0.3s; }
+        .btn-ghost:hover { border-color: var(--primary); color: var(--primary); }
+
+        #login-screen { position: fixed; inset: 0; z-index: 9999; display: flex; justify-content: center; align-items: center; background: radial-gradient(circle at center, #111 0%, #000 100%); }
+        .login-card { width: 400px; padding: 50px; text-align: center; border: 1px solid var(--glass-border); border-radius: 32px; background: var(--bg-card); backdrop-filter: blur(20px); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); }
+        .brand-title { font-size: 2.2rem; font-weight: 800; margin-bottom: 30px; background: linear-gradient(to right, #fff, var(--primary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: -1.5px; }
+        .login-input { width: 100%; padding: 16px; margin-bottom: 15px; background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); border-radius: 16px; color: white; transition: 0.3s; }
+        .login-input:focus { border-color: var(--primary); background: rgba(255,255,255,0.08); }
+        .btn-primary { width: 100%; padding: 14px; background: linear-gradient(135deg, var(--primary), var(--accent)); color: white; border: none; border-radius: 16px; font-weight: 700; cursor: pointer; transition: 0.3s; text-transform: uppercase; letter-spacing: 1px; }
+
+        #app-shell { display: none; width: 100%; max-width: 1600px; margin: 0 auto; padding: 20px 40px; }
+        .navbar { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; margin-bottom: 40px; border-bottom: 1px solid var(--glass-border); }
+        .nav-logo { font-size: 1.6rem; font-weight: 800; display: flex; align-items: center; gap: 12px; letter-spacing: -1px; }
+        .tabs-wrapper { display: flex; justify-content: center; margin-bottom: 40px; gap: 12px; flex-wrap: wrap; }
+        .tab-btn { background: transparent; border: 1px solid var(--glass-border); color: var(--text-muted); font-weight: 600; padding: 12px 28px; cursor: pointer; border-radius: 14px; transition: 0.3s; }
+        .tab-btn.active { background: rgba(99, 102, 241, 0.1); color: var(--primary); border-color: var(--primary); }
+
+        /* Botões Slim */
+        .upload-compact { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-bottom: 30px; }
+        .mini-drop { height: 60px; display: flex; align-items: center; justify-content: center; gap: 12px; border: 2px dashed var(--glass-border); border-radius: 16px; cursor: pointer; background: rgba(255,255,255,0.01); transition: 0.3s; position: relative; }
+        .mini-drop:hover { border-color: var(--primary); background: rgba(99, 102, 241, 0.05); }
+        .mini-drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+        .md-title { font-weight: 700; font-size: 0.85rem; color: #fff; text-transform: uppercase; letter-spacing: 0.5px; }
+        .md-sub { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+
+        .bento-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 25px; }
+        .stat-card { background: var(--bg-card); border: 1px solid var(--glass-border); border-radius: 28px; padding: 25px; backdrop-filter: blur(10px); transition: 0.3s; }
+        .stat-card:hover { transform: translateY(-8px); border-color: rgba(255,255,255,0.2); }
+        .rank-1 { border: 1px solid rgba(251, 191, 36, 0.3); background: linear-gradient(165deg, rgba(251,191,36,0.05), transparent); }
+        .rank-2 { border: 1px solid rgba(148, 163, 184, 0.3); }
+        .rank-3 { border: 1px solid rgba(205, 127, 50, 0.3); }
+        .sc-name { font-weight: 700; font-size: 1.1rem; color: #fff; }
+        .sc-rank { font-size: 1.2rem; font-weight: 800; opacity: 0.8; }
+        .sc-hero { text-align: center; margin: 20px 0; }
+        .sc-val { font-size: 3.5rem; font-weight: 800; line-height: 1; background: linear-gradient(to bottom, #fff, #64748b); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .sc-lbl { font-size: 0.75rem; letter-spacing: 2px; color: var(--text-muted); font-weight: 700; }
+        .sc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 20px; }
+        .si-l { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; }
+        .si-v { font-size: 0.95rem; font-weight: 600; color: #fff; display: flex; align-items: center; }
+
+        /* DC Input e Modal */
+        .dc-input { width: 50px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.2); color: #fff; text-align: center; border-radius: 6px; font-weight: bold; padding: 2px; outline: none; transition: 0.2s; }
+        .dc-input:focus { border-color: var(--primary); background: rgba(99, 102, 241, 0.1); }
+        .dc-input::-webkit-outer-spin-button, .dc-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+        #dc-modal-overlay { position: fixed; inset: 0; z-index: 10001; background: rgba(0,0,0,0.75); backdrop-filter: blur(8px); display: flex; justify-content: center; align-items: center; }
+        .dc-modal-content { background: var(--bg-card); border: 1px solid var(--glass-border); border-radius: 24px; padding: 30px; width: 100%; max-width: 320px; text-align: center; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.8); animation: fadeIn 0.3s ease; }
+        .dc-modal-title { font-size: 1.5rem; font-weight: 800; color: var(--primary); margin-bottom: 5px; }
+        .dc-modal-name { font-size: 1rem; color: #fff; margin-bottom: 25px; font-weight: 600; }
+        .dc-grid-btns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
+        .dc-btn { background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); color: white; font-weight: 800; font-size: 1.2rem; padding: 15px 0; border-radius: 12px; cursor: pointer; transition: 0.2s; }
+        .dc-btn:hover { background: var(--primary); border-color: var(--primary); transform: translateY(-2px); }
+        .dc-btn-zero { background: rgba(239, 68, 68, 0.1); border-color: var(--danger); color: var(--danger); }
+        .dc-btn-zero:hover { background: var(--danger); color: white; }
+
+        /* Controle HUB */
+        .ctrl-container { background: #fff; color: #1e293b; padding: 0; border-radius: 32px; overflow: hidden; max-width: 1100px; margin: 0 auto; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); }
+        .shopee-header { background: #fff; padding: 25px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f5f9; }
+        .logo-txt { color: #ee4d2d; font-weight: 900; font-size: 1.5rem; }
+        .hub-txt { color: #0f172a; font-weight: 800; font-size: 1rem; opacity: 0.7; }
+        .tbl-ctrl { width: 100%; border-collapse: collapse; text-align: center; }
+        .tbl-ctrl th { background: #f8fafc; color: #64748b; padding: 15px; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; }
+        .tbl-ctrl td { border: 1px solid #f1f5f9; padding: 12px; font-weight: 600; font-size: 0.95rem; }
+        .green-box { background: #f0fdf4; color: #16a34a; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; border-left: 1px solid #dcfce7; }
+        .gb-time { font-size: 3rem; font-weight: 900; letter-spacing: -1px; }
+
+        /* Mensal e Ranks */
+        .m-list { display: flex; flex-direction: column; gap: 12px; }
+        .m-row { display: grid; grid-template-columns: 60px 2fr 1fr 1fr 1fr 1fr 1fr; align-items: center; background: var(--bg-card); padding: 20px 35px; border-radius: 20px; border: 1px solid var(--glass-border); transition: 0.2s; }
+        .m-row:hover { background: rgba(255,255,255,0.05); border-color: var(--primary); }
+        .m-idx { font-weight: 800; color: var(--text-muted); font-size: 1.1rem; }
+
+        /* =========================================================
+           2. ISOLAMENTO ABSOLUTO DA ABA PRODUTIVIDADE (EXCEL REPLICA)
+           ========================================================= */
+        #view-prod { background-color: #ffffff; border-radius: 8px; padding: 20px; overflow-x: auto; color: #000; font-family: Arial, sans-serif !important; }
+        #view-prod * { font-family: Arial, sans-serif !important; }
+        
+        .spx-table { width: 100%; border-collapse: collapse; border: 2px solid #000; font-size: 11px; font-weight: bold; }
+        .spx-table th, .spx-table td { border: 1px solid #000; padding: 4px; text-align: center; vertical-align: middle; height: 22px; }
+        .spx-navy { background-color: #002f6c; color: #fff; }
+        .spx-orange { background-color: #ff9900; color: #000; font-size: 14px; }
+        .spx-green { background-color: #00b050; color: #fff; }
+        .spx-red { background-color: #ff0000; color: #fff; }
+        .spx-gray-light { background-color: #f2f2f2; }
+        .spx-gray-dark { background-color: #d9d9d9; }
+        .spx-header-container { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 2px; font-size: 12px; font-weight: bold; }
+        .spx-logo-text { color: red; font-size: 9px; font-style: italic; font-weight: 900; }
+        .spx-percent-giant { border: 2px solid #000 !important; background-color: #fff !important; }
+        .spx-percent-text { color: #ff0000; font-size: 70px; font-weight: 900; text-decoration: underline; letter-spacing: -2px; }
+        .editable-cell { cursor: text; outline: none; transition: box-shadow 0.2s; }
+        .editable-cell:hover, .editable-cell:focus { box-shadow: inset 0 0 0 2px #002f6c; background: #f0f8ff; }
+        .date-input-field { width: 100%; height: 100%; text-align: center; border: none; outline: none; background: transparent; font-family: inherit; font-weight: bold; font-size: inherit; color: inherit; }
+        .station-dropdown { width: 100%; height: 100%; background: transparent; border: none; color: #fff; font-weight: bold; font-size: 11px; text-align: center; cursor: pointer; outline: none; font-family: Arial, sans-serif !important; text-transform: uppercase; }
+        .station-dropdown option { color: #000; font-weight: normal; }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+    <div id="toast" class="toast">Notificação</div>
+
+    <div id="dc-modal-overlay" class="hidden">
+        <div class="dc-modal-content">
+            <div class="dc-modal-title">DOBLECHECK</div>
+            <div class="dc-modal-name" id="dc-modal-driver-name">NOME DO MOTORISTA</div>
+            <div class="dc-grid-btns">
+                <button class="dc-btn" onclick="applyDc(1)">1</button>
+                <button class="dc-btn" onclick="applyDc(2)">2</button>
+                <button class="dc-btn" onclick="applyDc(3)">3</button>
+                <button class="dc-btn" onclick="applyDc(4)">4</button>
+                <button class="dc-btn" onclick="applyDc(5)">5</button>
+                <button class="dc-btn" onclick="applyDc(6)">6</button>
+                <button class="dc-btn" onclick="applyDc(7)">7</button>
+                <button class="dc-btn" onclick="applyDc(8)">8</button>
+                <button class="dc-btn dc-btn-zero" onclick="applyDc(0)">0 (Zerar)</button>
+            </div>
+            <button class="btn-ghost" style="width:100%; padding: 12px;" onclick="closeDcModal()">CANCELAR</button>
+        </div>
+    </div>
+
+    <div id="login-screen">
+        <div class="login-card">
+            <div class="brand-title">LOGISTICS ELITE</div>
+            <input type="text" id="user" class="login-input" placeholder="ID Usuário">
+            <input type="password" id="pass" class="login-input" placeholder="Senha">
+            <button class="btn-primary" onclick="login()">Entrar no Sistema</button>
+            <p id="login-err" style="color:var(--danger); margin-top:20px; font-size:0.85rem; display:none;">Credenciais Inválidas</p>
+        </div>
+    </div>
+
+    <div id="app-shell">
+        <nav class="navbar">
+            <div class="nav-logo"><i class="fas fa-rocket" style="color:var(--primary)"></i> ANALYTICS GOLD</div>
+            <div style="background:rgba(255,255,255,0.05); padding:8px 20px; border-radius:14px; border: 1px solid var(--glass-border); font-size:0.85rem;">
+                <span id="display-user" style="font-weight:700; color:var(--primary)">USER</span> 
+                <i class="fas fa-sign-out-alt" style="cursor:pointer; margin-left:15px; color:var(--text-muted);" onclick="location.reload()"></i>
+            </div>
+        </nav>
+
+        <div class="tabs-wrapper">
+            <button class="tab-btn active" onclick="switchTab('dia')" id="btn-dia">RANKING DIÁRIO</button>
+            <button class="tab-btn" onclick="switchTab('rankprod')" id="btn-rankprod">RANK PRODUTIVIDADE</button>
+            
+            <button class="tab-btn admin-only" onclick="switchTab('prod')" id="btn-prod">PRODUTIVIDADE (H/H)</button>
+            <button class="tab-btn admin-only" onclick="switchTab('ctrl')" id="btn-ctrl">CONTROLE HUB</button>
+            <button class="tab-btn admin-only" onclick="switchTab('mes')" id="btn-mes">CONSOLIDADO MENSAL</button>
+        </div>
+
+        <section id="view-dia">
+            <div class="upload-compact">
+                <div class="mini-drop">
+                    <i class="fas fa-file-upload" style="font-size:1.2rem; color:var(--primary);"></i>
+                    <div class="md-text">
+                        <div class="md-title">Importação Única</div>
+                        <div class="md-sub" id="st-single">Selecionar CSV (Diário)</div>
+                    </div>
+                    <input type="file" id="file-single" accept=".csv" onclick="this.value=null" onchange="handleSingleFile(this)">
+                </div>
+                <div class="mini-drop admin-only">
+                    <i class="fas fa-boxes-stacked" style="font-size:1.2rem; color:var(--accent);"></i>
+                    <div class="md-text">
+                        <div class="md-title">Massa (Admin)</div>
+                        <div class="md-sub" id="st-mass">Múltiplos arquivos .CSV</div>
+                    </div>
+                    <input type="file" id="file-mass" accept=".csv" multiple onclick="this.value=null" onchange="handleMassFiles(this)">
+                </div>
+            </div>
+
+            <div style="display:flex; justify-content:center; gap:15px; margin-bottom:50px;">
+                <button class="btn-ghost" onclick="clearData()">Limpar Visualização</button>
+                <button class="btn-primary admin-only" style="width:auto; padding: 10px 30px;" onclick="saveToMonthly()">Arquivar no Mensal</button>
+            </div>
+
+            <div id="grid-diario" class="bento-grid"></div>
+        </section>
+
+        <section id="view-rankprod" class="hidden">
+            <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+                <h2 style="font-weight: 800; letter-spacing: -1px;">Ranking de Produtividade Diário (Sorting / Etiquetagem)</h2>
+            </div>
+            <div id="rankprod-list" class="m-list"></div>
+        </section>
+
+        <section id="view-prod" class="hidden">
+            <div style="margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+                <label style="cursor:pointer; background:#002f6c; color:white; padding:8px 15px; font-size:12px; font-weight:bold; border-radius:4px;">
+                    <i class="fas fa-upload"></i> Importar Dados e Preencher Estações
+                    <input type="file" accept=".csv, .xlsx" style="display:none;" onclick="this.value=null" onchange="importProdData(this)">
+                </label>
+                <span style="font-size: 11px; color: #666; font-style: italic;">* Data, Horários, Backlog, Volume Rot. e Células são editáveis!</span>
+            </div>
+
+            <div class="spx-header-container">
+                <div class="spx-logo-text">SPX</div>
+                <div style="flex-grow: 1; text-align: center;">LMHUB LMG-13 - Uberaba</div>
+                <div style="width: 20px;"></div>
+            </div>
+
+            <table class="spx-table" style="border-bottom:none;">
+                <tr><td colspan="12" class="spx-navy" style="font-size:12px;">Etiquetagem e 1º Sorting</td></tr>
+                <tr>
+                    <td class="spx-gray-light" style="width:8%">Data</td>
+                    <td style="width:8%; padding:0;"><input type="text" class="date-input-field" value="26/02/2026" maxlength="10" oninput="maskDate(event)"></td>
+                    <td rowspan="2" class="spx-gray-light" style="width:8%">Backlog</td>
+                    <td rowspan="2" class="spx-orange editable-cell" style="width:8%" contenteditable="true" id="p-backlog" onblur="calculateProdTotals()">342</td>
+                    <td class="spx-gray-light" style="width:10%">Horário início</td>
+                    <td style="width:8%">03:00</td>
+                    <td class="spx-gray-light" style="width:10%">Qtd realizada</td>
+                    <td class="spx-gray-dark" style="width:8%" id="p-realizada">0</td>
+                    <td class="spx-green" style="width:10%">% Etiquetado</td>
+                    <td style="width:8%" id="p-perc-etiquetado">0%</td>
+                    <td colspan="2" style="width:14%; text-align:left; padding-left:5px;">Obs:</td>
+                </tr>
+                <tr>
+                    <td class="spx-gray-light">Volume Rot.</td>
+                    <td class="editable-cell" contenteditable="true" id="p-vol-rot" onblur="calculateProdTotals()">15.053</td>
+                    <td class="spx-gray-light">Horário término</td>
+                    <td>06:38</td>
+                    <td class="spx-gray-light">Qtd pendente</td>
+                    <td id="p-pendente">15.053</td>
+                    <td class="spx-red">% Pendente</td>
+                    <td id="p-perc-pendente">100%</td>
+                    <td colspan="2"></td>
+                </tr>
+            </table>
+
+            <table class="spx-table" style="border-top:none;">
+                <thead>
+                    <tr class="spx-navy">
+                        <th style="width: 7%;">Produtividade</th>
+                        <th style="width: 7.5%; padding:0;"><select id="station-select-1" class="station-dropdown" onchange="refreshProdGridData()"><option value="">Estação 1</option></select></th>
+                        <th style="width: 7.5%; padding:0;"><select id="station-select-2" class="station-dropdown" onchange="refreshProdGridData()"><option value="">Estação 2</option></select></th>
+                        <th style="width: 7.5%; padding:0;"><select id="station-select-3" class="station-dropdown" onchange="refreshProdGridData()"><option value="">Estação 3</option></select></th>
+                        <th style="width: 7.5%; padding:0;"><select id="station-select-4" class="station-dropdown" onchange="refreshProdGridData()"><option value="">Estação 4</option></select></th>
+                        <th style="width: 7.5%; padding:0;"><select id="station-select-5" class="station-dropdown" onchange="refreshProdGridData()"><option value="">Estação 5</option></select></th>
+                        <th style="width: 7.5%; padding:0;"><select id="station-select-6" class="station-dropdown" onchange="refreshProdGridData()"><option value="">Estação 6</option></select></th>
+                        <th style="width: 7.5%; padding:0;"><select id="station-select-7" class="station-dropdown" onchange="refreshProdGridData()"><option value="">Estação 7</option></select></th>
+                        <th style="width: 7.5%; padding:0;"><select id="station-select-8" class="station-dropdown" onchange="refreshProdGridData()"><option value="">Estação 8</option></select></th>
+                        <th style="width: 7.5%; padding:0;"><select id="station-select-9" class="station-dropdown" onchange="refreshProdGridData()"><option value="">Estação 9</option></select></th>
+                        <th style="width: 7.5%;">Total H.</th>
+                        <th style="width: 15.5%;">Percentual etiquetado</th>
+                    </tr>
+                </thead>
+                <tbody id="prod-body-grid"></tbody>
+            </table>
+        </section>
+
+        <section id="view-ctrl" class="hidden">
+            <div class="ctrl-container">
+                <div class="shopee-header"><div class="logo-txt">Shopee <span style="color:#0f172a; font-style: normal;">XPRESS</span></div><div class="hub-txt">UBERABA | HUB LMG-13</div></div>
+                <div style="background:#0f172a; color:rgba(255,255,255,0.8); padding:12px; font-weight:700; text-align:center; font-size:0.75rem; text-transform:uppercase; letter-spacing:2px;">Performance Tracking & Double Check</div>
+                <div style="display: grid; grid-template-columns: 1.5fr 1fr;">
+                    <table class="tbl-ctrl"><tr><th>Data da Operação</th><td id="c-data">-</td></tr><tr><th>Volume Total</th><td id="c-vol">-</td></tr><tr><th>Total de Rotas</th><td id="c-rotas">-</td></tr><tr><th>Primeira Coleta</th><td id="c-ini">-</td></tr><tr><th>Última Coleta</th><td id="c-fim">-</td></tr><tr><th>Janela Operacional</th><td id="c-dur">-</td></tr></table>
+                    <div class="green-box"><div style="font-weight:800; font-size:0.7rem; opacity:0.6; text-transform:uppercase; margin-bottom:5px;">Tempo Médio / Coleta</div><div class="gb-time" id="c-avg-time">00:00:00</div></div>
+                </div>
+                <table class="tbl-ctrl">
+                    <tr style="background:#f8fafc;"><th style="color:#0f172a">Status</th><th>Rotas</th><th>Volume</th><th>Eficiência %</th></tr>
+                    <tr><td><span style="background:#dcfce7; color:#16a34a; padding:4px 12px; border-radius:8px; font-size:0.75rem;">FINALIZADO</span></td><td id="c-fin-rot">-</td><td id="c-fin-vol">-</td><td id="c-fin-perc" style="color:#16a34a; font-weight:800;">-</td></tr>
+                    <tr><td><span style="background:#fee2e2; color:#ef4444; padding:4px 12px; border-radius:8px; font-size:0.75rem;">PENDENTE</span></td><td id="c-pen-rot">-</td><td id="c-pen-vol">-</td><td id="c-pen-perc" style="color:#ef4444; font-weight:800;">-</td></tr>
+                </table>
+                <div style="padding: 20px; font-weight: 800; font-size: 0.8rem; background: #f8fafc; border-top: 1px solid #f1f5f9;">REPORT H/H</div>
+                <table class="tbl-ctrl"><tbody id="c-hourly-body"></tbody></table>
+                <table class="tbl-ctrl">
+                    <tr style="background:#f8fafc;"><th style="color:#0f172a">DIVERGÊNCIAS</th><th>ROTAS</th><th>VOL</th><th>%</th></tr>
+                    <tr><td style="color:#ef4444; font-weight:700">Missorted</td><td id="c-mis-rot">-</td><td id="c-mis-vol">-</td><td id="c-mis-perc" style="font-weight:700; color:#ef4444">-</td></tr>
+                    <tr><td style="color:#ef4444; font-weight:700">Missing</td><td id="c-missing-rot">-</td><td id="c-missing-vol">-</td><td id="c-missing-perc" style="font-weight:700; color:#ef4444">-</td></tr>
+                </table>
+            </div>
+        </section>
+
+        <section id="view-mes" class="hidden">
+            <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+                <h2 style="font-weight: 800; letter-spacing: -1px;">Consolidado do Período (Rotas Diárias)</h2>
+                <button class="btn-ghost" style="color:var(--danger); border-color:rgba(239, 68, 68, 0.2);" onclick="resetMonthly()">Zerar Banco de Dados</button>
+            </div>
+            <div id="monthly-list" class="m-list"></div>
+        </section>
+    </div>
+
+    <script>
+        // =========================================================
+        // CONFIGURAÇÃO DO FIREBASE (NUVEM)
+        // =========================================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyCPfPA96Zytrgx0PrkbL6lvuy1M3W7vxTk",
+            authDomain: "rank-spx-logistc.firebaseapp.com",
+            databaseURL: "https://rank-spx-logistc-default-rtdb.firebaseio.com",
+            projectId: "rank-spx-logistc",
+            storageBucket: "rank-spx-logistc.firebasestorage.app",
+            messagingSenderId: "426816846853",
+            appId: "1:426816846853:web:bc13432f05c2171ec8f06c"
+        };
+        if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
+        const dbFirebase = firebase.database();
+
+        // =========================================================
+        // ESCUTADORES EM TEMPO REAL PARA A MESA E O ADMIN
+        // =========================================================
+        dbFirebase.ref('shopee_daily_live').on('value', (snapshot) => {
+            const data = snapshot.val();
+            if (data) { dailyData = data; renderDaily(); } 
+            else { dailyData = []; renderDaily(); }
+        });
+
+        dbFirebase.ref('shopee_prod_live').on('value', (snapshot) => {
+            const data = snapshot.val();
+            if (data) { globalProdData = data; renderRankProd(); } 
+            else { globalProdData = {}; renderRankProd(); }
+        });
+
+        function saveDailyToCloud() { 
+            if(currentUser && currentUser.r === 'admin') {
+                dbFirebase.ref('shopee_daily_live').set(dailyData).catch(e => console.error("Erro ao sincronizar Diário:", e)); 
+            }
+        }
+        function saveProdToCloud() { 
+            if(currentUser && currentUser.r === 'admin') {
+                dbFirebase.ref('shopee_prod_live').set(globalProdData).catch(e => console.error("Erro ao sincronizar Produtividade:", e)); 
+            }
+        }
+
+        // =========================================================
+        
+        const USERS = [ { u:'admin', p:'spxadminl', r:'admin' }, { u:'mesa', p:'1234', r:'user' } ];
+        let currentUser = null;
+        let dailyData = [];
+        let ctrlData = initCtrl();
+        let globalProdData = {}; 
+
+        function initCtrl() { return { date: '', totalVol: 0, totalRotas: 0, minTime: null, maxTime: null, finRot: 0, finVol: 0, missRot: 0, missVol: 0, missingRot: 0, missingVol: 0, hourly: {}, sumDurHI: 0, countDurHI: 0 }; }
+
+        function login() {
+            const u = document.getElementById('user').value;
+            const p = document.getElementById('pass').value;
+            const found = USERS.find(x => x.u === u && x.p === p);
+            if(found) {
+                currentUser = found;
+                document.getElementById('login-screen').style.display = 'none';
+                document.getElementById('app-shell').style.display = 'block';
+                document.getElementById('display-user').innerText = u.toUpperCase();
+                if(found.r === 'admin') document.querySelectorAll('.admin-only').forEach(e => e.style.setProperty('display', 'inline-flex', 'important'));
+                initProdGrid(); 
+            } else { document.getElementById('login-err').style.display = 'block'; }
+        }
+        document.getElementById('pass').addEventListener('keypress', e=>{if(e.key==='Enter')login()});
+
+        function switchTab(id) {
+            document.querySelectorAll('section').forEach(s => s.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('view-'+id).classList.remove('hidden');
+            document.getElementById('btn-'+id).classList.add('active');
+            
+            if(id==='ctrl') renderControl();
+            if(id==='rankprod') renderRankProd(); 
+            if(id==='mes') renderMonthly(); 
+        }
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.innerText = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 3000);
+        }
+
+        function maskDate(e) {
+            let v = e.target.value.replace(/\D/g, ''); 
+            if (v.length > 8) v = v.substring(0, 8); 
+            if (v.length >= 5) e.target.value = v.substring(0, 2) + '/' + v.substring(2, 4) + '/' + v.substring(4, 8);
+            else if (v.length >= 3) e.target.value = v.substring(0, 2) + '/' + v.substring(2);
+            else e.target.value = v;
+        }
+
+        function fmtTime(s) { const m = Math.floor(s/60); const sec = Math.round(s%60); return `${m}m ${sec}s`; }
+        function secToHHMMSS(s) { if(!s) return "00:00:00"; const h = Math.floor(s/3600).toString().padStart(2,'0'); const m = Math.floor((s%3600)/60).toString().padStart(2,'0'); const sec = Math.floor(s%60).toString().padStart(2,'0'); return `${h}:${m}:${sec}`; }
+        function excelDate(serial) { if(!serial) return "-"; const date = new Date((serial - 25569) * 86400 * 1000); return date.toLocaleDateString('pt-BR'); }
+        function fmtExcelTime(dec) { if(!dec) return "-"; let s = Math.round(dec * 86400); return secToHHMMSS(s).substring(0,5); }
+
+        function readExcelFile(file, parseDates = false) {
+            return new Promise(resolve => {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    const workbook = XLSX.read(new Uint8Array(e.target.result), { type: 'array', cellDates: parseDates });
+                    const data = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], {header:1});
+                    resolve(data);
+                };
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        // --- IMPORTAÇÃO DIÁRIA DE ROTAS ---
+        async function handleSingleFile(input) {
+            if(input.files.length === 0) return;
+            dailyData = []; ctrlData = initCtrl();
+            const data = await readExcelFile(input.files[0], false);
+            processData([data], true); 
+            document.getElementById('st-single').innerText = "Carregado com sucesso!"; 
+            showToast("Importação Concluída");
+        }
+
+        async function handleMassFiles(input) {
+            if(input.files.length === 0) return;
+            dailyData = []; 
+            const files = Array.from(input.files);
+            const promises = files.map(f => readExcelFile(f, false));
+            const results = await Promise.all(promises);
+            processData(results, false); 
+            document.getElementById('st-mass').innerText = `${files.length} Arquivos`; 
+            showToast("Importação em Massa Concluída");
+        }
+
+        function processData(allFilesData, isSingleImport) {
+            const map = {};
+            
+            allFilesData.forEach(rows => {
+                for(let i=1; i<rows.length; i++) {
+                    const r = rows[i];
+                    let rawName = String(r[9] || ""); if(!rawName.trim()) continue;
+                    let nome = rawName.replace(/OPS?\s*\d*\s*-?\s*/gi, '').replace(/^\d+\s*-?\s*/, '').replace(/[\[\]]/g, '').trim().toUpperCase();
+                    nome = nome.replace(/[.\#$\[\]\/]/g, '');
+
+                    let volRank = parseFloat(String(r[3]).replace(/[^\d,-]/g,'').replace(',','.')) || 0; 
+                    let volCtrl = parseFloat(String(r[2]).replace(/[^\d,-]/g,'').replace(',','.')) || 0;
+                    let volValid = parseFloat(String(r[4]).replace(/[^\d,-]/g,'').replace(',','.')) || 0;
+                    let valF = parseFloat(String(r[5]).replace(/[^\d,-]/g,'').replace(',','.')) || 0;
+                    let valG = parseFloat(String(r[6]).replace(/[^\d,-]/g,'').replace(',','.')) || 0;
+                    let rec = parseFloat(String(r[11]).replace(',','.')) || 0;
+                    
+                    let tStart = r[7]; let tEnd = r[8];
+                    let time = 0; if(typeof tStart==='number' && typeof tEnd==='number') { let diff = tEnd - tStart; if(diff < 0) diff += 1; time = Math.round(diff * 86400); }
+                    
+                    if(!map[nome]) map[nome] = { nome, rotas:0, vol:0, reconf:0, time:0, doblecheck: 0 };
+                    map[nome].rotas += 1; map[nome].vol += volRank; map[nome].time += time; map[nome].reconf += rec;
+                    
+                    if (isSingleImport) {
+                        let status = String(r[12] || "").trim().toUpperCase(); 
+                        if(!ctrlData.date && tStart) ctrlData.date = excelDate(tStart);
+                        ctrlData.totalVol += volCtrl; ctrlData.totalRotas++;
+                        
+                        if(tStart) { if(ctrlData.minTime===null || tStart<ctrlData.minTime) ctrlData.minTime = tStart; }
+                        if(tEnd) { if(ctrlData.maxTime===null || tEnd>ctrlData.maxTime) ctrlData.maxTime = tEnd; }
+                        if(time > 0) { ctrlData.sumDurHI += time; ctrlData.countDurHI++; }
+                        
+                        if(status === 'VALIDATED') { 
+                            ctrlData.finRot++; ctrlData.finVol += volValid; 
+                            if(valF > 0) { ctrlData.missRot++; ctrlData.missVol += valF; } 
+                            if(valG > 0) { ctrlData.missingRot++; ctrlData.missingVol += valG; } 
+                        }
+
+                        if(typeof tStart === 'number') {
+                            let sDay = Math.round(tStart * 86400) % 86400;
+                            let h = Math.floor(sDay / 3600);
+                            let hStr = `${String(h).padStart(2,'0')}:00 - ${String(h+1).padStart(2,'0')}:00`;
+                            if(!ctrlData.hourly[hStr]) ctrlData.hourly[hStr] = {r:0, v:0};
+                            ctrlData.hourly[hStr].r++;
+                            ctrlData.hourly[hStr].v += volCtrl;
+                        }
+                    }
+                }
+            });
+            
+            dailyData = Object.values(map); 
+            saveDailyToCloud(); 
+            renderDaily(); 
+            if(currentUser && currentUser.r === 'admin') renderControl();
+        }
+
+        function clearData() { 
+            dailyData=[]; ctrlData=initCtrl(); 
+            saveDailyToCloud(); 
+            document.getElementById('st-single').innerText="Selecionar CSV (Diário)"; 
+            document.getElementById('st-mass').innerText="Múltiplos arquivos .CSV"; 
+            renderDaily(); renderControl(); showToast("Tela Limpa"); 
+        }
+
+        // --- POPUP DOBLECHECK ---
+        let currentDcName = "";
+        window.openDoblecheck = function(nome) {
+            currentDcName = nome;
+            document.getElementById('dc-modal-driver-name').innerText = "Motorista: " + nome;
+            document.getElementById('dc-modal-overlay').classList.remove('hidden');
+        };
+        window.closeDcModal = function() {
+            document.getElementById('dc-modal-overlay').classList.add('hidden');
+        };
+        window.applyDc = function(val) {
+            let d = dailyData.find(x => x.nome === currentDcName);
+            if(d) {
+                d.doblecheck = val;
+                saveDailyToCloud(); 
+                renderDaily(); 
+            }
+            closeDcModal();
+        };
+
+        function renderDaily() {
+            const grid = document.getElementById('grid-diario'); grid.innerHTML = '';
+            
+            let sorted = dailyData.map(d => { 
+                const avg = d.rotas>0 ? d.time/d.rotas : 0; 
+                let dc = d.doblecheck || 0;
+                let totalErros = d.reconf + dc;
+                let acur = d.vol > 0 ? ((d.vol - totalErros) / d.vol) * 100 : 100;
+                if(acur < 0) acur = 0;
+                return {...d, avg, acur, totalErros}; 
+            }).sort((a,b) => (b.rotas-a.rotas) || (b.vol-a.vol));
+
+            sorted.forEach((d, i) => {
+                const pos = i+1; let css = ''; let icon = ''; if(pos===1) { css='rank-1'; icon='🥇'; } else if(pos===2) { css='rank-2'; icon='🥈'; } else if(pos===3) { css='rank-3'; icon='🥉'; }
+                const div = document.createElement('div'); div.className = `stat-card ${css}`;
+                
+                let dcBtn = currentUser && currentUser.r === 'admin' 
+                    ? `<button class="btn-ghost" style="padding: 6px; font-size: 0.65rem; width: 100%; border-color: var(--primary); color: var(--primary);" onclick="openDoblecheck('${d.nome}')"><i class="fas fa-edit"></i> DOBLECHECK ${d.doblecheck > 0 ? '('+d.doblecheck+')' : ''}</button>` 
+                    : ``;
+
+                div.innerHTML = `
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                        <div class="sc-name">${icon} ${d.nome}</div><div class="sc-rank r-txt">#${pos}</div>
+                    </div>
+                    <div class="sc-hero">
+                        <div class="sc-val">${d.rotas}</div><div class="sc-lbl">ROTAS CONCLUÍDAS</div>
+                    </div>
+                    <div class="sc-grid">
+                        <div class="si"><div class="si-l">Volume</div><div class="si-v">${d.vol}</div></div>
+                        <div class="si"><div class="si-l">Acuracidade</div><div class="si-v" style="color:${d.acur>=99?'var(--success)':'var(--danger)'}">${d.acur.toFixed(2)}%</div></div>
+                        <div class="si"><div class="si-l">Erros Totais</div><div class="si-v" style="color:${d.totalErros>0?'var(--danger)':'#eee'}">${d.totalErros}</div></div>
+                        <div class="si" style="display:flex; align-items:flex-end;">${dcBtn}</div>
+                    </div>
+                    <div style="text-align:center; padding-top:15px; margin-top:15px; border-top: 1px solid rgba(255,255,255,0.05);">
+                        <div class="si-l">Tempo Médio: <span style="color:#fff; font-size: 0.85rem;">${fmtTime(d.avg)}</span></div>
+                    </div>
+                `;
+                grid.appendChild(div);
+            });
+        }
+        
+        function renderControl() {
+            const d = ctrlData; const el = (id)=>document.getElementById(id);
+            el('c-data').innerText = d.date || "-"; el('c-vol').innerText = d.totalVol; el('c-rotas').innerText = d.totalRotas;
+            el('c-ini').innerText = fmtExcelTime(d.minTime); el('c-fim').innerText = fmtExcelTime(d.maxTime);
+            let durSec = 0; if(d.minTime && d.maxTime) durSec = Math.round((d.maxTime - d.minTime)*86400); el('c-dur').innerText = secToHHMMSS(durSec);
+            let avgHI = d.countDurHI>0 ? d.sumDurHI/d.countDurHI : 0; el('c-avg-time').innerText = secToHHMMSS(avgHI);
+            
+            let total = d.totalVol;
+            let finPerc = total>0 ? (d.finVol/total)*100 : 0; let pendPerc = total>0 ? (100 - finPerc) : 0;
+            el('c-fin-rot').innerText = d.finRot; el('c-fin-vol').innerText = d.finVol; el('c-fin-perc').innerText = finPerc.toFixed(2).replace('.',',') + "%";
+            
+            let pendRot = d.totalRotas - d.finRot; let pendVol = d.totalVol - d.finVol;
+            el('c-pen-rot').innerText = pendRot; el('c-pen-vol').innerText = pendVol; el('c-pen-perc').innerText = pendPerc.toFixed(2).replace('.',',') + "%";
+            
+            el('c-mis-rot').innerText = d.missRot; el('c-mis-vol').innerText = d.missVol; let misPerc = total>0 ? (d.missRot/total)*100 : 0; el('c-mis-perc').innerText = misPerc.toFixed(2).replace('.',',') + "%";
+            el('c-missing-rot').innerText = d.missingRot; el('c-missing-vol').innerText = d.missingVol; let missingPerc = total>0 ? (d.missingRot/total)*100 : 0; el('c-missing-perc').innerText = missingPerc.toFixed(2).replace('.',',') + "%";
+            
+            const tbody = document.getElementById('c-hourly-body'); tbody.innerHTML = '';
+            Object.keys(d.hourly).sort().forEach(h => { tbody.innerHTML += `<tr><td>${h}</td><td style="text-align:center">${d.hourly[h].r}</td><td style="text-align:center">${d.hourly[h].v}</td></tr>`; });
+        }
+
+        // =========================================================
+        // FUNCIONALIDADE DO CONSOLIDADO MENSAL
+        // =========================================================
+        async function saveToMonthly() {
+            if(dailyData.length===0) return showToast("Sem dados para arquivar.");
+            showToast("Salvando na Nuvem...");
+            try {
+                const snapshot = await dbFirebase.ref('shopee_gold_db').once('value');
+                let db = snapshot.val() || {};
+                dailyData.forEach(d => {
+                    const k = d.nome; if(!db[k]) db[k] = {nome:k, rotas:0, vol:0, reconf:0, time:0};
+                    db[k].rotas += d.rotas; db[k].vol += d.vol; db[k].reconf += (d.reconf + (d.doblecheck || 0)); db[k].time += d.time;
+                });
+                await dbFirebase.ref('shopee_gold_db').set(db);
+                showToast("Arquivado na Nuvem!"); renderMonthly();
+            } catch(e) { console.error(e); showToast("Erro ao conectar com Firebase."); }
+        }
+        
+        async function renderMonthly() {
+            const container = document.getElementById('monthly-list'); 
+            if(!container) return;
+            container.innerHTML = '<div style="text-align:center;color:#666;padding:40px">Buscando dados na nuvem...</div>';
+            try {
+                const snapshot = await dbFirebase.ref('shopee_gold_db').once('value');
+                const db = snapshot.val() || {};
+                let list = Object.values(db).map(d => { 
+                    let acur = d.vol > 0 ? ((d.vol - d.reconf) / d.vol) * 100 : 100;
+                    if(acur < 0) acur = 0; let avg = d.rotas > 0 ? d.time / d.rotas : 0; return {...d, acur, avg}; 
+                }).sort((a,b) => (b.rotas-a.rotas) || (b.vol-a.vol));
+                
+                container.innerHTML = '';
+                if(list.length===0) { container.innerHTML = '<div style="text-align:center;color:#666;padding:40px">Histórico Vazio</div>'; return; }
+                
+                list.forEach((d, i) => {
+                    const pos = i+1; let css = ''; let icon = ''; if(pos===1) { css='mr-1'; icon='🥇'; } else if(pos===2) { css='mr-2'; icon='🥈'; } else if(pos===3) { css='mr-3'; icon='🥉'; }
+                    const div = document.createElement('div'); div.className = `stat-card m-row ${css}`;
+                    div.style.padding = "15px 30px";
+                    div.innerHTML = `<div class="m-idx">#${pos}</div><div style="font-weight:700;display:flex;gap:10px;align-items:center; color:#fff;">${icon} ${d.nome}</div><div class="m-stat"><div class="ms-l">Rotas</div><div class="ms-v">${d.rotas}</div></div><div class="m-stat"><div class="ms-l">Vol Total</div><div class="ms-v">${d.vol}</div></div><div class="m-stat"><div class="ms-l">Erros Totais</div><div class="ms-v" style="color:${d.reconf>0?'var(--danger)':'inherit'}">${d.reconf}</div></div><div class="m-stat"><div class="ms-l">Acuracidade Global</div><div class="ms-v" style="color:${d.acur>=99?'var(--success)':'var(--danger)'}">${d.acur.toFixed(2)}%</div></div><div class="m-stat"><div class="ms-l">T. Médio Global</div><div class="ms-v">${fmtTime(d.avg)}</div></div>`;
+                    container.appendChild(div);
+                });
+            } catch (e) { console.error(e); container.innerHTML = '<div style="text-align:center;color:var(--danger);padding:40px">Erro de conexão.</div>'; }
+        }
+        
+        async function resetMonthly() { 
+            if(confirm("Deseja apagar permanentemente o histórico MENSAL DA NUVEM?")) { 
+                await dbFirebase.ref('shopee_gold_db').remove(); renderMonthly(); showToast("Banco Apagado!"); 
+            } 
+        }
+
+        // =========================================================
+        // LÓGICA DE PRODUTIVIDADE E RANKING DE PRODUTIVIDADE
+        // =========================================================
+
+        function initProdGrid() {
+            const tbody = document.getElementById('prod-body-grid'); let html = '';
+            for (let i = 0; i < 24; i++) {
+                let hour = i.toString().padStart(2, '0') + ':00';
+                html += `<tr>`;
+                html += `<td style="border-left: 2px solid #000; font-weight: bold; background:#f0f8ff;" class="editable-cell" contenteditable="true" id="p-hour-${i}" onblur="refreshProdGridData()">${hour}</td>`;
+                for (let j = 1; j <= 9; j++) { html += `<td id="p-cell-${i}-${j}" class="editable-cell" contenteditable="true" onblur="calculateProdTotals()"></td>`; }
+                
+                // Célula do TOTAL DA HORA (Linha)
+                html += `<td id="p-row-total-${i}" style="font-weight: bold; background: #e2e8f0; color: #0f172a;"></td>`;
+                
+                if (i === 0) { html += `<td rowspan="24" class="spx-percent-giant"><span class="spx-percent-text" id="p-giant-percent">0%</span></td>`; }
+                html += `</tr>`;
+            }
+            html += `<tr class="spx-navy">`;
+            html += `<td style="border-left: 2px solid #000; padding: 4px;">Total</td>`;
+            for (let j = 1; j <= 9; j++) html += `<td style="color:#fff;" id="p-col-total-${j}">0</td>`;
+            
+            // Célula do TOTAL GERAL DAS HORAS
+            html += `<td style="color:#fff; font-weight: 900;" id="p-grand-total">0</td>`;
+            html += `<td style="background:#fff; border:2px solid #000; border-top:none;"></td>`; 
+            html += `</tr>`;
+            tbody.innerHTML = html;
+        }
+
+        async function importProdData(input) {
+            if(input.files.length === 0) return;
+            try {
+                const data = await readExcelFile(input.files[0], true);
+                if (!data || data.length === 0) { showToast("Arquivo vazio ou inválido."); return; }
+                
+                globalProdData = {}; 
+                let headers = data[0] || []; 
+                let colHoursMap = {};
+
+                for (let c = 3; c < headers.length; c++) {
+                    let timeVal = headers[c]; if (timeVal === undefined || timeVal === null || timeVal === '') continue;
+                    let hourStr = null;
+                    if (timeVal instanceof Date) { hourStr = timeVal.getHours().toString().padStart(2, '0') + ":00"; } 
+                    else if (typeof timeVal === 'number') { let totalSeconds = Math.round((timeVal - Math.floor(timeVal)) * 86400); let h = Math.floor(totalSeconds / 3600); hourStr = h.toString().padStart(2, '0') + ":00"; } 
+                    else { let match = String(timeVal).match(/(?:^|\s)(\d{1,2}):/); if(match) hourStr = match[1].padStart(2, '0') + ":00"; }
+                    if (hourStr) { colHoursMap[c] = hourStr; }
+                }
+
+                for(let i = 1; i < data.length; i++) {
+                    let row = data[i]; if(!row || !row[0]) continue;
+                    let rawName = String(row[0]); 
+                    let cleanName = rawName.replace(/\[ops\d+\]/gi, '').trim().split(' ')[0].toUpperCase();
+                    cleanName = cleanName.replace(/[.\#$\[\]\/]/g, '');
+
+                    if (!cleanName) continue;
+                    if(!globalProdData[cleanName]) globalProdData[cleanName] = {};
+                    
+                    for (let c in colHoursMap) {
+                        let mappedHour = colHoursMap[c]; 
+                        let valStr = String(row[c]).replace(/[^\d.,]/g, '').replace(',', '.');
+                        let val = parseFloat(valStr) || 0; 
+                        globalProdData[cleanName][mappedHour] = (globalProdData[cleanName][mappedHour] || 0) + val;
+                    }
+                }
+                updateDropdowns(); 
+                saveProdToCloud(); 
+                showToast("Produtividade Processada!");
+            } catch(e) { console.error("Erro na importação:", e); showToast("Erro ao processar arquivo Excel."); }
+        }
+
+        function updateDropdowns() {
+            let names = Object.keys(globalProdData).sort();
+            for(let j = 1; j <= 9; j++) {
+                let select = document.getElementById(`station-select-${j}`); 
+                if(select) {
+                    let currentVal = select.value;
+                    select.innerHTML = `<option value="">Estação ${j}</option>`;
+                    names.forEach(n => { select.innerHTML += `<option value="${n}">${n}</option>`; });
+                    if(names.includes(currentVal)) select.value = currentVal;
+                }
+            }
+            refreshProdGridData();
+        }
+
+        function refreshProdGridData() {
+            for(let i = 0; i < 24; i++) {
+                let hourCell = document.getElementById(`p-hour-${i}`); 
+                let rawHour = hourCell ? hourCell.innerText.trim() : '';
+                let hourRef = null; let match = rawHour.match(/^(\d{1,2})(:\d{2})?/); if(match) { hourRef = match[1].padStart(2, '0') + ":00"; }
+                
+                for(let j = 1; j <= 9; j++) {
+                    let select = document.getElementById(`station-select-${j}`); 
+                    let name = select ? select.value : ''; 
+                    let val = 0;
+                    if(hourRef && name && globalProdData[name] && globalProdData[name][hourRef]) { val = globalProdData[name][hourRef]; }
+                    let cell = document.getElementById(`p-cell-${i}-${j}`);
+                    if(cell) cell.innerText = val || '';
+                }
+            }
+            calculateProdTotals();
+        }
+
+        function calculateProdTotals() {
+            let colTotals = [0,0,0,0,0,0,0,0,0]; let grandTotal = 0;
+            for(let i = 0; i < 24; i++) {
+                let rowTotal = 0;
+                let hourCell = document.getElementById(`p-hour-${i}`); 
+                let rawHour = hourCell ? hourCell.innerText.trim() : '';
+                let hourRef = null; let match = rawHour.match(/^(\d{1,2})(:\d{2})?/); if(match) hourRef = match[1].padStart(2, '0') + ":00";
+
+                for(let j = 1; j <= 9; j++) {
+                    let cell = document.getElementById(`p-cell-${i}-${j}`);
+                    if(!cell) continue;
+                    
+                    let strVal = cell.innerText.replace(/[^\d.,]/g, '').replace(',', '.');
+                    let val = parseFloat(strVal) || 0;
+                    rowTotal += val; colTotals[j-1] += val;
+
+                    let select = document.getElementById(`station-select-${j}`);
+                    if(select) {
+                        let name = select.value;
+                        if(name && hourRef) {
+                            if(!globalProdData[name]) globalProdData[name] = {};
+                            globalProdData[name][hourRef] = val; 
+                        }
+                    }
+                }
+                grandTotal += rowTotal;
+                
+                // Preenche o total da linha
+                let rowTotalCell = document.getElementById(`p-row-total-${i}`);
+                if(rowTotalCell) {
+                    rowTotalCell.innerText = rowTotal > 0 ? rowTotal.toLocaleString('pt-BR') : '';
+                }
+            }
+            for(let j = 1; j <= 9; j++) { 
+                let colEl = document.getElementById(`p-col-total-${j}`);
+                if(colEl) colEl.innerText = colTotals[j-1] || '0'; 
+            }
+            
+            // Preenche o total geral da coluna Total H.
+            let grandTotalCell = document.getElementById('p-grand-total');
+            if(grandTotalCell) grandTotalCell.innerText = grandTotal.toLocaleString('pt-BR');
+
+            let volRotEl = document.getElementById('p-vol-rot');
+            let volRot = volRotEl ? (parseInt(volRotEl.innerText.replace(/\D/g, '')) || 0) : 0;
+            
+            let pRealizada = document.getElementById('p-realizada');
+            if(pRealizada) pRealizada.innerText = grandTotal.toLocaleString('pt-BR');
+            
+            let pendente = volRot - grandTotal; if(pendente < 0) pendente = 0;
+            let pPendente = document.getElementById('p-pendente');
+            if(pPendente) pPendente.innerText = pendente.toLocaleString('pt-BR');
+
+            let percentEtiquetado = volRot > 0 ? ((grandTotal / volRot) * 100).toFixed(0) : 0;
+            let percentPendente = volRot > 0 ? ((pendente / volRot) * 100).toFixed(0) : 0;
+
+            let percEtiqEl = document.getElementById('p-perc-etiquetado');
+            if(percEtiqEl) percEtiqEl.innerText = percentEtiquetado + '%';
+            
+            let percPendEl = document.getElementById('p-perc-pendente');
+            if(percPendEl) percPendEl.innerText = percentPendente + '%';
+            
+            let giantPerc = document.getElementById('p-giant-percent');
+            if(giantPerc) giantPerc.innerText = percentEtiquetado + '%';
+            
+            saveProdToCloud(); 
+            renderRankProd(); 
+        }
+
+        // --- RANKING DE PRODUTIVIDADE (DESIGN COMPACTO / SLIM) ---
+        function renderRankProd() {
+            const container = document.getElementById('rankprod-list');
+            if(!container) return;
+            container.innerHTML = '';
+            
+            let list = [];
+            for(let name in globalProdData) {
+                let total = 0;
+                for(let hour in globalProdData[name]) {
+                    total += globalProdData[name][hour];
+                }
+                if(total > 0) { list.push({ nome: name, total: total }); }
+            }
+            
+            list.sort((a,b) => b.total - a.total);
+
+            if(list.length === 0) {
+                container.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:40px; font-weight: 700; font-size: 1rem;">Aguardando importação dos dados de Produtividade...</div>';
+                return;
+            }
+
+            list.forEach((d, i) => {
+                const pos = i+1; let css = ''; let icon = ''; 
+                if(pos===1) { css='rank-1'; icon='<i class="fas fa-trophy" style="color:var(--gold);"></i>'; } 
+                else if(pos===2) { css='rank-2'; icon='<i class="fas fa-medal" style="color:var(--silver);"></i>'; } 
+                else if(pos===3) { css='rank-3'; icon='<i class="fas fa-medal" style="color:var(--bronze);"></i>'; }
+                else { icon = '<i class="fas fa-check-circle" style="color:rgba(255,255,255,0.1);"></i>'; }
+                
+                const div = document.createElement('div'); 
+                div.className = `stat-card ${css}`;
+                div.style.display = "flex";
+                div.style.justifyContent = "space-between";
+                div.style.alignItems = "center";
+                div.style.padding = "12px 25px"; 
+                div.style.marginBottom = "10px"; 
+                div.style.borderRadius = "18px";
+                
+                div.innerHTML = `
+                    <div style="display:flex; align-items:center; gap: 15px;">
+                        <div style="font-size: 1.2rem; width: 30px; color: var(--text-muted); font-weight: 800;">#${pos}</div>
+                        <div style="font-weight:700; display:flex; gap:10px; align-items:center; color:#f8fafc; font-size:1.1rem;">
+                            <span style="font-size:1.2rem; display:flex; align-items:center; justify-content:center;">${icon}</span> ${d.nome}
+                        </div>
+                    </div>
+                    <div style="text-align: right; background: rgba(0,0,0,0.2); padding: 8px 20px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.03); display:flex; align-items: center; gap: 15px;">
+                        <div style="font-size: 0.65rem; letter-spacing: 1px; color: var(--text-muted); font-weight: 800; text-transform: uppercase;">Vol. Etiquetado</div>
+                        <div style="font-size: 1.6rem; background: linear-gradient(to bottom, #fff, #94a3b8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 900; line-height: 1;">${d.total.toLocaleString('pt-BR')}</div>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+    </script>
+</body>
+</html>
