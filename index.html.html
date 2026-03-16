@@ -187,7 +187,7 @@
             <div class="nav-logo"><i class="fas fa-rocket" style="color:var(--primary)"></i> ANALYTICS GOLD</div>
             <div style="background:rgba(255,255,255,0.05); padding:8px 20px; border-radius:14px; border: 1px solid var(--glass-border); font-size:0.85rem;">
                 <span id="display-user" style="font-weight:700; color:var(--primary)">USER</span> 
-                <i class="fas fa-sign-out-alt" style="cursor:pointer; margin-left:15px; color:var(--text-muted);" onclick="location.reload()"></i>
+                <i class="fas fa-sign-out-alt" style="cursor:pointer; margin-left:15px; color:var(--text-muted);" onclick="logout()"></i>
             </div>
         </nav>
 
@@ -356,7 +356,6 @@
             else { dailyData = []; renderDaily(); }
         });
 
-        // Este escutador atualiza o Rank de Produtividade instantaneamente para todos (Mesa e Admin)
         dbFirebase.ref('shopee_prod_live').on('value', (snapshot) => {
             const data = snapshot.val();
             if (data) { globalProdData = data; renderRankProd(); } 
@@ -384,12 +383,27 @@
 
         function initCtrl() { return { date: '', totalVol: 0, totalRotas: 0, minTime: null, maxTime: null, finRot: 0, finVol: 0, missRot: 0, missVol: 0, missingRot: 0, missingVol: 0, hourly: {}, sumDurHI: 0, countDurHI: 0 }; }
 
+        // --- SISTEMA DE LOGIN COM MEMÓRIA (LOCALSTORAGE) ---
+        function checkSession() {
+            const saved = localStorage.getItem('spxUser');
+            if(saved) {
+                const found = JSON.parse(saved);
+                currentUser = found;
+                document.getElementById('login-screen').style.display = 'none';
+                document.getElementById('app-shell').style.display = 'block';
+                document.getElementById('display-user').innerText = found.u.toUpperCase();
+                if(found.r === 'admin') document.querySelectorAll('.admin-only').forEach(e => e.style.setProperty('display', 'inline-flex', 'important'));
+                initProdGrid(); 
+            }
+        }
+
         function login() {
             const u = document.getElementById('user').value;
             const p = document.getElementById('pass').value;
             const found = USERS.find(x => x.u === u && x.p === p);
             if(found) {
                 currentUser = found;
+                localStorage.setItem('spxUser', JSON.stringify(found)); // SALVA NO NAVEGADOR
                 document.getElementById('login-screen').style.display = 'none';
                 document.getElementById('app-shell').style.display = 'block';
                 document.getElementById('display-user').innerText = u.toUpperCase();
@@ -397,7 +411,15 @@
                 initProdGrid(); 
             } else { document.getElementById('login-err').style.display = 'block'; }
         }
+
+        function logout() {
+            localStorage.removeItem('spxUser'); // APAGA A CREDENCIAL
+            location.reload(); // RECARREGA PARA A TELA DE LOGIN
+        }
+
+        window.onload = checkSession; // RODA A VERIFICAÇÃO ASSIM QUE ABRIR O LINK
         document.getElementById('pass').addEventListener('keypress', e=>{if(e.key==='Enter')login()});
+        // ---------------------------------------------------
 
         function switchTab(id) {
             document.querySelectorAll('section').forEach(s => s.classList.add('hidden'));
@@ -552,11 +574,8 @@
                 const avg = d.rotas>0 ? d.time/d.rotas : 0; 
                 let dc = d.doblecheck || 0;
                 
-                // ----------------------------------------------------
-                // LÓGICA PUNITIVA: PESO 5 NO DOBLECHECK (CÁLCULO ACURACIDADE)
-                // ----------------------------------------------------
-                let totalErrosTela = d.reconf + dc; // Visual na tela (Ex: 1 erro)
-                let errosAcuracidade = d.reconf + (dc * 5); // Tira 5 pontos de volume no cálculo
+                let totalErrosTela = d.reconf + dc; 
+                let errosAcuracidade = d.reconf + (dc * 5); 
                 
                 let acur = d.vol > 0 ? ((d.vol - errosAcuracidade) / d.vol) * 100 : 100;
                 if(acur < 0) acur = 0;
@@ -614,7 +633,6 @@
             Object.keys(d.hourly).sort().forEach(h => { tbody.innerHTML += `<tr><td>${h}</td><td style="text-align:center">${d.hourly[h].r}</td><td style="text-align:center">${d.hourly[h].v}</td></tr>`; });
         }
 
-        // --- CONSOLIDADO MENSAL COM PUNIÇÃO (PESO 5) ---
         async function saveToMonthly() {
             if(dailyData.length===0) return showToast("Sem dados para arquivar.");
             showToast("Salvando na Nuvem...");
@@ -626,7 +644,7 @@
                     db[k].rotas += d.rotas; 
                     db[k].vol += d.vol; 
                     db[k].reconf += d.reconf; 
-                    db[k].doblecheck = (db[k].doblecheck || 0) + (d.doblecheck || 0); // Salva o erro do DC separado para a punição mensal
+                    db[k].doblecheck = (db[k].doblecheck || 0) + (d.doblecheck || 0); 
                     db[k].time += d.time;
                 });
                 await dbFirebase.ref('shopee_gold_db').set(db);
@@ -642,10 +660,9 @@
                 const snapshot = await dbFirebase.ref('shopee_gold_db').once('value');
                 const db = snapshot.val() || {};
                 let list = Object.values(db).map(d => { 
-                    
                     let dc = d.doblecheck || 0;
-                    let totalErrosTela = d.reconf + dc; // O que aparece na tabela do mensal
-                    let errosAcuracidade = d.reconf + (dc * 5); // O PESO PUNITIVO 5 NO MENSAL
+                    let totalErrosTela = d.reconf + dc; 
+                    let errosAcuracidade = d.reconf + (dc * 5); 
 
                     let acur = d.vol > 0 ? ((d.vol - errosAcuracidade) / d.vol) * 100 : 100;
                     if(acur < 0) acur = 0; 
@@ -684,18 +701,13 @@
                 html += `<tr>`;
                 html += `<td style="border-left: 2px solid #000; font-weight: bold; background:#f0f8ff;" class="editable-cell" contenteditable="true" id="p-hour-${i}" onblur="refreshProdGridData()">${hour}</td>`;
                 for (let j = 1; j <= 9; j++) { html += `<td id="p-cell-${i}-${j}" class="editable-cell" contenteditable="true" onblur="calculateProdTotals()"></td>`; }
-                
-                // Célula do TOTAL DA HORA (Linha)
                 html += `<td id="p-row-total-${i}" style="font-weight: bold; background: #e2e8f0; color: #0f172a;"></td>`;
-                
                 if (i === 0) { html += `<td rowspan="24" class="spx-percent-giant"><span class="spx-percent-text" id="p-giant-percent">0%</span></td>`; }
                 html += `</tr>`;
             }
             html += `<tr class="spx-navy">`;
             html += `<td style="border-left: 2px solid #000; padding: 4px;">Total</td>`;
             for (let j = 1; j <= 9; j++) html += `<td style="color:#fff;" id="p-col-total-${j}">0</td>`;
-            
-            // Célula do TOTAL GERAL DAS HORAS
             html += `<td style="color:#fff; font-weight: 900;" id="p-grand-total">0</td>`;
             html += `<td style="background:#fff; border:2px solid #000; border-top:none;"></td>`; 
             html += `</tr>`;
