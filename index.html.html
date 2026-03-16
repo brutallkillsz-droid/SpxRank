@@ -356,6 +356,7 @@
             else { dailyData = []; renderDaily(); }
         });
 
+        // Este escutador atualiza o Rank de Produtividade instantaneamente para todos (Mesa e Admin)
         dbFirebase.ref('shopee_prod_live').on('value', (snapshot) => {
             const data = snapshot.val();
             if (data) { globalProdData = data; renderRankProd(); } 
@@ -550,10 +551,17 @@
             let sorted = dailyData.map(d => { 
                 const avg = d.rotas>0 ? d.time/d.rotas : 0; 
                 let dc = d.doblecheck || 0;
-                let totalErros = d.reconf + dc;
-                let acur = d.vol > 0 ? ((d.vol - totalErros) / d.vol) * 100 : 100;
+                
+                // ----------------------------------------------------
+                // LÓGICA PUNITIVA: PESO 5 NO DOBLECHECK (CÁLCULO ACURACIDADE)
+                // ----------------------------------------------------
+                let totalErrosTela = d.reconf + dc; // Visual na tela (Ex: 1 erro)
+                let errosAcuracidade = d.reconf + (dc * 5); // Tira 5 pontos de volume no cálculo
+                
+                let acur = d.vol > 0 ? ((d.vol - errosAcuracidade) / d.vol) * 100 : 100;
                 if(acur < 0) acur = 0;
-                return {...d, avg, acur, totalErros}; 
+                
+                return {...d, avg, acur, totalErrosTela}; 
             }).sort((a,b) => (b.rotas-a.rotas) || (b.vol-a.vol));
 
             sorted.forEach((d, i) => {
@@ -574,7 +582,7 @@
                     <div class="sc-grid">
                         <div class="si"><div class="si-l">Volume</div><div class="si-v">${d.vol}</div></div>
                         <div class="si"><div class="si-l">Acuracidade</div><div class="si-v" style="color:${d.acur>=99?'var(--success)':'var(--danger)'}">${d.acur.toFixed(2)}%</div></div>
-                        <div class="si"><div class="si-l">Erros Totais</div><div class="si-v" style="color:${d.totalErros>0?'var(--danger)':'#eee'}">${d.totalErros}</div></div>
+                        <div class="si"><div class="si-l">Erros Totais</div><div class="si-v" style="color:${d.totalErrosTela>0?'var(--danger)':'#eee'}">${d.totalErrosTela}</div></div>
                         <div class="si" style="display:flex; align-items:flex-end;">${dcBtn}</div>
                     </div>
                     <div style="text-align:center; padding-top:15px; margin-top:15px; border-top: 1px solid rgba(255,255,255,0.05);">
@@ -606,9 +614,7 @@
             Object.keys(d.hourly).sort().forEach(h => { tbody.innerHTML += `<tr><td>${h}</td><td style="text-align:center">${d.hourly[h].r}</td><td style="text-align:center">${d.hourly[h].v}</td></tr>`; });
         }
 
-        // =========================================================
-        // FUNCIONALIDADE DO CONSOLIDADO MENSAL
-        // =========================================================
+        // --- CONSOLIDADO MENSAL COM PUNIÇÃO (PESO 5) ---
         async function saveToMonthly() {
             if(dailyData.length===0) return showToast("Sem dados para arquivar.");
             showToast("Salvando na Nuvem...");
@@ -616,8 +622,12 @@
                 const snapshot = await dbFirebase.ref('shopee_gold_db').once('value');
                 let db = snapshot.val() || {};
                 dailyData.forEach(d => {
-                    const k = d.nome; if(!db[k]) db[k] = {nome:k, rotas:0, vol:0, reconf:0, time:0};
-                    db[k].rotas += d.rotas; db[k].vol += d.vol; db[k].reconf += (d.reconf + (d.doblecheck || 0)); db[k].time += d.time;
+                    const k = d.nome; if(!db[k]) db[k] = {nome:k, rotas:0, vol:0, reconf:0, time:0, doblecheck:0};
+                    db[k].rotas += d.rotas; 
+                    db[k].vol += d.vol; 
+                    db[k].reconf += d.reconf; 
+                    db[k].doblecheck = (db[k].doblecheck || 0) + (d.doblecheck || 0); // Salva o erro do DC separado para a punição mensal
+                    db[k].time += d.time;
                 });
                 await dbFirebase.ref('shopee_gold_db').set(db);
                 showToast("Arquivado na Nuvem!"); renderMonthly();
@@ -632,8 +642,16 @@
                 const snapshot = await dbFirebase.ref('shopee_gold_db').once('value');
                 const db = snapshot.val() || {};
                 let list = Object.values(db).map(d => { 
-                    let acur = d.vol > 0 ? ((d.vol - d.reconf) / d.vol) * 100 : 100;
-                    if(acur < 0) acur = 0; let avg = d.rotas > 0 ? d.time / d.rotas : 0; return {...d, acur, avg}; 
+                    
+                    let dc = d.doblecheck || 0;
+                    let totalErrosTela = d.reconf + dc; // O que aparece na tabela do mensal
+                    let errosAcuracidade = d.reconf + (dc * 5); // O PESO PUNITIVO 5 NO MENSAL
+
+                    let acur = d.vol > 0 ? ((d.vol - errosAcuracidade) / d.vol) * 100 : 100;
+                    if(acur < 0) acur = 0; 
+                    
+                    let avg = d.rotas > 0 ? d.time / d.rotas : 0; 
+                    return {...d, acur, avg, totalErrosTela}; 
                 }).sort((a,b) => (b.rotas-a.rotas) || (b.vol-a.vol));
                 
                 container.innerHTML = '';
@@ -643,7 +661,7 @@
                     const pos = i+1; let css = ''; let icon = ''; if(pos===1) { css='mr-1'; icon='🥇'; } else if(pos===2) { css='mr-2'; icon='🥈'; } else if(pos===3) { css='mr-3'; icon='🥉'; }
                     const div = document.createElement('div'); div.className = `stat-card m-row ${css}`;
                     div.style.padding = "15px 30px";
-                    div.innerHTML = `<div class="m-idx">#${pos}</div><div style="font-weight:700;display:flex;gap:10px;align-items:center; color:#fff;">${icon} ${d.nome}</div><div class="m-stat"><div class="ms-l">Rotas</div><div class="ms-v">${d.rotas}</div></div><div class="m-stat"><div class="ms-l">Vol Total</div><div class="ms-v">${d.vol}</div></div><div class="m-stat"><div class="ms-l">Erros Totais</div><div class="ms-v" style="color:${d.reconf>0?'var(--danger)':'inherit'}">${d.reconf}</div></div><div class="m-stat"><div class="ms-l">Acuracidade Global</div><div class="ms-v" style="color:${d.acur>=99?'var(--success)':'var(--danger)'}">${d.acur.toFixed(2)}%</div></div><div class="m-stat"><div class="ms-l">T. Médio Global</div><div class="ms-v">${fmtTime(d.avg)}</div></div>`;
+                    div.innerHTML = `<div class="m-idx">#${pos}</div><div style="font-weight:700;display:flex;gap:10px;align-items:center; color:#fff;">${icon} ${d.nome}</div><div class="m-stat"><div class="ms-l">Rotas</div><div class="ms-v">${d.rotas}</div></div><div class="m-stat"><div class="ms-l">Vol Total</div><div class="ms-v">${d.vol}</div></div><div class="m-stat"><div class="ms-l">Erros Totais</div><div class="ms-v" style="color:${d.totalErrosTela>0?'var(--danger)':'inherit'}">${d.totalErrosTela}</div></div><div class="m-stat"><div class="ms-l">Acuracidade Global</div><div class="ms-v" style="color:${d.acur>=99?'var(--success)':'var(--danger)'}">${d.acur.toFixed(2)}%</div></div><div class="m-stat"><div class="ms-l">T. Médio Global</div><div class="ms-v">${fmtTime(d.avg)}</div></div>`;
                     container.appendChild(div);
                 });
             } catch (e) { console.error(e); container.innerHTML = '<div style="text-align:center;color:var(--danger);padding:40px">Erro de conexão.</div>'; }
@@ -784,7 +802,6 @@
                 }
                 grandTotal += rowTotal;
                 
-                // Preenche o total da linha
                 let rowTotalCell = document.getElementById(`p-row-total-${i}`);
                 if(rowTotalCell) {
                     rowTotalCell.innerText = rowTotal > 0 ? rowTotal.toLocaleString('pt-BR') : '';
@@ -795,7 +812,6 @@
                 if(colEl) colEl.innerText = colTotals[j-1] || '0'; 
             }
             
-            // Preenche o total geral da coluna Total H.
             let grandTotalCell = document.getElementById('p-grand-total');
             if(grandTotalCell) grandTotalCell.innerText = grandTotal.toLocaleString('pt-BR');
 
