@@ -251,19 +251,20 @@
             </div>
 
             <table class="spx-table" style="border-bottom:none;">
-                <tr><td colspan="12" class="spx-navy" style="font-size:12px;">Etiquetagem e 1º Sorting</td></tr>
+                <!-- Ajuste no Colspan para caber a Estação 10 (13 colunas totais) -->
+                <tr><td colspan="13" class="spx-navy" style="font-size:12px;">Etiquetagem e 1º Sorting</td></tr>
                 <tr>
-                    <td class="spx-gray-light" style="width:8%">Data</td>
-                    <td style="width:8%; padding:0;"><input type="text" class="date-input-field" value="26/02/2026" maxlength="10" oninput="maskDate(event)"></td>
-                    <td rowspan="2" class="spx-gray-light" style="width:8%">Backlog</td>
-                    <td rowspan="2" class="spx-orange editable-cell" style="width:8%" contenteditable="true" id="p-backlog" onblur="calculateProdTotals()">342</td>
-                    <td class="spx-gray-light" style="width:10%">Horário início</td>
-                    <td style="width:8%">03:00</td>
-                    <td class="spx-gray-light" style="width:10%">Qtd realizada</td>
-                    <td class="spx-gray-dark" style="width:8%" id="p-realizada">0</td>
-                    <td class="spx-green" style="width:10%">% Etiquetado</td>
-                    <td style="width:8%" id="p-perc-etiquetado">0%</td>
-                    <td colspan="2" style="width:14%; text-align:left; padding-left:5px;">Obs:</td>
+                    <td class="spx-gray-light" style="width:7%">Data</td>
+                    <td style="width:7%; padding:0;"><input type="text" class="date-input-field" value="26/02/2026" maxlength="10" oninput="maskDate(event)"></td>
+                    <td rowspan="2" class="spx-gray-light" style="width:7%">Backlog</td>
+                    <td rowspan="2" class="spx-orange editable-cell" style="width:7%" contenteditable="true" id="p-backlog" onblur="calculateProdTotals()">342</td>
+                    <td class="spx-gray-light" style="width:9%">Horário início</td>
+                    <td style="width:7%">03:00</td>
+                    <td class="spx-gray-light" style="width:9%">Qtd realizada</td>
+                    <td class="spx-gray-dark" style="width:7%" id="p-realizada">0</td>
+                    <td class="spx-green" style="width:9%">% Etiquetado</td>
+                    <td style="width:7%" id="p-perc-etiquetado">0%</td>
+                    <td colspan="3" style="width:24%; text-align:left; padding-left:5px;">Obs:</td>
                 </tr>
                 <tr>
                     <td class="spx-gray-light">Volume Rot.</td>
@@ -274,7 +275,7 @@
                     <td id="p-pendente">15.053</td>
                     <td class="spx-red">% Pendente</td>
                     <td id="p-perc-pendente">100%</td>
-                    <td colspan="2"></td>
+                    <td colspan="3"></td>
                 </tr>
             </table>
 
@@ -282,17 +283,20 @@
                 <thead>
                     <tr class="spx-navy">
                         <th style="width: 7%;">Produtividade</th>
-                        <th style="width: 7.5%; padding:0;"><select id="station-select-1" class="station-dropdown" onchange="refreshProdGridData()"><option value="">Estação 1</option></select></th>
-                        <th style="width: 7.5%; padding:0;"><select id="station-select-2" class="station-dropdown" onchange="refreshProdGridData()"><option value="">Estação 2</option></select></th>
-                        <th style="width: 7.5%; padding:0;"><select id="station-select-3" class="station-dropdown" onchange="refreshProdGridData()"><option value="">Estação 3</option></select></th>
-                        <th style="width: 7.5%; padding:0;"><select id="station-select-4" class="station-dropdown" onchange="refreshProdGridData()"><option value="">Estação 4</option></select></th>
-                        <th style="width: 7.5%; padding:0;"><select id="station-select-5" class="station-dropdown" onchange="refreshProdGridData()"><option value="">Estação 5</option></select></th>
-                        <th style="width: 7.5%; padding:0;"><select id="station-select-6" class="station-dropdown" onchange="refreshProdGridData()"><option value="">Estação 6</option></select></th>
-                        <th style="width: 7.5%; padding:0;"><select id="station-select-7" class="station-dropdown" onchange="refreshProdGridData()"><option value="">Estação 7</option></select></th>
-                        <th style="width: 7.5%; padding:0;"><select id="station-select-8" class="station-dropdown" onchange="refreshProdGridData()"><option value="">Estação 8</option></select></th>
-                        <th style="width: 7.5%; padding:0;"><select id="station-select-9" class="station-dropdown" onchange="refreshProdGridData()"><option value="">Estação 9</option></select></th>
-                        <th style="width: 7.5%;">Total H.</th>
-                        <th style="width: 15.5%;">Percentual etiquetado</th>
+                        <th style="width: 6.8%; padding:0;"><select id="station-select-1" class="station-dropdown" onchange="refreshProdGridData()"><option value="">Estação 1</option></select></th>
+                        <th style="width: 6.8%; padding:0;"><select id="station-select-2" class="station-dropdown" onchange="refreshProdGridData()"><option value="">Estação 2</option></select></th>
+                        <th style="width: 6.8%; padding:0;"><select id="station-select-3" class="station-dropdown" onchange="refreshProdGridData()"><option value="">Estação 3</option></select></th>
+                        <th style="width: 6.8%; padding:0;"><select id="station-select-4" class="station-dropdown" onchange="refreshProdGridData()"><option value="">Estação 4</option></select></th>
+                        <th style="width: 6.8%; padding:0;"><select id="station-select-5" class="station-dropdown" onchange="refreshProdGridData()"><option value="">Estação 5</option></select></th>
+                        <th style="width: 6.8%; padding:0;"><select id="station-select-6" class="station-dropdown" onchange="refreshProdGridData()"><option value="">Estação 6</option></select></th>
+                        <th style="width: 6.8%; padding:0;"><select id="station-select-7" class="station-dropdown" onchange="refreshProdGridData()"><option value="">Estação 7</option></select></th>
+                        <th style="width: 6.8%; padding:0;"><select id="station-select-8" class="station-dropdown" onchange="refreshProdGridData()"><option value="">Estação 8</option></select></th>
+                        <th style="width: 6.8%; padding:0;"><select id="station-select-9" class="station-dropdown" onchange="refreshProdGridData()"><option value="">Estação 9</option></select></th>
+                        <!-- Adicionada Estação 10 -->
+                        <th style="width: 6.8%; padding:0;"><select id="station-select-10" class="station-dropdown" onchange="refreshProdGridData()"><option value="">Estação 10</option></select></th>
+                        
+                        <th style="width: 6.8%;">Total H.</th>
+                        <th style="width: 15%;">Percentual etiquetado</th>
                     </tr>
                 </thead>
                 <tbody id="prod-body-grid"></tbody>
@@ -403,7 +407,7 @@
             const found = USERS.find(x => x.u === u && x.p === p);
             if(found) {
                 currentUser = found;
-                localStorage.setItem('spxUser', JSON.stringify(found)); // SALVA NO NAVEGADOR
+                localStorage.setItem('spxUser', JSON.stringify(found));
                 document.getElementById('login-screen').style.display = 'none';
                 document.getElementById('app-shell').style.display = 'block';
                 document.getElementById('display-user').innerText = u.toUpperCase();
@@ -413,11 +417,11 @@
         }
 
         function logout() {
-            localStorage.removeItem('spxUser'); // APAGA A CREDENCIAL
-            location.reload(); // RECARREGA PARA A TELA DE LOGIN
+            localStorage.removeItem('spxUser'); 
+            location.reload(); 
         }
 
-        window.onload = checkSession; // RODA A VERIFICAÇÃO ASSIM QUE ABRIR O LINK
+        window.onload = checkSession; 
         document.getElementById('pass').addEventListener('keypress', e=>{if(e.key==='Enter')login()});
         // ---------------------------------------------------
 
@@ -700,14 +704,16 @@
                 let hour = i.toString().padStart(2, '0') + ':00';
                 html += `<tr>`;
                 html += `<td style="border-left: 2px solid #000; font-weight: bold; background:#f0f8ff;" class="editable-cell" contenteditable="true" id="p-hour-${i}" onblur="refreshProdGridData()">${hour}</td>`;
-                for (let j = 1; j <= 9; j++) { html += `<td id="p-cell-${i}-${j}" class="editable-cell" contenteditable="true" onblur="calculateProdTotals()"></td>`; }
+                // LOOP ATUALIZADO PARA 10 ESTAÇÕES
+                for (let j = 1; j <= 10; j++) { html += `<td id="p-cell-${i}-${j}" class="editable-cell" contenteditable="true" onblur="calculateProdTotals()"></td>`; }
+                
                 html += `<td id="p-row-total-${i}" style="font-weight: bold; background: #e2e8f0; color: #0f172a;"></td>`;
                 if (i === 0) { html += `<td rowspan="24" class="spx-percent-giant"><span class="spx-percent-text" id="p-giant-percent">0%</span></td>`; }
                 html += `</tr>`;
             }
             html += `<tr class="spx-navy">`;
             html += `<td style="border-left: 2px solid #000; padding: 4px;">Total</td>`;
-            for (let j = 1; j <= 9; j++) html += `<td style="color:#fff;" id="p-col-total-${j}">0</td>`;
+            for (let j = 1; j <= 10; j++) html += `<td style="color:#fff;" id="p-col-total-${j}">0</td>`;
             html += `<td style="color:#fff; font-weight: 900;" id="p-grand-total">0</td>`;
             html += `<td style="background:#fff; border:2px solid #000; border-top:none;"></td>`; 
             html += `</tr>`;
@@ -757,7 +763,7 @@
 
         function updateDropdowns() {
             let names = Object.keys(globalProdData).sort();
-            for(let j = 1; j <= 9; j++) {
+            for(let j = 1; j <= 10; j++) {
                 let select = document.getElementById(`station-select-${j}`); 
                 if(select) {
                     let currentVal = select.value;
@@ -775,7 +781,7 @@
                 let rawHour = hourCell ? hourCell.innerText.trim() : '';
                 let hourRef = null; let match = rawHour.match(/^(\d{1,2})(:\d{2})?/); if(match) { hourRef = match[1].padStart(2, '0') + ":00"; }
                 
-                for(let j = 1; j <= 9; j++) {
+                for(let j = 1; j <= 10; j++) {
                     let select = document.getElementById(`station-select-${j}`); 
                     let name = select ? select.value : ''; 
                     let val = 0;
@@ -788,14 +794,14 @@
         }
 
         function calculateProdTotals() {
-            let colTotals = [0,0,0,0,0,0,0,0,0]; let grandTotal = 0;
+            let colTotals = [0,0,0,0,0,0,0,0,0,0]; let grandTotal = 0;
             for(let i = 0; i < 24; i++) {
                 let rowTotal = 0;
                 let hourCell = document.getElementById(`p-hour-${i}`); 
                 let rawHour = hourCell ? hourCell.innerText.trim() : '';
                 let hourRef = null; let match = rawHour.match(/^(\d{1,2})(:\d{2})?/); if(match) hourRef = match[1].padStart(2, '0') + ":00";
 
-                for(let j = 1; j <= 9; j++) {
+                for(let j = 1; j <= 10; j++) {
                     let cell = document.getElementById(`p-cell-${i}-${j}`);
                     if(!cell) continue;
                     
@@ -819,7 +825,7 @@
                     rowTotalCell.innerText = rowTotal > 0 ? rowTotal.toLocaleString('pt-BR') : '';
                 }
             }
-            for(let j = 1; j <= 9; j++) { 
+            for(let j = 1; j <= 10; j++) { 
                 let colEl = document.getElementById(`p-col-total-${j}`);
                 if(colEl) colEl.innerText = colTotals[j-1] || '0'; 
             }
@@ -853,7 +859,7 @@
             renderRankProd(); 
         }
 
-        // --- RANKING DE PRODUTIVIDADE (DESIGN COMPACTO / SLIM) ---
+        // --- RANKING DE PRODUTIVIDADE ---
         function renderRankProd() {
             const container = document.getElementById('rankprod-list');
             if(!container) return;
