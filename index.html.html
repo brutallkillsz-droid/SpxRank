@@ -489,8 +489,23 @@
                 for(let i=1; i<rows.length; i++) {
                     const r = rows[i];
                     let rawName = String(r[9] || ""); if(!rawName.trim()) continue;
-                    let nome = rawName.replace(/OPS?\s*\d*\s*-?\s*/gi, '').replace(/^\d+\s*-?\s*/, '').replace(/[\[\]]/g, '').trim().toUpperCase();
-                    nome = nome.replace(/[.\#$\[\]\/]/g, '');
+                    
+                    // ANTI-ERRO: Mesma lógica de limpar AT do começo e pegar Inicial do Sobrenome
+                    let tempName = rawName.replace(/\[.*?\]/g, '')
+                                          .replace(/^(AT|OPS?)\s*-?\s*\d*\s*-?\s*/gi, '')
+                                          .replace(/^\d+\s*-?\s*/, '')
+                                          .trim().toUpperCase();
+                    tempName = tempName.replace(/[.\#$\[\]\/]/g, '');
+
+                    let parts = tempName.split(/\s+/).filter(Boolean);
+                    let cleanName = "";
+                    if(parts.length > 1) {
+                        cleanName = parts[0] + " " + parts[1].charAt(0);
+                    } else if(parts.length === 1) {
+                        cleanName = parts[0];
+                    }
+                    if (!cleanName) continue;
+                    let nome = cleanName;
 
                     let volRank = parseFloat(String(r[3]).replace(/[^\d,-]/g,'').replace(',','.')) || 0; 
                     let volCtrl = parseFloat(String(r[2]).replace(/[^\d,-]/g,'').replace(',','.')) || 0;
@@ -736,13 +751,19 @@
                 for(let i = 1; i < data.length; i++) {
                     let row = data[i]; if(!row || !row[0]) continue;
                     let rawName = String(row[0]); 
-                    let tempName = rawName.replace(/\[ops\d+\]/gi, '').trim().toUpperCase();
-                    tempName = tempName.replace(/[.\#$\[\]\/]/g, '');
+                    
+                    // --- CORTA "AT", "OP", "OPS", NÚMEROS DA FRENTE ---
+                    let tempName = rawName.replace(/\[.*?\]/g, '')
+                                          .replace(/^(AT|OPS?)\s*-?\s*\d*\s*-?\s*/gi, '')
+                                          .replace(/^\d+\s*-?\s*/, '')
+                                          .trim().toUpperCase();
+                                          
+                    tempName = tempName.replace(/[.\#$\[\]\/]/g, ''); // Limpa caracteres que o Firebase rejeita
 
                     let parts = tempName.split(/\s+/).filter(Boolean);
                     let cleanName = "";
                     
-                    // --- ALTERAÇÃO: PEGA O PRIMEIRO NOME E A PRIMEIRA LETRA DO SOBRENOME ---
+                    // --- PEGA PRIMEIRO NOME + PRIMEIRA LETRA DO SOBRENOME ---
                     if(parts.length > 1) {
                         cleanName = parts[0] + " " + parts[1].charAt(0);
                     } else if(parts.length === 1) {
