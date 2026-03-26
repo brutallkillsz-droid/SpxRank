@@ -251,6 +251,7 @@
             </div>
 
             <table class="spx-table" style="border-bottom:none;">
+                <!-- Ajuste no Colspan para caber a Estação 10 (13 colunas totais) -->
                 <tr><td colspan="13" class="spx-navy" style="font-size:12px;">Etiquetagem e 1º Sorting</td></tr>
                 <tr>
                     <td class="spx-gray-light" style="width:7%">Data</td>
@@ -291,7 +292,9 @@
                         <th style="width: 6.8%; padding:0;"><select id="station-select-7" class="station-dropdown" onchange="refreshProdGridData()"><option value="">Estação 7</option></select></th>
                         <th style="width: 6.8%; padding:0;"><select id="station-select-8" class="station-dropdown" onchange="refreshProdGridData()"><option value="">Estação 8</option></select></th>
                         <th style="width: 6.8%; padding:0;"><select id="station-select-9" class="station-dropdown" onchange="refreshProdGridData()"><option value="">Estação 9</option></select></th>
+                        <!-- Adicionada Estação 10 -->
                         <th style="width: 6.8%; padding:0;"><select id="station-select-10" class="station-dropdown" onchange="refreshProdGridData()"><option value="">Estação 10</option></select></th>
+                        
                         <th style="width: 6.8%;">Total H.</th>
                         <th style="width: 15%;">Percentual etiquetado</th>
                     </tr>
@@ -384,6 +387,7 @@
 
         function initCtrl() { return { date: '', totalVol: 0, totalRotas: 0, minTime: null, maxTime: null, finRot: 0, finVol: 0, missRot: 0, missVol: 0, missingRot: 0, missingVol: 0, hourly: {}, sumDurHI: 0, countDurHI: 0 }; }
 
+        // --- SISTEMA DE LOGIN COM MEMÓRIA (LOCALSTORAGE) ---
         function checkSession() {
             const saved = localStorage.getItem('spxUser');
             if(saved) {
@@ -419,6 +423,7 @@
 
         window.onload = checkSession; 
         document.getElementById('pass').addEventListener('keypress', e=>{if(e.key==='Enter')login()});
+        // ---------------------------------------------------
 
         function switchTab(id) {
             document.querySelectorAll('section').forEach(s => s.classList.add('hidden'));
@@ -489,23 +494,8 @@
                 for(let i=1; i<rows.length; i++) {
                     const r = rows[i];
                     let rawName = String(r[9] || ""); if(!rawName.trim()) continue;
-                    
-                    // ANTI-ERRO: Mesma lógica de limpar AT do começo e pegar Inicial do Sobrenome
-                    let tempName = rawName.replace(/\[.*?\]/g, '')
-                                          .replace(/^(AT|OPS?)\s*-?\s*\d*\s*-?\s*/gi, '')
-                                          .replace(/^\d+\s*-?\s*/, '')
-                                          .trim().toUpperCase();
-                    tempName = tempName.replace(/[.\#$\[\]\/]/g, '');
-
-                    let parts = tempName.split(/\s+/).filter(Boolean);
-                    let cleanName = "";
-                    if(parts.length > 1) {
-                        cleanName = parts[0] + " " + parts[1].charAt(0);
-                    } else if(parts.length === 1) {
-                        cleanName = parts[0];
-                    }
-                    if (!cleanName) continue;
-                    let nome = cleanName;
+                    let nome = rawName.replace(/OPS?\s*\d*\s*-?\s*/gi, '').replace(/^\d+\s*-?\s*/, '').replace(/[\[\]]/g, '').trim().toUpperCase();
+                    nome = nome.replace(/[.\#$\[\]\/]/g, '');
 
                     let volRank = parseFloat(String(r[3]).replace(/[^\d,-]/g,'').replace(',','.')) || 0; 
                     let volCtrl = parseFloat(String(r[2]).replace(/[^\d,-]/g,'').replace(',','.')) || 0;
@@ -714,6 +704,7 @@
                 let hour = i.toString().padStart(2, '0') + ':00';
                 html += `<tr>`;
                 html += `<td style="border-left: 2px solid #000; font-weight: bold; background:#f0f8ff;" class="editable-cell" contenteditable="true" id="p-hour-${i}" onblur="refreshProdGridData()">${hour}</td>`;
+                // LOOP ATUALIZADO PARA 10 ESTAÇÕES
                 for (let j = 1; j <= 10; j++) { html += `<td id="p-cell-${i}-${j}" class="editable-cell" contenteditable="true" onblur="calculateProdTotals()"></td>`; }
                 
                 html += `<td id="p-row-total-${i}" style="font-weight: bold; background: #e2e8f0; color: #0f172a;"></td>`;
@@ -751,24 +742,8 @@
                 for(let i = 1; i < data.length; i++) {
                     let row = data[i]; if(!row || !row[0]) continue;
                     let rawName = String(row[0]); 
-                    
-                    // --- CORTA "AT", "OP", "OPS", NÚMEROS DA FRENTE ---
-                    let tempName = rawName.replace(/\[.*?\]/g, '')
-                                          .replace(/^(AT|OPS?)\s*-?\s*\d*\s*-?\s*/gi, '')
-                                          .replace(/^\d+\s*-?\s*/, '')
-                                          .trim().toUpperCase();
-                                          
-                    tempName = tempName.replace(/[.\#$\[\]\/]/g, ''); // Limpa caracteres que o Firebase rejeita
-
-                    let parts = tempName.split(/\s+/).filter(Boolean);
-                    let cleanName = "";
-                    
-                    // --- PEGA PRIMEIRO NOME + PRIMEIRA LETRA DO SOBRENOME ---
-                    if(parts.length > 1) {
-                        cleanName = parts[0] + " " + parts[1].charAt(0);
-                    } else if(parts.length === 1) {
-                        cleanName = parts[0];
-                    }
+                    let cleanName = rawName.replace(/\[ops\d+\]/gi, '').trim().split(' ')[0].toUpperCase();
+                    cleanName = cleanName.replace(/[.\#$\[\]\/]/g, '');
 
                     if (!cleanName) continue;
                     if(!globalProdData[cleanName]) globalProdData[cleanName] = {};
@@ -884,6 +859,7 @@
             renderRankProd(); 
         }
 
+        // --- RANKING DE PRODUTIVIDADE ---
         function renderRankProd() {
             const container = document.getElementById('rankprod-list');
             if(!container) return;
