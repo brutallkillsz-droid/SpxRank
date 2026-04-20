@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Logistics Elite | HUB LMG-13</title>
+    <title>Logistics Elite | HUB LMG-48</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -246,7 +246,7 @@
 
             <div class="spx-header-container">
                 <div class="spx-logo-text">SPX</div>
-                <div style="flex-grow: 1; text-align: center;">LMHUB LMG-13 - Uberaba</div>
+                <div style="flex-grow: 1; text-align: center;">LMHUB LMG-48 - Uberaba</div>
                 <div style="width: 20px;"></div>
             </div>
 
@@ -258,7 +258,7 @@
                     <td rowspan="2" class="spx-gray-light" style="width:7%">Backlog</td>
                     <td rowspan="2" class="spx-orange editable-cell" style="width:7%" contenteditable="true" id="p-backlog" onblur="calculateProdTotals()">342</td>
                     <td class="spx-gray-light" style="width:9%">Horário início</td>
-                    <td style="width:7%">03:00</td>
+                    <td style="width:7%" class="editable-cell" contenteditable="true" id="p-hora-ini">03:00</td>
                     <td class="spx-gray-light" style="width:9%">Qtd realizada</td>
                     <td class="spx-gray-dark" style="width:7%" id="p-realizada">0</td>
                     <td class="spx-green" style="width:9%">% Etiquetado</td>
@@ -269,7 +269,7 @@
                     <td class="spx-gray-light">Volume Rot.</td>
                     <td class="editable-cell" contenteditable="true" id="p-vol-rot" onblur="calculateProdTotals()">15.053</td>
                     <td class="spx-gray-light">Horário término</td>
-                    <td>06:38</td>
+                    <td class="editable-cell" contenteditable="true" id="p-hora-fim">06:38</td>
                     <td class="spx-gray-light">Qtd pendente</td>
                     <td id="p-pendente">15.053</td>
                     <td class="spx-red">% Pendente</td>
@@ -302,7 +302,7 @@
 
         <section id="view-ctrl" class="hidden">
             <div class="ctrl-container">
-                <div class="shopee-header"><div class="logo-txt">Shopee <span style="color:#0f172a; font-style: normal;">XPRESS</span></div><div class="hub-txt">UBERABA | HUB LMG-13</div></div>
+                <div class="shopee-header"><div class="logo-txt">Shopee <span style="color:#0f172a; font-style: normal;">XPRESS</span></div><div class="hub-txt">UBERABA | HUB LMG-48</div></div>
                 <div style="background:#0f172a; color:rgba(255,255,255,0.8); padding:12px; font-weight:700; text-align:center; font-size:0.75rem; text-transform:uppercase; letter-spacing:2px;">Performance Tracking & Double Check</div>
                 <div style="display: grid; grid-template-columns: 1.5fr 1fr;">
                     <table class="tbl-ctrl"><tr><th>Data da Operação</th><td id="c-data">-</td></tr><tr><th>Volume Total</th><td id="c-vol">-</td></tr><tr><th>Total de Rotas</th><td id="c-rotas">-</td></tr><tr><th>Primeira Coleta</th><td id="c-ini">-</td></tr><tr><th>Última Coleta</th><td id="c-fim">-</td></tr><tr><th>Janela Operacional</th><td id="c-dur">-</td></tr></table>
@@ -489,8 +489,22 @@
                 for(let i=1; i<rows.length; i++) {
                     const r = rows[i];
                     let rawName = String(r[9] || ""); if(!rawName.trim()) continue;
-                    let nome = rawName.replace(/OPS?\s*\d*\s*-?\s*/gi, '').replace(/^\d+\s*-?\s*/, '').replace(/[\[\]]/g, '').trim().toUpperCase();
-                    nome = nome.replace(/[.\#$\[\]\/]/g, '');
+                    
+                    let tempName = rawName.replace(/\[.*?\]/g, '')
+                                          .replace(/^(AT|OPS?)\s*-?\s*\d*\s*-?\s*/gi, '')
+                                          .replace(/^\d+\s*-?\s*/, '')
+                                          .trim().toUpperCase();
+                    tempName = tempName.replace(/[.\#$\[\]\/]/g, '');
+
+                    let parts = tempName.split(/\s+/).filter(Boolean);
+                    let cleanName = "";
+                    if(parts.length > 1) {
+                        cleanName = parts[0] + " " + parts[1].charAt(0);
+                    } else if(parts.length === 1) {
+                        cleanName = parts[0];
+                    }
+                    if (!cleanName) continue;
+                    let nome = cleanName;
 
                     let volRank = parseFloat(String(r[3]).replace(/[^\d,-]/g,'').replace(',','.')) || 0; 
                     let volCtrl = parseFloat(String(r[2]).replace(/[^\d,-]/g,'').replace(',','.')) || 0;
@@ -736,13 +750,17 @@
                 for(let i = 1; i < data.length; i++) {
                     let row = data[i]; if(!row || !row[0]) continue;
                     let rawName = String(row[0]); 
-                    let tempName = rawName.replace(/\[ops\d+\]/gi, '').trim().toUpperCase();
+                    
+                    let tempName = rawName.replace(/\[.*?\]/g, '')
+                                          .replace(/^(AT|OPS?)\s*-?\s*\d*\s*-?\s*/gi, '')
+                                          .replace(/^\d+\s*-?\s*/, '')
+                                          .trim().toUpperCase();
+                                          
                     tempName = tempName.replace(/[.\#$\[\]\/]/g, '');
 
                     let parts = tempName.split(/\s+/).filter(Boolean);
                     let cleanName = "";
                     
-                    // --- ALTERAÇÃO: PEGA O PRIMEIRO NOME E A PRIMEIRA LETRA DO SOBRENOME ---
                     if(parts.length > 1) {
                         cleanName = parts[0] + " " + parts[1].charAt(0);
                     } else if(parts.length === 1) {
@@ -837,18 +855,24 @@
             let grandTotalCell = document.getElementById('p-grand-total');
             if(grandTotalCell) grandTotalCell.innerText = grandTotal.toLocaleString('pt-BR');
 
+            // --- NOVA MATEMÁTICA: TOTAL ALVO = VOLUME ROT + BACKLOG ---
             let volRotEl = document.getElementById('p-vol-rot');
             let volRot = volRotEl ? (parseInt(volRotEl.innerText.replace(/\D/g, '')) || 0) : 0;
+            
+            let backlogEl = document.getElementById('p-backlog');
+            let backlog = backlogEl ? (parseInt(backlogEl.innerText.replace(/\D/g, '')) || 0) : 0;
+            
+            let totalAlvo = volRot + backlog; // SOMA OFICIAL PARA OS 100%
             
             let pRealizada = document.getElementById('p-realizada');
             if(pRealizada) pRealizada.innerText = grandTotal.toLocaleString('pt-BR');
             
-            let pendente = volRot - grandTotal; if(pendente < 0) pendente = 0;
+            let pendente = totalAlvo - grandTotal; if(pendente < 0) pendente = 0;
             let pPendente = document.getElementById('p-pendente');
             if(pPendente) pPendente.innerText = pendente.toLocaleString('pt-BR');
 
-            let percentEtiquetado = volRot > 0 ? ((grandTotal / volRot) * 100).toFixed(0) : 0;
-            let percentPendente = volRot > 0 ? ((pendente / volRot) * 100).toFixed(0) : 0;
+            let percentEtiquetado = totalAlvo > 0 ? ((grandTotal / totalAlvo) * 100).toFixed(0) : 0;
+            let percentPendente = totalAlvo > 0 ? ((pendente / totalAlvo) * 100).toFixed(0) : 0;
 
             let percEtiqEl = document.getElementById('p-perc-etiquetado');
             if(percEtiqEl) percEtiqEl.innerText = percentEtiquetado + '%';
