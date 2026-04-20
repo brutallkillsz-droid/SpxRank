@@ -140,9 +140,16 @@
         .spx-logo-text { color: red; font-size: 9px; font-style: italic; font-weight: 900; }
         .spx-percent-giant { border: 2px solid #000 !important; background-color: #fff !important; }
         .spx-percent-text { color: #ff0000; font-size: 70px; font-weight: 900; text-decoration: underline; letter-spacing: -2px; }
+        
         .editable-cell { cursor: text; outline: none; transition: box-shadow 0.2s; }
         .editable-cell:hover, .editable-cell:focus { box-shadow: inset 0 0 0 2px #002f6c; background: #f0f8ff; }
-        .date-input-field { width: 100%; height: 100%; text-align: center; border: none; outline: none; background: transparent; font-family: inherit; font-weight: bold; font-size: inherit; color: inherit; }
+        
+        /* Ajuste nativo para inputs de data e hora ficarem perfeitos na tabela */
+        .date-input-field { width: 100%; height: 100%; text-align: center; border: none; outline: none; background: transparent; font-family: inherit; font-weight: bold; font-size: inherit; color: inherit; cursor: pointer; }
+        .date-input-field:hover, .date-input-field:focus { background-color: rgba(0, 47, 108, 0.1); }
+        .date-input-field::-webkit-calendar-picker-indicator { cursor: pointer; opacity: 0.6; }
+        .date-input-field::-webkit-calendar-picker-indicator:hover { opacity: 1; }
+
         .station-dropdown { width: 100%; height: 100%; background: transparent; border: none; color: #fff; font-weight: bold; font-size: 11px; text-align: center; cursor: pointer; outline: none; font-family: Arial, sans-serif !important; text-transform: uppercase; }
         .station-dropdown option { color: #000; font-weight: normal; }
 
@@ -254,11 +261,11 @@
                 <tr><td colspan="13" class="spx-navy" style="font-size:12px;">Etiquetagem e 1º Sorting</td></tr>
                 <tr>
                     <td class="spx-gray-light" style="width:7%">Data</td>
-                    <td style="width:7%; padding:0;"><input type="text" class="date-input-field" value="26/02/2026" maxlength="10" oninput="maskDate(event)"></td>
+                    <td style="width:7%; padding:0;"><input type="date" class="date-input-field" id="p-data" value="2026-02-26"></td>
                     <td rowspan="2" class="spx-gray-light" style="width:7%">Backlog</td>
                     <td rowspan="2" class="spx-orange editable-cell" style="width:7%" contenteditable="true" id="p-backlog" onblur="calculateProdTotals()">342</td>
                     <td class="spx-gray-light" style="width:9%">Horário início</td>
-                    <td style="width:7%" class="editable-cell" contenteditable="true" id="p-hora-ini">03:00</td>
+                    <td style="width:7%; padding:0;"><input type="time" class="date-input-field" id="p-hora-ini" value="03:00" min="00:00" max="17:00"></td>
                     <td class="spx-gray-light" style="width:9%">Qtd realizada</td>
                     <td class="spx-gray-dark" style="width:7%" id="p-realizada">0</td>
                     <td class="spx-green" style="width:9%">% Etiquetado</td>
@@ -269,7 +276,7 @@
                     <td class="spx-gray-light">Volume Rot.</td>
                     <td class="editable-cell" contenteditable="true" id="p-vol-rot" onblur="calculateProdTotals()">15.053</td>
                     <td class="spx-gray-light">Horário término</td>
-                    <td class="editable-cell" contenteditable="true" id="p-hora-fim">06:38</td>
+                    <td style="padding:0;"><input type="time" class="date-input-field" id="p-hora-fim" value="06:38" min="00:00" max="17:00"></td>
                     <td class="spx-gray-light">Qtd pendente</td>
                     <td id="p-pendente">15.053</td>
                     <td class="spx-red">% Pendente</td>
@@ -434,14 +441,6 @@
         function showToast(msg) {
             const t = document.getElementById('toast');
             t.innerText = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 3000);
-        }
-
-        function maskDate(e) {
-            let v = e.target.value.replace(/\D/g, ''); 
-            if (v.length > 8) v = v.substring(0, 8); 
-            if (v.length >= 5) e.target.value = v.substring(0, 2) + '/' + v.substring(2, 4) + '/' + v.substring(4, 8);
-            else if (v.length >= 3) e.target.value = v.substring(0, 2) + '/' + v.substring(2);
-            else e.target.value = v;
         }
 
         function fmtTime(s) { const m = Math.floor(s/60); const sec = Math.round(s%60); return `${m}m ${sec}s`; }
@@ -862,9 +861,9 @@
             let backlogEl = document.getElementById('p-backlog');
             let backlog = backlogEl ? (parseInt(backlogEl.innerText.replace(/\D/g, '')) || 0) : 0;
             
-            let totalAlvo = volRot; // O teto é o Volume Rotativo
+            let totalAlvo = volRot; 
             
-            // Qtd Realizada (Feito) = Estações + Backlog
+            // Qtd Realizada = Estações + Backlog
             let qtdRealizada = grandTotal + backlog; 
             
             let pRealizada = document.getElementById('p-realizada');
