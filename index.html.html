@@ -855,20 +855,22 @@
             let grandTotalCell = document.getElementById('p-grand-total');
             if(grandTotalCell) grandTotalCell.innerText = grandTotal.toLocaleString('pt-BR');
 
-            // --- NOVA MATEMÁTICA: TOTAL ALVO = VOLUME ROT + BACKLOG ---
+            // LÓGICA DE 100%: Total Alvo = Vol. Rotativo
             let volRotEl = document.getElementById('p-vol-rot');
             let volRot = volRotEl ? (parseInt(volRotEl.innerText.replace(/\D/g, '')) || 0) : 0;
             
             let backlogEl = document.getElementById('p-backlog');
             let backlog = backlogEl ? (parseInt(backlogEl.innerText.replace(/\D/g, '')) || 0) : 0;
             
-            let totalAlvo = volRot + backlog; // SOMA OFICIAL PARA OS 100%
+            let totalAlvo = volRot; // O teto é o Volume Rotativo
             
-            let qtdRealizada = grandTotal + backlog; // Backlog somado ao resultado final das estações
+            // Qtd Realizada (Feito) = Estações + Backlog
+            let qtdRealizada = grandTotal + backlog; 
             
             let pRealizada = document.getElementById('p-realizada');
             if(pRealizada) pRealizada.innerText = qtdRealizada.toLocaleString('pt-BR');
             
+            // Qtd Pendente = Total Alvo - Qtd Realizada
             let pendente = totalAlvo - qtdRealizada; 
             if(pendente < 0) pendente = 0;
             
