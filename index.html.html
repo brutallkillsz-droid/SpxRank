@@ -864,14 +864,18 @@
             
             let totalAlvo = volRot + backlog; // SOMA OFICIAL PARA OS 100%
             
-            let pRealizada = document.getElementById('p-realizada');
-            if(pRealizada) pRealizada.innerText = grandTotal.toLocaleString('pt-BR');
+            let qtdRealizada = grandTotal + backlog; // Backlog somado ao resultado final das estações
             
-            let pendente = totalAlvo - grandTotal; if(pendente < 0) pendente = 0;
+            let pRealizada = document.getElementById('p-realizada');
+            if(pRealizada) pRealizada.innerText = qtdRealizada.toLocaleString('pt-BR');
+            
+            let pendente = totalAlvo - qtdRealizada; 
+            if(pendente < 0) pendente = 0;
+            
             let pPendente = document.getElementById('p-pendente');
             if(pPendente) pPendente.innerText = pendente.toLocaleString('pt-BR');
 
-            let percentEtiquetado = totalAlvo > 0 ? ((grandTotal / totalAlvo) * 100).toFixed(0) : 0;
+            let percentEtiquetado = totalAlvo > 0 ? ((qtdRealizada / totalAlvo) * 100).toFixed(0) : 0;
             let percentPendente = totalAlvo > 0 ? ((pendente / totalAlvo) * 100).toFixed(0) : 0;
 
             let percEtiqEl = document.getElementById('p-perc-etiquetado');
