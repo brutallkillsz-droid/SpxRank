@@ -138,21 +138,19 @@
         .spx-gray-dark { background-color: #d9d9d9; }
         .spx-header-container { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 2px; font-size: 12px; font-weight: bold; }
         .spx-logo-text { color: red; font-size: 9px; font-style: italic; font-weight: 900; }
-        .spx-percent-giant { border: 2px solid #000 !important; background-color: #fff !important; }
+        
+        .spx-percent-giant { border: 2px solid #000 !important; background-color: #fff !important; transition: color 0.3s; }
         .spx-percent-text { color: #ff0000; font-size: 70px; font-weight: 900; text-decoration: underline; letter-spacing: -2px; }
+        
         .editable-cell { cursor: text; outline: none; transition: box-shadow 0.2s; }
         .editable-cell:hover, .editable-cell:focus { box-shadow: inset 0 0 0 2px #002f6c; background: #f0f8ff; }
         
-        /* ---------------------------------------------------------
-           TRUQUE MÁGICO: INPUTS DE DATA E HORA CLICKÁVEIS NA CÉLULA
-           --------------------------------------------------------- */
         .date-input-field { 
             width: 100%; height: 100%; text-align: center; border: none; outline: none; 
             background: transparent; font-family: inherit; font-weight: bold; 
             font-size: inherit; color: inherit; cursor: pointer; position: relative; z-index: 1;
         }
         .date-input-field:hover, .date-input-field:focus { background-color: rgba(0, 47, 108, 0.1); }
-        /* Estica o icone invisivel para preencher a celula inteira e acionar o popup */
         .date-input-field::-webkit-calendar-picker-indicator {
             position: absolute; top: 0; left: 0; right: 0; bottom: 0;
             width: 100%; height: 100%; opacity: 0; cursor: pointer; z-index: 2;
@@ -457,10 +455,10 @@
             t.innerText = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 3000);
         }
 
+        function fmtTime(s) { const m = Math.floor(s/60); const sec = Math.round(s%60); return `${m}m ${sec}s`; }
         function secToHHMMSS(s) { if(!s) return "00:00:00"; const h = Math.floor(s/3600).toString().padStart(2,'0'); const m = Math.floor((s%3600)/60).toString().padStart(2,'0'); const sec = Math.floor(s%60).toString().padStart(2,'0'); return `${h}:${m}:${sec}`; }
         function excelDate(serial) { if(!serial) return "-"; const date = new Date((serial - 25569) * 86400 * 1000); return date.toLocaleDateString('pt-BR'); }
         function fmtExcelTime(dec) { if(!dec) return "-"; let s = Math.round(dec * 86400); return secToHHMMSS(s).substring(0,5); }
-        function fmtTime(s) { const m = Math.floor(s/60); const sec = Math.round(s%60); return `${m}m ${sec}s`; }
 
         function readExcelFile(file, parseDates = false) {
             return new Promise(resolve => {
@@ -868,7 +866,7 @@
             let grandTotalCell = document.getElementById('p-grand-total');
             if(grandTotalCell) grandTotalCell.innerText = grandTotal.toLocaleString('pt-BR');
 
-            // LÓGICA DE 100%: Total Alvo = Vol. Rotativo
+            // LÓGICA DE 100% COM TRAVA E CORES: Total Alvo = Vol. Rotativo
             let volRotEl = document.getElementById('p-vol-rot');
             let volRot = volRotEl ? (parseInt(volRotEl.innerText.replace(/\D/g, '')) || 0) : 0;
             
@@ -890,8 +888,12 @@
             let pPendente = document.getElementById('p-pendente');
             if(pPendente) pPendente.innerText = pendente.toLocaleString('pt-BR');
 
-            let percentEtiquetado = totalAlvo > 0 ? ((qtdRealizada / totalAlvo) * 100).toFixed(0) : 0;
-            let percentPendente = totalAlvo > 0 ? ((pendente / totalAlvo) * 100).toFixed(0) : 0;
+            // Calculando as porcentagens e travando no máximo 100%
+            let percentEtiquetado = totalAlvo > 0 ? parseInt(((qtdRealizada / totalAlvo) * 100).toFixed(0)) : 0;
+            if (percentEtiquetado > 100) percentEtiquetado = 100; // Trava máxima de 100%
+            
+            let percentPendente = totalAlvo > 0 ? parseInt(((pendente / totalAlvo) * 100).toFixed(0)) : 0;
+            if (percentPendente < 0) percentPendente = 0; // Trava mínima de 0%
 
             let percEtiqEl = document.getElementById('p-perc-etiquetado');
             if(percEtiqEl) percEtiqEl.innerText = percentEtiquetado + '%';
@@ -899,8 +901,18 @@
             let percPendEl = document.getElementById('p-perc-pendente');
             if(percPendEl) percPendEl.innerText = percentPendente + '%';
             
+            // Controle da Cor e Exibição do Percentual Gigante
             let giantPerc = document.getElementById('p-giant-percent');
-            if(giantPerc) giantPerc.innerText = percentEtiquetado + '%';
+            if(giantPerc) {
+                giantPerc.innerText = percentEtiquetado + '%';
+                
+                // Se a meta bateu ou passou de 97%, fica Verde. Senão, fica Vermelho.
+                if (percentEtiquetado >= 97) {
+                    giantPerc.style.color = '#00b050'; // Verde Excel
+                } else {
+                    giantPerc.style.color = '#ff0000'; // Vermelho Excel
+                }
+            }
             
             saveProdToCloud(); 
             renderRankProd(); 
