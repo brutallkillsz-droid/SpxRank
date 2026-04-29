@@ -254,7 +254,7 @@
                     <i class="fas fa-upload"></i> Importar Dados e Preencher Estações
                     <input type="file" accept=".csv, .xlsx" style="display:none;" onclick="this.value=null" onchange="importProdData(this)">
                 </label>
-                <span style="font-size: 11px; color: #666; font-style: italic;">* Data, Horários, Backlog, Volume Rot. e Células são editáveis!</span>
+                <span style="font-size: 11px; color: #666; font-style: italic;">* Data, Horários, Backlog, XPT, Volume Rot. e Células são editáveis!</span>
             </div>
 
             <div class="spx-header-container">
@@ -264,23 +264,27 @@
             </div>
 
             <table class="spx-table" style="border-bottom:none;">
-                <tr><td colspan="13" class="spx-navy" style="font-size:12px;">Etiquetagem e 1º Sorting</td></tr>
+                <tr><td colspan="15" class="spx-navy" style="font-size:12px;">Etiquetagem e 1º Sorting</td></tr>
                 <tr>
-                    <td class="spx-gray-light" style="width:7%">Data</td>
-                    <td style="width:7%; padding:0; position:relative; cursor:pointer;" onclick="try{document.getElementById('p-data').showPicker()}catch(e){}">
+                    <td class="spx-gray-light" style="width:6%">Data</td>
+                    <td style="width:6%; padding:0; position:relative; cursor:pointer;" onclick="try{document.getElementById('p-data').showPicker()}catch(e){}">
                         <input type="date" class="date-input-field" id="p-data" value="2026-02-26">
                     </td>
-                    <td rowspan="2" class="spx-gray-light" style="width:7%">Backlog</td>
-                    <td rowspan="2" class="spx-orange editable-cell" style="width:7%" contenteditable="true" id="p-backlog" onblur="calculateProdTotals()">342</td>
-                    <td class="spx-gray-light" style="width:9%">Horário início</td>
-                    <td style="width:7%; padding:0; position:relative; cursor:pointer;" onclick="try{document.getElementById('p-hora-ini').showPicker()}catch(e){}">
+                    <td rowspan="2" class="spx-gray-light" style="width:6%">Backlog</td>
+                    <td rowspan="2" class="spx-orange editable-cell" style="width:6%" contenteditable="true" id="p-backlog" onblur="calculateProdTotals()">342</td>
+                    
+                    <td rowspan="2" class="spx-gray-light" style="width:6%">XPT</td>
+                    <td rowspan="2" class="spx-orange editable-cell" style="width:6%" contenteditable="true" id="p-xpt" onblur="calculateProdTotals()">0</td>
+
+                    <td class="spx-gray-light" style="width:8%">Horário início</td>
+                    <td style="width:6%; padding:0; position:relative; cursor:pointer;" onclick="try{document.getElementById('p-hora-ini').showPicker()}catch(e){}">
                         <input type="time" class="date-input-field" id="p-hora-ini" value="03:00" min="00:00" max="17:00">
                     </td>
-                    <td class="spx-gray-light" style="width:9%">Qtd realizada</td>
-                    <td class="spx-gray-dark" style="width:7%" id="p-realizada">0</td>
-                    <td class="spx-green" style="width:9%">% Etiquetado</td>
-                    <td style="width:7%" id="p-perc-etiquetado">0%</td>
-                    <td colspan="3" style="width:24%; text-align:left; padding-left:5px;">Obs:</td>
+                    <td class="spx-gray-light" style="width:8%">Qtd realizada</td>
+                    <td class="spx-gray-dark" style="width:6%" id="p-realizada">0</td>
+                    <td class="spx-green" style="width:8%">% Etiquetado</td>
+                    <td style="width:6%" id="p-perc-etiquetado">0%</td>
+                    <td colspan="3" style="width:22%; text-align:left; padding-left:5px;">Obs:</td>
                 </tr>
                 <tr>
                     <td class="spx-gray-light">Volume Rot.</td>
@@ -866,34 +870,37 @@
             let grandTotalCell = document.getElementById('p-grand-total');
             if(grandTotalCell) grandTotalCell.innerText = grandTotal.toLocaleString('pt-BR');
 
-            // LÓGICA DE 100% COM TRAVA E CORES: Total Alvo = Vol. Rotativo
+            // --- LÓGICA DE 100%: Total Alvo = Vol. Rotativo ---
             let volRotEl = document.getElementById('p-vol-rot');
             let volRot = volRotEl ? (parseInt(volRotEl.innerText.replace(/\D/g, '')) || 0) : 0;
             
             let backlogEl = document.getElementById('p-backlog');
             let backlog = backlogEl ? (parseInt(backlogEl.innerText.replace(/\D/g, '')) || 0) : 0;
+
+            let xptEl = document.getElementById('p-xpt');
+            let xpt = xptEl ? (parseInt(xptEl.innerText.replace(/\D/g, '')) || 0) : 0;
             
             let totalAlvo = volRot; 
             
-            // Qtd Realizada = Estações + Backlog
-            let qtdRealizada = grandTotal + backlog; 
+            // Qtd Realizada = Estações + Backlog + XPT
+            let qtdRealizada = grandTotal + backlog + xpt; 
             
             let pRealizada = document.getElementById('p-realizada');
             if(pRealizada) pRealizada.innerText = qtdRealizada.toLocaleString('pt-BR');
             
             // Qtd Pendente = Total Alvo - Qtd Realizada
             let pendente = totalAlvo - qtdRealizada; 
-            if(pendente < 0) pendente = 0;
+            if(pendente < 0) pendente = 0; // Trava para não ficar negativo
             
             let pPendente = document.getElementById('p-pendente');
             if(pPendente) pPendente.innerText = pendente.toLocaleString('pt-BR');
 
-            // Calculando as porcentagens e travando no máximo 100%
+            // Calculando porcentagens com a trava máxima de 100%
             let percentEtiquetado = totalAlvo > 0 ? parseInt(((qtdRealizada / totalAlvo) * 100).toFixed(0)) : 0;
-            if (percentEtiquetado > 100) percentEtiquetado = 100; // Trava máxima de 100%
+            if (percentEtiquetado > 100) percentEtiquetado = 100; // Nunca passa de 100
             
             let percentPendente = totalAlvo > 0 ? parseInt(((pendente / totalAlvo) * 100).toFixed(0)) : 0;
-            if (percentPendente < 0) percentPendente = 0; // Trava mínima de 0%
+            if (percentPendente < 0) percentPendente = 0; // Nunca fica negativo
 
             let percEtiqEl = document.getElementById('p-perc-etiquetado');
             if(percEtiqEl) percEtiqEl.innerText = percentEtiquetado + '%';
@@ -901,16 +908,14 @@
             let percPendEl = document.getElementById('p-perc-pendente');
             if(percPendEl) percPendEl.innerText = percentPendente + '%';
             
-            // Controle da Cor e Exibição do Percentual Gigante
             let giantPerc = document.getElementById('p-giant-percent');
             if(giantPerc) {
                 giantPerc.innerText = percentEtiquetado + '%';
-                
-                // Se a meta bateu ou passou de 97%, fica Verde. Senão, fica Vermelho.
+                // Muda para verde a partir de 97%
                 if (percentEtiquetado >= 97) {
-                    giantPerc.style.color = '#00b050'; // Verde Excel
+                    giantPerc.style.color = '#00b050'; // Verde
                 } else {
-                    giantPerc.style.color = '#ff0000'; // Vermelho Excel
+                    giantPerc.style.color = '#ff0000'; // Vermelho
                 }
             }
             
