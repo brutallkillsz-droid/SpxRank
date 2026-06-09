@@ -5,12 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Painel Liderança | HUB LMG-48</title>
     
+    <!-- Bibliotecas Externas (Excel e Gráficos BI) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
 
+    <!-- FIREBASE -->
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
 
@@ -74,7 +76,7 @@
            ========================================================= */
         #app-shell { display: none; width: 100%; height: 100vh; flex-direction: row; }
 
-        /* Sidebar Navigation - Ajustada para ser mais sutil */
+        /* Sidebar Navigation */
         .sidebar { width: 240px; background: rgba(10, 10, 15, 0.95); border-right: 1px solid var(--glass-border); display: flex; flex-direction: column; padding: 15px 12px; z-index: 100; height: 100vh; overflow-y: auto; flex-shrink: 0; }
         .sidebar::-webkit-scrollbar { width: 5px; }
         .sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
@@ -190,9 +192,11 @@
         .esc-sidebar { width: 260px; background: var(--bg-card); border: 1px solid var(--glass-border); border-radius: 20px; padding: 20px; flex-shrink: 0; display: flex; flex-direction: column; max-height: 85vh; }
         .esc-sidebar-title { color: var(--primary); font-size: 1rem; font-weight: 800; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px; }
         #sidebar-names-list { overflow-y: auto; flex-grow: 1; display: flex; flex-direction: column; gap: 6px; padding-right: 5px; }
-        .sidebar-name-item { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); padding: 10px 12px; border-radius: 8px; font-size: 0.75rem; font-weight: 600; color: #e2e8f0; transition: 0.2s; display: flex; align-items: center; gap: 8px; }
+        
+        .sidebar-name-item { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); padding: 8px 10px; border-radius: 8px; font-size: 0.7rem; font-weight: 600; color: #e2e8f0; transition: 0.2s; display: flex; align-items: center; justify-content: space-between; }
         .sidebar-name-item:hover { border-color: var(--primary); background: rgba(99, 102, 241, 0.05); }
-        .sidebar-name-item i { color: var(--primary); font-size: 0.9rem; }
+        .sidebar-name-item i.fa-user { color: var(--primary); font-size: 0.8rem; margin-right: 8px; }
+        
         #sidebar-names-list::-webkit-scrollbar { width: 6px; }
         #sidebar-names-list::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); border-radius: 10px; }
         #sidebar-names-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; }
@@ -269,6 +273,7 @@
 </head>
 <body>
 
+    <!-- POPUPS GLOBAIS -->
     <div id="toast" class="toast">Notificação</div>
 
     <div id="pres-popup" class="hidden">
@@ -314,6 +319,7 @@
         </div>
     </div>
 
+    <!-- TELA DE LOGIN -->
     <div id="login-screen">
         <div class="login-card">
             <div class="brand-title">LOGISTICS ELITE</div>
@@ -324,17 +330,20 @@
         </div>
     </div>
 
+    <!-- APP SHELL -->
     <div id="app-shell">
         
+        <!-- SIDEBAR DE NAVEGAÇÃO -->
         <aside class="sidebar">
-            <div class="nav-logo" style="margin-bottom: 10px;">
+            <div class="nav-logo">
                 <i class="fas fa-rocket"></i> PAINEL LIDERANÇA
             </div>
             <div class="user-panel">
-                <span id="display-user" style="font-weight:700; color:var(--primary); font-size: 0.9rem;">USER</span> 
+                <span id="display-user" style="font-weight:700; color:var(--primary);">USER</span> 
                 <i class="fas fa-sign-out-alt" style="cursor:pointer; color:var(--text-muted);" onclick="logout()" title="Sair"></i>
             </div>
 
+            <!-- Grupo ESCALAS -->
             <div class="menu-group">
                 <div class="menu-header open" onclick="toggleMenu('menu-escalas', this)">
                     <span><i class="fas fa-calendar-alt"></i> Escalas</span>
@@ -347,6 +356,7 @@
                 </div>
             </div>
 
+            <!-- Grupo RANKS -->
             <div class="menu-group">
                 <div class="menu-header open" onclick="toggleMenu('menu-ranks', this)">
                     <span><i class="fas fa-trophy"></i> Ranks</span>
@@ -360,6 +370,7 @@
                 </div>
             </div>
 
+            <!-- Grupo ACOMPANHAMENTO -->
             <div class="menu-group admin-only block-container">
                 <div class="menu-header open" onclick="toggleMenu('menu-acomp', this)">
                     <span><i class="fas fa-chart-line"></i> Acompanhamento</span>
@@ -372,6 +383,7 @@
             </div>
         </aside>
 
+        <!-- CONTEÚDO PRINCIPAL (MAIN) -->
         <main class="main-content">
             
             <section id="view-dia" class="hidden">
@@ -518,6 +530,10 @@
                 <div id="monthly-list" class="m-list"></div>
             </section>
 
+            <!-- ============================================== -->
+            <!-- ABAS DE ESCALA E DATAS AUTOMÁTICAS             -->
+            <!-- ============================================== -->
+
             <section id="view-escala" class="hidden esc-layout">
                 <div class="esc-main-content" style="padding: 0;">
                     <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
@@ -525,7 +541,7 @@
                         <div class="admin-only flex-container" style="display:flex; gap: 10px;">
                             <button class="btn-ghost" style="border-color: var(--accent); color: var(--accent);" onclick="autoDistributeAll()">Sortear Semana Toda</button>
                             <button class="btn-ghost" style="border-color: var(--danger); color: var(--danger);" onclick="clearEscalaSemana()"><i class="fas fa-trash"></i> Limpar Semana</button>
-                            <input type="week" id="hist-date-input" class="btn-ghost" style="background: rgba(255,255,255,0.05); color: #fff; border-color: var(--glass-border); outline: none; cursor: pointer;" title="Selecione a Semana do Ano" onchange="updateDatesFromWeek()" onclick="try{this.showPicker()}catch(e){}">
+                            <input type="week" id="hist-date-input" class="btn-ghost" style="background: rgba(255,255,255,0.05); color: #fff; border-color: var(--glass-border); outline: none; cursor: pointer;" title="Selecione a Semana do Ano" onchange="updateDatesFromWeek()">
                             <button class="btn-primary" style="width:auto; padding: 10px 30px;" onclick="archiveEscalaSemanal()">Salvar Histórico Semanal</button>
                         </div>
                     </div>
@@ -575,7 +591,8 @@
 
                 <div class="nasa-board">
                     <table class="nasa-table" id="presenca-table-body">
-                        </table>
+                        <!-- Gerado pelo JS -->
+                    </table>
                 </div>
                 
                 <div style="display: flex; gap: 15px; margin-top: 20px; font-size: 0.8rem; font-weight: 700; color: var(--text-muted); padding-left: 15px;">
@@ -621,11 +638,11 @@
             { id: 'segunda', nome: 'ESCALA SEGUNDA', bg: '#5c6e85', cor: '#fff' } 
         ];
         
-        // NOVO: Array atualizado com a exclusão do Gaioleiro 2 e inclusão da Mesa 9 Volumoso
         const escRows = ['ABASTECEDOR', 'BIPADOR', 'ETIQUETADOR', 'SORTING MESA', 'SORTING RUAS'];
         const escCols = ['Mesa1', 'Mesa2', 'Mesa3', 'Mesa4', 'Mesa5', 'Mesa6', 'Mesa7', 'Mesa8', 'Mesa9 VOLUMOSO', 'HANDOVER', 'Gaioleiro 1 pct', 'MESA XPT'];
         
-        let operadoresList = [
+        let operadoresList = []; 
+        let defaultOperadores = [
             "ANA CARLA TEIXEIRA DE JESUS REIS", "ANA CLAUDIA DAIBERT TOSTA", "AURIETE DE JESUS SALES DOS SANTOS",
             "EDUARDO MARTINS RAMALHO DOS SANTOS", "EDUARDO ROMARIO DE OLIVEIRA SILVA", "JEAN RODRIGUES FERREIRA SOUSA",
             "JOSENICE MARINHO DO NASCIMENTO", "KAIQUE SILVA FERREIRA", "LUCAS VINICIUS DOS SANTOS",
@@ -638,7 +655,7 @@
             "WILLIAM RESENDE DOS SANTOS", "VICTOR HENRIQUE FERNANDES FREITAS", "IGOR HENRIQUE MATHEUS",
             "ALAN HIDE NITTA", "ALICE ANA LAURA SILVA", "CAUA HENRIQUE ALVES PEREIRA",
             "IDYANARA COSTA DE PAULA", "YASMIN SILVA NASCIMENTO", "CLEDSSA CARLA MARTINS DOS SANTOS"
-        ].sort(); 
+        ];
 
         let liveEscalaSemana = {};
         let currentSidebarDay = 'quarta';
@@ -680,11 +697,28 @@
         // =========================================================
         // LISTENERS GLOBAIS DO FIREBASE
         // =========================================================
+        
+        dbFirebase.ref('shopee_colaboradores').on('value', snap => {
+            if(snap.exists()) {
+                operadoresList = Object.values(snap.val()).sort();
+            } else {
+                let initialDb = {};
+                defaultOperadores.forEach(op => initialDb[op] = op);
+                dbFirebase.ref('shopee_colaboradores').set(initialDb);
+                operadoresList = [...defaultOperadores].sort();
+            }
+            if(document.getElementById('view-escala') && !document.getElementById('view-escala').classList.contains('hidden')){
+                renderEscalaSemana(); 
+            }
+            if(document.getElementById('view-presenca') && !document.getElementById('view-presenca').classList.contains('hidden')){
+                renderPresencaGrid();
+            }
+        });
+
         dbFirebase.ref('shopee_daily_live').on('value', (snapshot) => { const data = snapshot.val(); if (data) { dailyData = data; renderDaily(); } else { dailyData = []; renderDaily(); } });
         dbFirebase.ref('shopee_prod_live').on('value', (snapshot) => { const data = snapshot.val(); if (data) { globalProdData = data; renderRankProd(); } else { globalProdData = {}; renderRankProd(); } });
         dbFirebase.ref('shopee_escala_semana_live').on('value', (snapshot) => { const data = snapshot.val(); if (data) { liveEscalaSemana = data; renderEscalaSemana(); } else { initEmptyEscalaSemana(); renderEscalaSemana(); } });
 
-        // Configuração de Mês Base e Listener de Presença
         const dateObj = new Date();
         currentPresMes = dateObj.getFullYear() + '-' + String(dateObj.getMonth() + 1).padStart(2, '0');
         
@@ -754,14 +788,32 @@
         // =========================================================
         async function handleSingleFile(input) {
             if(input.files.length === 0) return;
-            dailyData = []; ctrlData = initCtrl(); const data = await readExcelFile(input.files[0], false); processData([data], true); 
-            document.getElementById('st-single').innerText = "Carregado com sucesso!"; showToast("Importação Concluída");
+            dailyData = []; ctrlData = initCtrl();
+            try {
+                const data = await readExcelFile(input.files[0], false); 
+                processData([data], true); 
+                document.getElementById('st-single').innerText = "Carregado com sucesso!"; 
+                showToast("Importação Concluída");
+            } catch (e) {
+                console.error("Erro na importação:", e);
+                showToast("Erro ao processar arquivo diário.");
+            }
         }
 
         async function handleMassFiles(input) {
             if(input.files.length === 0) return;
-            dailyData = []; const files = Array.from(input.files); const promises = files.map(f => readExcelFile(f, false)); const results = await Promise.all(promises); processData(results, false); 
-            document.getElementById('st-mass').innerText = `${files.length} Arquivos`; showToast("Importação em Massa Concluída");
+            dailyData = []; 
+            try {
+                const files = Array.from(input.files); 
+                const promises = files.map(f => readExcelFile(f, false)); 
+                const results = await Promise.all(promises); 
+                processData(results, false); 
+                document.getElementById('st-mass').innerText = `${files.length} Arquivos`; 
+                showToast("Importação em Massa Concluída");
+            } catch (e) {
+                console.error("Erro na importação em massa:", e);
+                showToast("Erro ao processar arquivos.");
+            }
         }
 
         function processData(allFilesData, isSingleImport) {
@@ -817,7 +869,14 @@
             el('c-data').innerText = d.date || "-"; el('c-vol').innerText = d.totalVol; el('c-rotas').innerText = d.totalRotas; el('c-ini').innerText = fmtExcelTime(d.minTime); el('c-fim').innerText = fmtExcelTime(d.maxTime);
             let durSec = 0; if(d.minTime && d.maxTime) durSec = Math.round((d.maxTime - d.minTime)*86400); el('c-dur').innerText = secToHHMMSS(durSec);
             let avgHI = d.countDurHI>0 ? d.sumDurHI/d.countDurHI : 0; el('c-avg-time').innerText = secToHHMMSS(avgHI);
-            let total = d.totalVol; let finPerc = total>0 ? (d.finVol/total)*100 : 0; let pendPerc = total>0 ? (100 - finPerc) : 0;
+            
+            // CORREÇÃO CRÍTICA APLICADA: Variáveis declaradas adequadamente
+            let total = d.totalVol; 
+            let finPerc = total>0 ? (d.finVol/total)*100 : 0; 
+            let pendPerc = total>0 ? (100 - finPerc) : 0;
+            let pendRot = d.totalRotas - d.finRot;
+            let pendVol = d.totalVol - d.finVol;
+
             el('c-fin-rot').innerText = d.finRot; el('c-fin-vol').innerText = d.finVol; el('c-fin-perc').innerText = finPerc.toFixed(2).replace('.',',') + "%";
             el('c-pen-rot').innerText = pendRot; el('c-pen-vol').innerText = pendVol; el('c-pen-perc').innerText = pendPerc.toFixed(2).replace('.',',') + "%";
             el('c-mis-rot').innerText = d.missRot; el('c-mis-vol').innerText = d.missVol; let misPerc = total>0 ? (d.missRot/total)*100 : 0; el('c-mis-perc').innerText = misPerc.toFixed(2).replace('.',',') + "%";
@@ -843,7 +902,7 @@
                 container.innerHTML = '';
                 if(list.length===0) { container.innerHTML = '<div style="text-align:center;color:#666;padding:40px">Histórico Vazio</div>'; return; }
                 list.forEach((d, i) => {
-                    const pos = i+1; let css = ''; let icon = ''; if(pos===1) { css='mr-1'; icon='🥇'; } else if(pos===2) { css='mr-2'; icon='🥈'; } else if(pos===3) { css='rank-3'; icon='🥉'; }
+                    const pos = i+1; let css = ''; let icon = ''; if(pos===1) { css='mr-1'; icon='🥇'; } else if(pos===2) { css='rank-2'; icon='🥈'; } else if(pos===3) { css='rank-3'; icon='🥉'; }
                     const div = document.createElement('div'); div.className = `stat-card m-row ${css}`; div.style.padding = "15px 30px";
                     div.innerHTML = `<div class="m-idx">#${pos}</div><div style="font-weight:700;display:flex;gap:10px;align-items:center; color:#fff;">${icon} ${d.nome}</div><div class="m-stat"><div class="ms-l">Rotas</div><div class="ms-v">${d.rotas}</div></div><div class="m-stat"><div class="ms-l">Vol Total</div><div class="ms-v">${d.vol}</div></div><div class="m-stat"><div class="ms-l">Erros Totais</div><div class="ms-v" style="color:${d.totalErrosTela>0?'var(--danger)':'inherit'}">${d.totalErrosTela}</div></div><div class="m-stat"><div class="ms-l">Acuracidade Global</div><div class="ms-v" style="color:${d.acur>=99?'var(--success)':'var(--danger)'}">${d.acur.toFixed(2)}%</div></div><div class="m-stat"><div class="ms-l">T. Médio Global</div><div class="ms-v">${fmtTime(d.avg)}</div></div>`;
                     container.appendChild(div);
@@ -854,7 +913,7 @@
         async function resetMonthly() { if(confirm("Deseja apagar permanentemente o histórico MENSAL DA NUVEM?")) { await dbFirebase.ref('shopee_gold_db').remove(); renderMonthly(); showToast("Banco Apagado!"); } }
 
         // =========================================================
-        // PRODUTIVIDADE (INTACTA E BLINDADA COM NOVO HORÁRIO 23:00)
+        // PRODUTIVIDADE E DASHBOARD BI
         // =========================================================
         function initProdGrid() {
             const tbody = document.getElementById('prod-body-grid'); let html = '';
@@ -1118,12 +1177,20 @@
             if(!name) return showToast("Digite o nome completo.");
             if(operadoresList.includes(name)) return showToast("Este colaborador já existe.");
             
-            operadoresList.push(name);
-            operadoresList.sort();
-            input.value = "";
-            renderEscalaSemana();
-            renderPresencaGrid(); 
-            showToast("Colaborador cadastrado!");
+            dbFirebase.ref('shopee_colaboradores/' + name).set(name)
+                .then(() => {
+                    input.value = "";
+                    showToast("Colaborador cadastrado!");
+                }).catch(e => console.error(e));
+        }
+
+        function removeCollaborator(name) {
+            if(confirm(`Deseja realmente desligar/remover o colaborador ${name} do sistema?`)) {
+                dbFirebase.ref('shopee_colaboradores/' + name).remove()
+                    .then(() => {
+                        showToast("Colaborador removido!");
+                    }).catch(e => console.error(e));
+            }
         }
 
         function clearEscalaSemana() {
@@ -1378,7 +1445,13 @@
             let html = ''; let availableCount = 0;
             operadoresList.forEach(op => { 
                 if (!selectedValues.includes(op) && !absentees.includes(op)) { 
-                    html += `<div class="sidebar-name-item"><i class="fas fa-user"></i> ${op}</div>`; 
+                    html += `
+                    <div class="sidebar-name-item">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <i class="fas fa-user"></i> ${op}
+                        </div>
+                        <i class="fas fa-times" style="color:var(--danger); cursor:pointer; font-size:1rem; padding:0 5px;" onclick="removeCollaborator('${op}')" title="Desligar Colaborador"></i>
+                    </div>`; 
                     availableCount++; 
                 } 
             });
