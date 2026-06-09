@@ -5,14 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Painel Liderança | HUB LMG-48</title>
     
-    <!-- Bibliotecas Externas (Excel e Gráficos BI) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
 
-    <!-- FIREBASE -->
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
 
@@ -189,13 +187,15 @@
            ========================================================= */
         .esc-layout { display: flex; gap: 20px; align-items: flex-start; }
         .esc-main-content { flex-grow: 1; overflow: hidden; }
-        .esc-sidebar { width: 240px; background: var(--bg-card); border: 1px solid var(--glass-border); border-radius: 16px; padding: 15px; flex-shrink: 0; display: flex; flex-direction: column; max-height: 85vh; }
-        .esc-sidebar-title { color: var(--primary); font-size: 0.9rem; font-weight: 800; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px; }
+        .esc-sidebar { width: 260px; background: var(--bg-card); border: 1px solid var(--glass-border); border-radius: 20px; padding: 20px; flex-shrink: 0; display: flex; flex-direction: column; max-height: 85vh; }
+        .esc-sidebar-title { color: var(--primary); font-size: 1rem; font-weight: 800; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px; }
         #sidebar-names-list { overflow-y: auto; flex-grow: 1; display: flex; flex-direction: column; gap: 6px; padding-right: 5px; }
-        .sidebar-name-item { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); padding: 8px 10px; border-radius: 8px; font-size: 0.7rem; font-weight: 600; color: #e2e8f0; transition: 0.2s; display: flex; align-items: center; gap: 8px; }
+        
+        .sidebar-name-item { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); padding: 8px 10px; border-radius: 8px; font-size: 0.7rem; font-weight: 600; color: #e2e8f0; transition: 0.2s; display: flex; align-items: center; justify-content: space-between; }
         .sidebar-name-item:hover { border-color: var(--primary); background: rgba(99, 102, 241, 0.05); }
-        .sidebar-name-item i { color: var(--primary); font-size: 0.8rem; }
-        #sidebar-names-list::-webkit-scrollbar { width: 4px; }
+        .sidebar-name-item i.fa-user { color: var(--primary); font-size: 0.8rem; margin-right: 8px; }
+        
+        #sidebar-names-list::-webkit-scrollbar { width: 6px; }
         #sidebar-names-list::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); border-radius: 10px; }
         #sidebar-names-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; }
 
@@ -211,6 +211,7 @@
         .esc-red-txt { color: #ff0000 !important; }
         .esc-select { width: 100%; background: transparent; border: none; font-size: 9px; font-weight: 800; text-align: center; cursor: pointer; color: #000; outline: none; font-family: inherit; letter-spacing: -0.2px; }
         .esc-select option { color: #000; font-weight: normal; }
+        .esc-select option:disabled { color: #ccc; font-style: italic; }
         .esc-block { margin-bottom: 40px; border-bottom: 3px dashed #ccc; padding-bottom: 20px; }
         .esc-block:last-child { border-bottom: none; }
 
@@ -270,7 +271,6 @@
 </head>
 <body>
 
-    <!-- POPUPS GLOBAIS -->
     <div id="toast" class="toast">Notificação</div>
 
     <div id="pres-popup" class="hidden">
@@ -316,7 +316,6 @@
         </div>
     </div>
 
-    <!-- TELA DE LOGIN -->
     <div id="login-screen">
         <div class="login-card">
             <div class="brand-title">LOGISTICS ELITE</div>
@@ -327,10 +326,8 @@
         </div>
     </div>
 
-    <!-- APP SHELL -->
     <div id="app-shell">
         
-        <!-- SIDEBAR DE NAVEGAÇÃO -->
         <aside class="sidebar">
             <div class="nav-logo">
                 <i class="fas fa-rocket"></i> PAINEL LIDERANÇA
@@ -340,7 +337,6 @@
                 <i class="fas fa-sign-out-alt" style="cursor:pointer; color:var(--text-muted);" onclick="logout()" title="Sair"></i>
             </div>
 
-            <!-- Grupo ESCALAS -->
             <div class="menu-group">
                 <div class="menu-header open" onclick="toggleMenu('menu-escalas', this)">
                     <span><i class="fas fa-calendar-alt"></i> Escalas</span>
@@ -353,7 +349,6 @@
                 </div>
             </div>
 
-            <!-- Grupo RANKS -->
             <div class="menu-group">
                 <div class="menu-header open" onclick="toggleMenu('menu-ranks', this)">
                     <span><i class="fas fa-trophy"></i> Ranks</span>
@@ -367,7 +362,6 @@
                 </div>
             </div>
 
-            <!-- Grupo ACOMPANHAMENTO -->
             <div class="menu-group admin-only block-container">
                 <div class="menu-header open" onclick="toggleMenu('menu-acomp', this)">
                     <span><i class="fas fa-chart-line"></i> Acompanhamento</span>
@@ -380,7 +374,6 @@
             </div>
         </aside>
 
-        <!-- CONTEÚDO PRINCIPAL (MAIN) -->
         <main class="main-content">
             
             <section id="view-dia" class="hidden">
@@ -527,10 +520,6 @@
                 <div id="monthly-list" class="m-list"></div>
             </section>
 
-            <!-- ============================================== -->
-            <!-- ABAS DE ESCALA E DATAS AUTOMÁTICAS             -->
-            <!-- ============================================== -->
-
             <section id="view-escala" class="hidden esc-layout">
                 <div class="esc-main-content" style="padding: 0;">
                     <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
@@ -538,7 +527,7 @@
                         <div class="admin-only flex-container" style="display:flex; gap: 10px;">
                             <button class="btn-ghost" style="border-color: var(--accent); color: var(--accent);" onclick="autoDistributeAll()">Sortear Semana Toda</button>
                             <button class="btn-ghost" style="border-color: var(--danger); color: var(--danger);" onclick="clearEscalaSemana()"><i class="fas fa-trash"></i> Limpar Semana</button>
-                            <input type="week" id="hist-date-input" class="btn-ghost" style="background: rgba(255,255,255,0.05); color: #fff; border-color: var(--glass-border); outline: none; cursor: pointer;" title="Selecione a Semana do Ano" onchange="updateDatesFromWeek()">
+                            <input type="week" id="hist-date-input" class="btn-ghost" style="background: rgba(255,255,255,0.05); color: #fff; border-color: var(--glass-border); outline: none; cursor: pointer;" title="Selecione a Semana do Ano" onchange="updateDatesFromWeek()" onclick="try{this.showPicker()}catch(e){}">
                             <button class="btn-primary" style="width:auto; padding: 10px 30px;" onclick="archiveEscalaSemanal()">Salvar Histórico Semanal</button>
                         </div>
                     </div>
@@ -588,15 +577,13 @@
 
                 <div class="nasa-board">
                     <table class="nasa-table" id="presenca-table-body">
-                        <!-- Gerado pelo JS -->
-                    </table>
+                        </table>
                 </div>
                 
                 <div style="display: flex; gap: 15px; margin-top: 20px; font-size: 0.8rem; font-weight: 700; color: var(--text-muted); padding-left: 15px;">
                     <div style="display: flex; align-items: center; gap: 6px;"><div class="badge-pres badge-P">P</div> Presença</div>
                     <div style="display: flex; align-items: center; gap: 6px;"><div class="badge-pres badge-F">F</div> Falta</div>
                     <div style="display: flex; align-items: center; gap: 6px;"><div class="badge-pres badge-FG">FG</div> Folga</div>
-                    <!-- NOVO: Legenda AT -->
                     <div style="display: flex; align-items: center; gap: 6px;"><div class="badge-pres badge-AT">AT</div> Atestado</div>
                 </div>
             </section>
@@ -635,10 +622,13 @@
             { id: 'domingo', nome: 'ESCALA DOMINGO', bg: '#f4b084', cor: '#000' },
             { id: 'segunda', nome: 'ESCALA SEGUNDA', bg: '#5c6e85', cor: '#fff' } 
         ];
-        const escRows = ['ABASTECEDOR', 'BIPADOR', 'ETIQUETADOR', 'SORTING MESA', 'SORTING RUAS'];
-        const escCols = ['Mesa1', 'Mesa2', 'Mesa3', 'Mesa4', 'Mesa5', 'Mesa6', 'Mesa7', 'Mesa8 VOLUMOSO', 'HANDOVER', 'Gaioleiro 1 pct', 'Gaioleiro 2 VOL', 'MESA XPT'];
         
-        let operadoresList = [
+        const escRows = ['ABASTECEDOR', 'BIPADOR', 'ETIQUETADOR', 'SORTING MESA', 'SORTING RUAS'];
+        const escCols = ['Mesa1', 'Mesa2', 'Mesa3', 'Mesa4', 'Mesa5', 'Mesa6', 'Mesa7', 'Mesa8', 'Mesa9 VOLUMOSO', 'HANDOVER', 'Gaioleiro 1 pct', 'MESA XPT'];
+        
+        // NOVO: Array Dinâmico de Operadores que será alimentado pelo Firebase
+        let operadoresList = []; 
+        let defaultOperadores = [
             "ANA CARLA TEIXEIRA DE JESUS REIS", "ANA CLAUDIA DAIBERT TOSTA", "AURIETE DE JESUS SALES DOS SANTOS",
             "EDUARDO MARTINS RAMALHO DOS SANTOS", "EDUARDO ROMARIO DE OLIVEIRA SILVA", "JEAN RODRIGUES FERREIRA SOUSA",
             "JOSENICE MARINHO DO NASCIMENTO", "KAIQUE SILVA FERREIRA", "LUCAS VINICIUS DOS SANTOS",
@@ -651,7 +641,7 @@
             "WILLIAM RESENDE DOS SANTOS", "VICTOR HENRIQUE FERNANDES FREITAS", "IGOR HENRIQUE MATHEUS",
             "ALAN HIDE NITTA", "ALICE ANA LAURA SILVA", "CAUA HENRIQUE ALVES PEREIRA",
             "IDYANARA COSTA DE PAULA", "YASMIN SILVA NASCIMENTO", "CLEDSSA CARLA MARTINS DOS SANTOS"
-        ].sort(); 
+        ];
 
         let liveEscalaSemana = {};
         let currentSidebarDay = 'quarta';
@@ -693,6 +683,25 @@
         // =========================================================
         // LISTENERS GLOBAIS DO FIREBASE
         // =========================================================
+        
+        // NOVO: Listener de Colaboradores na Nuvem
+        dbFirebase.ref('shopee_colaboradores').on('value', snap => {
+            if(snap.exists()) {
+                operadoresList = Object.values(snap.val()).sort();
+            } else {
+                let initialDb = {};
+                defaultOperadores.forEach(op => initialDb[op] = op);
+                dbFirebase.ref('shopee_colaboradores').set(initialDb);
+                operadoresList = [...defaultOperadores].sort();
+            }
+            if(document.getElementById('view-escala') && !document.getElementById('view-escala').classList.contains('hidden')){
+                renderEscalaSemana(); 
+            }
+            if(document.getElementById('view-presenca') && !document.getElementById('view-presenca').classList.contains('hidden')){
+                renderPresencaGrid();
+            }
+        });
+
         dbFirebase.ref('shopee_daily_live').on('value', (snapshot) => { const data = snapshot.val(); if (data) { dailyData = data; renderDaily(); } else { dailyData = []; renderDaily(); } });
         dbFirebase.ref('shopee_prod_live').on('value', (snapshot) => { const data = snapshot.val(); if (data) { globalProdData = data; renderRankProd(); } else { globalProdData = {}; renderRankProd(); } });
         dbFirebase.ref('shopee_escala_semana_live').on('value', (snapshot) => { const data = snapshot.val(); if (data) { liveEscalaSemana = data; renderEscalaSemana(); } else { initEmptyEscalaSemana(); renderEscalaSemana(); } });
@@ -763,18 +772,37 @@
         function confirmShift(shift) { selectedShiftTemp = shift; document.getElementById('shift-display').innerText = "| TURNO: " + shift; closeShiftModal(); document.getElementById('file-prod').click(); }
 
         // =========================================================
-        // DIÁRIO E CONTROLE HUB... 
+        // DIÁRIO
         // =========================================================
         async function handleSingleFile(input) {
             if(input.files.length === 0) return;
-            dailyData = []; ctrlData = initCtrl(); const data = await readExcelFile(input.files[0], false); processData([data], true); 
-            document.getElementById('st-single').innerText = "Carregado com sucesso!"; showToast("Importação Concluída");
+            dailyData = []; ctrlData = initCtrl();
+            
+            try {
+                const data = await readExcelFile(input.files[0], false); 
+                processData([data], true); 
+                document.getElementById('st-single').innerText = "Carregado com sucesso!"; 
+                showToast("Importação Concluída");
+            } catch (e) {
+                console.error("Erro na importação:", e);
+                showToast("Erro ao processar arquivo diário.");
+            }
         }
 
         async function handleMassFiles(input) {
             if(input.files.length === 0) return;
-            dailyData = []; const files = Array.from(input.files); const promises = files.map(f => readExcelFile(f, false)); const results = await Promise.all(promises); processData(results, false); 
-            document.getElementById('st-mass').innerText = `${files.length} Arquivos`; showToast("Importação em Massa Concluída");
+            dailyData = []; 
+            try {
+                const files = Array.from(input.files); 
+                const promises = files.map(f => readExcelFile(f, false)); 
+                const results = await Promise.all(promises); 
+                processData(results, false); 
+                document.getElementById('st-mass').innerText = `${files.length} Arquivos`; 
+                showToast("Importação em Massa Concluída");
+            } catch (e) {
+                console.error("Erro na importação em massa:", e);
+                showToast("Erro ao processar arquivos.");
+            }
         }
 
         function processData(allFilesData, isSingleImport) {
@@ -856,7 +884,7 @@
                 container.innerHTML = '';
                 if(list.length===0) { container.innerHTML = '<div style="text-align:center;color:#666;padding:40px">Histórico Vazio</div>'; return; }
                 list.forEach((d, i) => {
-                    const pos = i+1; let css = ''; let icon = ''; if(pos===1) { css='mr-1'; icon='🥇'; } else if(pos===2) { css='mr-2'; icon='🥈'; } else if(pos===3) { css='rank-3'; icon='🥉'; }
+                    const pos = i+1; let css = ''; let icon = ''; if(pos===1) { css='mr-1'; icon='🥇'; } else if(pos===2) { css='rank-2'; icon='🥈'; } else if(pos===3) { css='rank-3'; icon='🥉'; }
                     const div = document.createElement('div'); div.className = `stat-card m-row ${css}`; div.style.padding = "15px 30px";
                     div.innerHTML = `<div class="m-idx">#${pos}</div><div style="font-weight:700;display:flex;gap:10px;align-items:center; color:#fff;">${icon} ${d.nome}</div><div class="m-stat"><div class="ms-l">Rotas</div><div class="ms-v">${d.rotas}</div></div><div class="m-stat"><div class="ms-l">Vol Total</div><div class="ms-v">${d.vol}</div></div><div class="m-stat"><div class="ms-l">Erros Totais</div><div class="ms-v" style="color:${d.totalErrosTela>0?'var(--danger)':'inherit'}">${d.totalErrosTela}</div></div><div class="m-stat"><div class="ms-l">Acuracidade Global</div><div class="ms-v" style="color:${d.acur>=99?'var(--success)':'var(--danger)'}">${d.acur.toFixed(2)}%</div></div><div class="m-stat"><div class="ms-l">T. Médio Global</div><div class="ms-v">${fmtTime(d.avg)}</div></div>`;
                     container.appendChild(div);
@@ -872,7 +900,9 @@
         function initProdGrid() {
             const tbody = document.getElementById('prod-body-grid'); let html = '';
             for (let i = 0; i < 24; i++) {
-                let hour = i.toString().padStart(2, '0') + ':00';
+                let h = (i === 0) ? 23 : i - 1;
+                let hour = h.toString().padStart(2, '0') + ':00';
+                
                 html += `<tr><td style="border-left: 2px solid #000; font-weight: bold; background:#f0f8ff;" class="editable-cell" contenteditable="true" id="p-hour-${i}" onblur="refreshProdGridData()">${hour}</td>`;
                 for (let j = 1; j <= 10; j++) { html += `<td id="p-cell-${i}-${j}" class="editable-cell" contenteditable="true" onblur="calculateProdTotals()"></td>`; }
                 html += `<td id="p-row-total-${i}" style="font-weight: bold; background: #e2e8f0; color: #0f172a;"></td>`;
@@ -888,25 +918,53 @@
         async function importProdData(input) {
             if(input.files.length === 0) return;
             try {
-                const data = await readExcelFile(input.files[0], true); if (!data || data.length === 0) { showToast("Arquivo vazio ou inválido."); return; }
-                globalProdData = {}; let headers = data[0] || []; let colHoursMap = {};
+                const data = await readExcelFile(input.files[0], true); 
+                if (!data || data.length === 0) { showToast("Arquivo vazio ou inválido."); return; }
+                globalProdData = {}; 
+                let headers = data[0] || []; 
+                let colHoursMap = {};
+
+                let allowedHours = [];
+                if (selectedShiftTemp === 'AM') {
+                    allowedHours = ['23:00', '00:00', '01:00', '02:00', '03:00', '04:00'];
+                } else if (selectedShiftTemp === 'PM') {
+                    allowedHours = ['07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00'];
+                }
+
                 for (let c = 3; c < headers.length; c++) {
                     let timeVal = headers[c]; if (timeVal === undefined || timeVal === null || timeVal === '') continue;
                     let hourStr = null;
                     if (timeVal instanceof Date) { hourStr = timeVal.getHours().toString().padStart(2, '0') + ":00"; } 
                     else if (typeof timeVal === 'number') { let totalSeconds = Math.round((timeVal - Math.floor(timeVal)) * 86400); let h = Math.floor(totalSeconds / 3600); hourStr = h.toString().padStart(2, '0') + ":00"; } 
                     else { let match = String(timeVal).match(/(?:^|\s)(\d{1,2}):/); if(match) hourStr = match[1].padStart(2, '0') + ":00"; }
-                    if (hourStr) { colHoursMap[c] = hourStr; }
+                    
+                    if (hourStr && (!selectedShiftTemp || allowedHours.includes(hourStr))) { 
+                        colHoursMap[c] = hourStr; 
+                    }
                 }
+
                 for(let i = 1; i < data.length; i++) {
                     let row = data[i]; if(!row || !row[0]) continue; let rawName = String(row[0]); 
                     let tempName = rawName.replace(/\[.*?\]/g, '').replace(/^(AT|OPS?)\s*-?\s*\d*\s*-?\s*/gi, '').replace(/^\d+\s*-?\s*/, '').trim().toUpperCase(); tempName = tempName.replace(/[.\#$\[\]\/]/g, '');
                     let parts = tempName.split(/\s+/).filter(Boolean); let cleanName = "";
                     if(parts.length > 1) { cleanName = parts[0] + " " + parts[1].charAt(0); } else if(parts.length === 1) { cleanName = parts[0]; }
                     if (!cleanName) continue;
+                    
+                    let hasValidData = false;
+                    for (let c in colHoursMap) {
+                        let valStr = String(row[c] || '').replace(/[^\d.,]/g, '').replace(',', '.');
+                        let val = parseFloat(valStr) || 0;
+                        if(val > 0) hasValidData = true;
+                    }
+
+                    if(!hasValidData) continue;
+
                     if(!globalProdData[cleanName]) globalProdData[cleanName] = {};
                     for (let c in colHoursMap) {
-                        let mappedHour = colHoursMap[c]; let valStr = String(row[c]).replace(/[^\d.,]/g, '').replace(',', '.'); let val = parseFloat(valStr) || 0; globalProdData[cleanName][mappedHour] = (globalProdData[cleanName][mappedHour] || 0) + val;
+                        let mappedHour = colHoursMap[c]; 
+                        let valStr = String(row[c] || '').replace(/[^\d.,]/g, '').replace(',', '.'); 
+                        let val = parseFloat(valStr) || 0; 
+                        globalProdData[cleanName][mappedHour] = (globalProdData[cleanName][mappedHour] || 0) + val;
                     }
                 }
                 updateDropdowns(); saveProdToCloud(); showToast("Produtividade Processada!");
@@ -964,20 +1022,6 @@
             let giantPerc = document.getElementById('p-giant-percent');
             if(giantPerc) { giantPerc.innerText = percentEtiquetado + '%'; if (percentEtiquetado >= 97) giantPerc.style.color = '#00b050'; else giantPerc.style.color = '#ff0000'; }
             saveProdToCloud(); renderRankProd(); 
-        }
-
-        function renderRankProd() {
-            const container = document.getElementById('rankprod-list'); if(!container) return; container.innerHTML = ''; let list = [];
-            for(let name in globalProdData) { let total = 0; for(let hour in globalProdData[name]) { total += globalProdData[name][hour]; } if(total > 0) { list.push({ nome: name, total: total }); } }
-            list.sort((a,b) => b.total - a.total);
-            if(list.length === 0) { container.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:40px; font-weight: 700; font-size: 1rem;">Aguardando importação dos dados de Produtividade...</div>'; return; }
-            list.forEach((d, i) => {
-                const pos = i+1; let css = ''; let icon = ''; 
-                if(pos===1) { css='rank-1'; icon='<i class="fas fa-trophy" style="color:var(--gold);"></i>'; } else if(pos===2) { css='rank-2'; icon='<i class="fas fa-medal" style="color:var(--silver);"></i>'; } else if(pos===3) { css='rank-3'; icon='<i class="fas fa-medal" style="color:var(--bronze);"></i>'; } else { icon = '<i class="fas fa-check-circle" style="color:rgba(255,255,255,0.1);"></i>'; }
-                const div = document.createElement('div'); div.className = `stat-card ${css}`; div.style.display = "flex"; div.style.justifyContent = "space-between"; div.style.alignItems = "center"; div.style.padding = "12px 25px"; div.style.marginBottom = "10px"; div.style.borderRadius = "18px";
-                div.innerHTML = `<div style="display:flex; align-items:center; gap: 15px;"><div style="font-size: 1.2rem; width: 30px; color: var(--text-muted); font-weight: 800;">#${pos}</div><div style="font-weight:700; display:flex; gap:10px; align-items:center; color:#f8fafc; font-size:1.1rem;"><span style="font-size:1.2rem; display:flex; align-items:center; justify-content:center;">${icon}</span> ${d.nome}</div></div><div style="text-align: right; background: rgba(0,0,0,0.2); padding: 8px 20px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.03); display:flex; align-items: center; gap: 15px;"><div style="font-size: 0.65rem; letter-spacing: 1px; color: var(--text-muted); font-weight: 800; text-transform: uppercase;">Vol. Etiquetado</div><div style="font-size: 1.6rem; background: linear-gradient(to bottom, #fff, #94a3b8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 900; line-height: 1;">${d.total.toLocaleString('pt-BR')}</div></div>`;
-                container.appendChild(div);
-            });
         }
 
         async function renderBIChart() {
@@ -1101,7 +1145,6 @@
             if(match) {
                 let day = parseInt(match[1]);
                 for(let op in livePresenca) {
-                    // ADICIONADO A CHECAGEM PARA "AT"
                     if(livePresenca[op] && (livePresenca[op][day] === 'F' || livePresenca[op][day] === 'FG' || livePresenca[op][day] === 'AT')) {
                         absentees.push(op);
                     }
@@ -1110,18 +1153,28 @@
             return absentees;
         }
 
+        // NOVO: Função para Adicionar ao BD
         function addNewCollaborator() {
             const input = document.getElementById('new-worker-name');
             const name = input.value.trim().toUpperCase();
             if(!name) return showToast("Digite o nome completo.");
             if(operadoresList.includes(name)) return showToast("Este colaborador já existe.");
             
-            operadoresList.push(name);
-            operadoresList.sort();
-            input.value = "";
-            renderEscalaSemana();
-            renderPresencaGrid(); 
-            showToast("Colaborador cadastrado!");
+            dbFirebase.ref('shopee_colaboradores/' + name).set(name)
+                .then(() => {
+                    input.value = "";
+                    showToast("Colaborador cadastrado!");
+                }).catch(e => console.error(e));
+        }
+
+        // NOVO: Função para Remover do BD
+        function removeCollaborator(name) {
+            if(confirm(`Deseja realmente desligar/remover o colaborador ${name} do sistema?`)) {
+                dbFirebase.ref('shopee_colaboradores/' + name).remove()
+                    .then(() => {
+                        showToast("Colaborador removido!");
+                    }).catch(e => console.error(e));
+            }
         }
 
         function clearEscalaSemana() {
@@ -1359,6 +1412,7 @@
 
         function changeSidebarDay() { currentSidebarDay = document.getElementById('sidebar-day-select').value; updateSidebar(); }
 
+        // NOVO: Renderiza a lixeira apenas para ADMINS
         function updateSidebar() {
             if (!currentUser || currentUser.r !== 'admin') return;
             let container = document.getElementById('sidebar-names-list'); if (!container) return;
@@ -1376,7 +1430,13 @@
             let html = ''; let availableCount = 0;
             operadoresList.forEach(op => { 
                 if (!selectedValues.includes(op) && !absentees.includes(op)) { 
-                    html += `<div class="sidebar-name-item"><i class="fas fa-user"></i> ${op}</div>`; 
+                    html += `
+                    <div class="sidebar-name-item">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <i class="fas fa-user"></i> ${op}
+                        </div>
+                        <i class="fas fa-times" style="color:var(--danger); cursor:pointer; font-size:1rem; padding:0 5px;" onclick="removeCollaborator('${op}')" title="Desligar Colaborador"></i>
+                    </div>`; 
                     availableCount++; 
                 } 
             });
@@ -1503,116 +1563,4 @@
 
                     const div = document.createElement('div'); div.className = `stat-card`; div.style.padding = "20px"; div.style.marginBottom = "15px";
                     div.innerHTML = `
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px; border-bottom: 1px solid var(--glass-border); padding-bottom: 15px;">
-                            <div style="font-weight: 800; font-size: 1.2rem; color: var(--primary);">
-                                <i class="fas fa-calendar-week" style="margin-right: 8px;"></i> ${displayWeek}
-                            </div>
-                            <button class="btn-ghost" style="padding: 6px 12px; font-size: 0.75rem;" onclick="document.getElementById('hist-det-${index}').classList.toggle('hidden')">
-                                <i class="fas fa-search"></i> Ver Relatório
-                            </button>
-                        </div>
-                        <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap: 15px;">
-                            <div class="si"><div class="si-l">Headcount (Quarta)</div><div class="si-v" style="font-size: 1.2rem;">${resumo.hc}</div></div>
-                            <div class="si"><div class="si-l">Pct Proc. (Quarta)</div><div class="si-v" style="color:var(--success); font-size: 1.2rem;">${resumo.pct}</div></div>
-                            <div class="si"><div class="si-l">Nec. DW (Quarta)</div><div class="si-v" style="color:var(--danger); font-size: 1.2rem;">${resumo.dw}</div></div>
-                        </div>
-                        ${tableHtml}
-                    `;
-                    container.appendChild(div);
-                });
-            } catch (e) { console.error(e); container.innerHTML = '<div style="text-align:center;color:var(--danger);padding:40px">Erro de conexão.</div>'; }
-        }
-
-        // =========================================================
-        // PRESENÇA MENSAL (CONTROLE AO VIVO)
-        // =========================================================
-
-        function loadPresencaData() {
-            renderPresencaGrid();
-        }
-
-        function changePresencaMonth() {
-            let val = document.getElementById('pres-month-select').value;
-            if(val) {
-                dbFirebase.ref('shopee_presenca_live/' + currentPresMes).off('value', presencaListener);
-                currentPresMes = val;
-                presencaListener = dbFirebase.ref('shopee_presenca_live/' + currentPresMes).on('value', snap => {
-                    livePresenca = snap.val() || {};
-                    renderPresencaGrid();
-                    if(!document.getElementById('view-escala').classList.contains('hidden')) {
-                        escDiasConf.forEach(d => updateDropdownsAvailability(d.id));
-                        updateSidebar();
-                    }
-                });
-            }
-        }
-
-        function getDaysInMonth(monthStr) {
-            let parts = monthStr.split('-');
-            let year = parseInt(parts[0]);
-            let month = parseInt(parts[1]);
-            return new Date(year, month, 0).getDate();
-        }
-
-        function renderPresencaGrid() {
-            const tbody = document.getElementById('presenca-table-body');
-            if(!tbody) return;
-
-            let daysCount = getDaysInMonth(currentPresMes);
-            let isAdm = currentUser && currentUser.r === 'admin';
-
-            let html = `<tr><th>COLABORADOR</th>`;
-            for(let d = 1; d <= daysCount; d++) { html += `<th>${d}</th>`; }
-            html += `<th class="tot-P">P</th><th class="tot-F">F</th><th class="tot-FG">FG</th><th class="tot-AT">AT</th></tr>`;
-
-            operadoresList.forEach(colab => {
-                let pCount = 0; let fCount = 0; let fgCount = 0; let atCount = 0;
-                let colabData = livePresenca[colab] || {};
-
-                html += `<tr><td>${colab}</td>`;
-                
-                for(let d = 1; d <= daysCount; d++) {
-                    let val = colabData[d] || '';
-                    if(val === 'P') pCount++; 
-                    if(val === 'F') fCount++; 
-                    if(val === 'FG') fgCount++;
-                    if(val === 'AT') atCount++;
-
-                    let badgeClass = val ? `badge-${val}` : 'badge-empty';
-                    let displayVal = val || '';
-                    let clickEvent = isAdm ? `onclick="openPresPopup('${colab}', ${d}, event)"` : '';
-                    html += `<td class="pres-cell" ${clickEvent}><div class="badge-pres ${badgeClass}">${displayVal}</div></td>`;
-                }
-                html += `<td class="tot-col tot-P">${pCount}</td><td class="tot-col tot-F">${fCount}</td><td class="tot-col tot-FG">${fgCount}</td><td class="tot-col tot-AT">${atCount}</td></tr>`;
-            });
-            tbody.innerHTML = html;
-        }
-
-        function openPresPopup(colab, dia, event) {
-            activePresColab = colab; activePresDia = dia;
-            const popup = document.getElementById('pres-popup');
-            popup.classList.remove('hidden');
-            
-            let x = event.pageX - 70; let y = event.pageY + 15;
-            popup.style.left = x + 'px'; popup.style.top = y + 'px';
-        }
-
-        function setPresenca(val) {
-            if(!livePresenca[activePresColab]) livePresenca[activePresColab] = {};
-            livePresenca[activePresColab][activePresDia] = val;
-            
-            if(val === '') { delete livePresenca[activePresColab][activePresDia]; }
-            dbFirebase.ref('shopee_presenca_live/' + currentPresMes).set(livePresenca);
-            document.getElementById('pres-popup').classList.add('hidden');
-        }
-
-        document.addEventListener('click', function(e) {
-            const popup = document.getElementById('pres-popup');
-            if(!popup.classList.contains('hidden') && !e.target.closest('.pres-cell') && !e.target.closest('#pres-popup')) {
-                popup.classList.add('hidden');
-            }
-        });
-
-    </script>
-</body>
-</html>
+                        <div style="
