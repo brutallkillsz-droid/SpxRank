@@ -190,11 +190,9 @@
         .esc-sidebar { width: 260px; background: var(--bg-card); border: 1px solid var(--glass-border); border-radius: 20px; padding: 20px; flex-shrink: 0; display: flex; flex-direction: column; max-height: 85vh; }
         .esc-sidebar-title { color: var(--primary); font-size: 1rem; font-weight: 800; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px; }
         #sidebar-names-list { overflow-y: auto; flex-grow: 1; display: flex; flex-direction: column; gap: 6px; padding-right: 5px; }
-        
-        .sidebar-name-item { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); padding: 8px 10px; border-radius: 8px; font-size: 0.7rem; font-weight: 600; color: #e2e8f0; transition: 0.2s; display: flex; align-items: center; justify-content: space-between; }
+        .sidebar-name-item { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); padding: 10px 12px; border-radius: 8px; font-size: 0.75rem; font-weight: 600; color: #e2e8f0; transition: 0.2s; display: flex; align-items: center; gap: 8px; }
         .sidebar-name-item:hover { border-color: var(--primary); background: rgba(99, 102, 241, 0.05); }
-        .sidebar-name-item i.fa-user { color: var(--primary); font-size: 0.8rem; margin-right: 8px; }
-        
+        .sidebar-name-item i { color: var(--primary); font-size: 0.9rem; }
         #sidebar-names-list::-webkit-scrollbar { width: 6px; }
         #sidebar-names-list::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); border-radius: 10px; }
         #sidebar-names-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; }
@@ -329,11 +327,11 @@
     <div id="app-shell">
         
         <aside class="sidebar">
-            <div class="nav-logo">
+            <div class="nav-logo" style="margin-bottom: 10px;">
                 <i class="fas fa-rocket"></i> PAINEL LIDERANÇA
             </div>
             <div class="user-panel">
-                <span id="display-user" style="font-weight:700; color:var(--primary);">USER</span> 
+                <span id="display-user" style="font-weight:700; color:var(--primary); font-size: 0.9rem;">USER</span> 
                 <i class="fas fa-sign-out-alt" style="cursor:pointer; color:var(--text-muted);" onclick="logout()" title="Sair"></i>
             </div>
 
@@ -537,7 +535,7 @@
                 <div class="esc-sidebar admin-only flex-container">
                     <div class="esc-sidebar-title">Novo Colaborador</div>
                     <div style="margin-bottom: 20px; display: flex; gap: 8px;">
-                        <input type="text" id="new-worker-name" placeholder="Nome Completo" style="flex: 1; padding: 8px; border-radius: 8px; background: rgba(255,255,255,0.05); color: #fff; border: 1px solid var(--glass-border); font-size: 0.75rem; font-weight: 600;">
+                        <input type="text" id="new-worker-name" placeholder="Nome Completo" style="flex: 1; padding: 8px; border-radius: 8px; background: rgba(255,255,255,0.05); color: #fff; border: 1px solid var(--glass-border); font-size: 0.8rem; font-weight: 600;">
                         <button onclick="addNewCollaborator()" style="background: var(--primary); color: white; border: none; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 0.8rem; font-weight: bold;"><i class="fas fa-plus"></i></button>
                     </div>
                     <div class="esc-sidebar-title" style="margin-top: 10px; border-top: 1px solid var(--glass-border); padding-top: 15px;">Banco de Nomes</div>
@@ -623,12 +621,11 @@
             { id: 'segunda', nome: 'ESCALA SEGUNDA', bg: '#5c6e85', cor: '#fff' } 
         ];
         
+        // NOVO: Array atualizado com a exclusão do Gaioleiro 2 e inclusão da Mesa 9 Volumoso
         const escRows = ['ABASTECEDOR', 'BIPADOR', 'ETIQUETADOR', 'SORTING MESA', 'SORTING RUAS'];
         const escCols = ['Mesa1', 'Mesa2', 'Mesa3', 'Mesa4', 'Mesa5', 'Mesa6', 'Mesa7', 'Mesa8', 'Mesa9 VOLUMOSO', 'HANDOVER', 'Gaioleiro 1 pct', 'MESA XPT'];
         
-        // NOVO: Array Dinâmico de Operadores que será alimentado pelo Firebase
-        let operadoresList = []; 
-        let defaultOperadores = [
+        let operadoresList = [
             "ANA CARLA TEIXEIRA DE JESUS REIS", "ANA CLAUDIA DAIBERT TOSTA", "AURIETE DE JESUS SALES DOS SANTOS",
             "EDUARDO MARTINS RAMALHO DOS SANTOS", "EDUARDO ROMARIO DE OLIVEIRA SILVA", "JEAN RODRIGUES FERREIRA SOUSA",
             "JOSENICE MARINHO DO NASCIMENTO", "KAIQUE SILVA FERREIRA", "LUCAS VINICIUS DOS SANTOS",
@@ -641,7 +638,7 @@
             "WILLIAM RESENDE DOS SANTOS", "VICTOR HENRIQUE FERNANDES FREITAS", "IGOR HENRIQUE MATHEUS",
             "ALAN HIDE NITTA", "ALICE ANA LAURA SILVA", "CAUA HENRIQUE ALVES PEREIRA",
             "IDYANARA COSTA DE PAULA", "YASMIN SILVA NASCIMENTO", "CLEDSSA CARLA MARTINS DOS SANTOS"
-        ];
+        ].sort(); 
 
         let liveEscalaSemana = {};
         let currentSidebarDay = 'quarta';
@@ -683,25 +680,6 @@
         // =========================================================
         // LISTENERS GLOBAIS DO FIREBASE
         // =========================================================
-        
-        // NOVO: Listener de Colaboradores na Nuvem
-        dbFirebase.ref('shopee_colaboradores').on('value', snap => {
-            if(snap.exists()) {
-                operadoresList = Object.values(snap.val()).sort();
-            } else {
-                let initialDb = {};
-                defaultOperadores.forEach(op => initialDb[op] = op);
-                dbFirebase.ref('shopee_colaboradores').set(initialDb);
-                operadoresList = [...defaultOperadores].sort();
-            }
-            if(document.getElementById('view-escala') && !document.getElementById('view-escala').classList.contains('hidden')){
-                renderEscalaSemana(); 
-            }
-            if(document.getElementById('view-presenca') && !document.getElementById('view-presenca').classList.contains('hidden')){
-                renderPresencaGrid();
-            }
-        });
-
         dbFirebase.ref('shopee_daily_live').on('value', (snapshot) => { const data = snapshot.val(); if (data) { dailyData = data; renderDaily(); } else { dailyData = []; renderDaily(); } });
         dbFirebase.ref('shopee_prod_live').on('value', (snapshot) => { const data = snapshot.val(); if (data) { globalProdData = data; renderRankProd(); } else { globalProdData = {}; renderRankProd(); } });
         dbFirebase.ref('shopee_escala_semana_live').on('value', (snapshot) => { const data = snapshot.val(); if (data) { liveEscalaSemana = data; renderEscalaSemana(); } else { initEmptyEscalaSemana(); renderEscalaSemana(); } });
@@ -776,33 +754,14 @@
         // =========================================================
         async function handleSingleFile(input) {
             if(input.files.length === 0) return;
-            dailyData = []; ctrlData = initCtrl();
-            
-            try {
-                const data = await readExcelFile(input.files[0], false); 
-                processData([data], true); 
-                document.getElementById('st-single').innerText = "Carregado com sucesso!"; 
-                showToast("Importação Concluída");
-            } catch (e) {
-                console.error("Erro na importação:", e);
-                showToast("Erro ao processar arquivo diário.");
-            }
+            dailyData = []; ctrlData = initCtrl(); const data = await readExcelFile(input.files[0], false); processData([data], true); 
+            document.getElementById('st-single').innerText = "Carregado com sucesso!"; showToast("Importação Concluída");
         }
 
         async function handleMassFiles(input) {
             if(input.files.length === 0) return;
-            dailyData = []; 
-            try {
-                const files = Array.from(input.files); 
-                const promises = files.map(f => readExcelFile(f, false)); 
-                const results = await Promise.all(promises); 
-                processData(results, false); 
-                document.getElementById('st-mass').innerText = `${files.length} Arquivos`; 
-                showToast("Importação em Massa Concluída");
-            } catch (e) {
-                console.error("Erro na importação em massa:", e);
-                showToast("Erro ao processar arquivos.");
-            }
+            dailyData = []; const files = Array.from(input.files); const promises = files.map(f => readExcelFile(f, false)); const results = await Promise.all(promises); processData(results, false); 
+            document.getElementById('st-mass').innerText = `${files.length} Arquivos`; showToast("Importação em Massa Concluída");
         }
 
         function processData(allFilesData, isSingleImport) {
@@ -884,7 +843,7 @@
                 container.innerHTML = '';
                 if(list.length===0) { container.innerHTML = '<div style="text-align:center;color:#666;padding:40px">Histórico Vazio</div>'; return; }
                 list.forEach((d, i) => {
-                    const pos = i+1; let css = ''; let icon = ''; if(pos===1) { css='mr-1'; icon='🥇'; } else if(pos===2) { css='rank-2'; icon='🥈'; } else if(pos===3) { css='rank-3'; icon='🥉'; }
+                    const pos = i+1; let css = ''; let icon = ''; if(pos===1) { css='mr-1'; icon='🥇'; } else if(pos===2) { css='mr-2'; icon='🥈'; } else if(pos===3) { css='rank-3'; icon='🥉'; }
                     const div = document.createElement('div'); div.className = `stat-card m-row ${css}`; div.style.padding = "15px 30px";
                     div.innerHTML = `<div class="m-idx">#${pos}</div><div style="font-weight:700;display:flex;gap:10px;align-items:center; color:#fff;">${icon} ${d.nome}</div><div class="m-stat"><div class="ms-l">Rotas</div><div class="ms-v">${d.rotas}</div></div><div class="m-stat"><div class="ms-l">Vol Total</div><div class="ms-v">${d.vol}</div></div><div class="m-stat"><div class="ms-l">Erros Totais</div><div class="ms-v" style="color:${d.totalErrosTela>0?'var(--danger)':'inherit'}">${d.totalErrosTela}</div></div><div class="m-stat"><div class="ms-l">Acuracidade Global</div><div class="ms-v" style="color:${d.acur>=99?'var(--success)':'var(--danger)'}">${d.acur.toFixed(2)}%</div></div><div class="m-stat"><div class="ms-l">T. Médio Global</div><div class="ms-v">${fmtTime(d.avg)}</div></div>`;
                     container.appendChild(div);
@@ -895,7 +854,7 @@
         async function resetMonthly() { if(confirm("Deseja apagar permanentemente o histórico MENSAL DA NUVEM?")) { await dbFirebase.ref('shopee_gold_db').remove(); renderMonthly(); showToast("Banco Apagado!"); } }
 
         // =========================================================
-        // PRODUTIVIDADE E DASHBOARD BI
+        // PRODUTIVIDADE (INTACTA E BLINDADA COM NOVO HORÁRIO 23:00)
         // =========================================================
         function initProdGrid() {
             const tbody = document.getElementById('prod-body-grid'); let html = '';
@@ -1153,28 +1112,18 @@
             return absentees;
         }
 
-        // NOVO: Função para Adicionar ao BD
         function addNewCollaborator() {
             const input = document.getElementById('new-worker-name');
             const name = input.value.trim().toUpperCase();
             if(!name) return showToast("Digite o nome completo.");
             if(operadoresList.includes(name)) return showToast("Este colaborador já existe.");
             
-            dbFirebase.ref('shopee_colaboradores/' + name).set(name)
-                .then(() => {
-                    input.value = "";
-                    showToast("Colaborador cadastrado!");
-                }).catch(e => console.error(e));
-        }
-
-        // NOVO: Função para Remover do BD
-        function removeCollaborator(name) {
-            if(confirm(`Deseja realmente desligar/remover o colaborador ${name} do sistema?`)) {
-                dbFirebase.ref('shopee_colaboradores/' + name).remove()
-                    .then(() => {
-                        showToast("Colaborador removido!");
-                    }).catch(e => console.error(e));
-            }
+            operadoresList.push(name);
+            operadoresList.sort();
+            input.value = "";
+            renderEscalaSemana();
+            renderPresencaGrid(); 
+            showToast("Colaborador cadastrado!");
         }
 
         function clearEscalaSemana() {
@@ -1412,7 +1361,6 @@
 
         function changeSidebarDay() { currentSidebarDay = document.getElementById('sidebar-day-select').value; updateSidebar(); }
 
-        // NOVO: Renderiza a lixeira apenas para ADMINS
         function updateSidebar() {
             if (!currentUser || currentUser.r !== 'admin') return;
             let container = document.getElementById('sidebar-names-list'); if (!container) return;
@@ -1430,13 +1378,7 @@
             let html = ''; let availableCount = 0;
             operadoresList.forEach(op => { 
                 if (!selectedValues.includes(op) && !absentees.includes(op)) { 
-                    html += `
-                    <div class="sidebar-name-item">
-                        <div style="display:flex; align-items:center; gap:8px;">
-                            <i class="fas fa-user"></i> ${op}
-                        </div>
-                        <i class="fas fa-times" style="color:var(--danger); cursor:pointer; font-size:1rem; padding:0 5px;" onclick="removeCollaborator('${op}')" title="Desligar Colaborador"></i>
-                    </div>`; 
+                    html += `<div class="sidebar-name-item"><i class="fas fa-user"></i> ${op}</div>`; 
                     availableCount++; 
                 } 
             });
@@ -1484,10 +1426,6 @@
             try { await dbFirebase.ref('shopee_escala_history/' + dataInput).set(liveEscalaSemana); showToast("Semana Salva com Sucesso!"); } catch(e) { console.error(e); showToast("Erro ao salvar histórico."); }
         }
 
-        // =========================================================
-        // HISTÓRICO DE ESCALAS DETALHADO (RELATÓRIO INDIVIDUAL NASA)
-        // =========================================================
-        
         function clearEscalaHistory() {
             if(confirm("ATENÇÃO: Deseja apagar permanentemente TODO o histórico de escalas semanais salvas? Esta ação não pode ser desfeita.")) {
                 dbFirebase.ref('shopee_escala_history').remove()
@@ -1563,4 +1501,112 @@
 
                     const div = document.createElement('div'); div.className = `stat-card`; div.style.padding = "20px"; div.style.marginBottom = "15px";
                     div.innerHTML = `
-                        <div style="
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px; border-bottom: 1px solid var(--glass-border); padding-bottom: 15px;">
+                            <div style="font-weight: 800; font-size: 1.2rem; color: var(--primary);">
+                                <i class="fas fa-calendar-week" style="margin-right: 8px;"></i> ${displayWeek}
+                            </div>
+                            <button class="btn-ghost" style="padding: 6px 12px; font-size: 0.75rem;" onclick="document.getElementById('hist-det-${index}').classList.toggle('hidden')">
+                                <i class="fas fa-search"></i> Ver Relatório
+                            </button>
+                        </div>
+                        <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap: 15px;">
+                            <div class="si"><div class="si-l">Headcount (Quarta)</div><div class="si-v" style="font-size: 1.2rem;">${resumo.hc}</div></div>
+                            <div class="si"><div class="si-l">Pct Proc. (Quarta)</div><div class="si-v" style="color:var(--success); font-size: 1.2rem;">${resumo.pct}</div></div>
+                            <div class="si"><div class="si-l">Nec. DW (Quarta)</div><div class="si-v" style="color:var(--danger); font-size: 1.2rem;">${resumo.dw}</div></div>
+                        </div>
+                        ${tableHtml}
+                    `;
+                    container.appendChild(div);
+                });
+            } catch (e) { console.error(e); container.innerHTML = '<div style="text-align:center;color:var(--danger);padding:40px">Erro de conexão.</div>'; }
+        }
+
+        // =========================================================
+        // PRESENÇA MENSAL (CONTROLE AO VIVO)
+        // =========================================================
+
+        function loadPresencaData() {
+            renderPresencaGrid();
+        }
+
+        function changePresencaMonth() {
+            let val = document.getElementById('pres-month-select').value;
+            if(val) {
+                dbFirebase.ref('shopee_presenca_live/' + currentPresMes).off('value', presencaListener);
+                currentPresMes = val;
+                presencaListener = dbFirebase.ref('shopee_presenca_live/' + currentPresMes).on('value', snap => {
+                    livePresenca = snap.val() || {};
+                    renderPresencaGrid();
+                    if(!document.getElementById('view-escala').classList.contains('hidden')) {
+                        escDiasConf.forEach(d => updateDropdownsAvailability(d.id));
+                        updateSidebar();
+                    }
+                });
+            }
+        }
+
+        function getDaysInMonth(monthStr) {
+            let parts = monthStr.split('-');
+            let year = parseInt(parts[0]);
+            let month = parseInt(parts[1]);
+            return new Date(year, month, 0).getDate();
+        }
+
+        function renderPresencaGrid() {
+            const tbody = document.getElementById('presenca-table-body');
+            if(!tbody) return;
+
+            let daysCount = getDaysInMonth(currentPresMes);
+            let isAdm = currentUser && currentUser.r === 'admin';
+
+            let html = `<tr><th>COLABORADOR</th>`;
+            for(let d = 1; d <= daysCount; d++) { html += `<th>${d}</th>`; }
+            html += `<th class="tot-P">P</th><th class="tot-F">F</th><th class="tot-FG">FG</th><th class="tot-AT">AT</th></tr>`;
+
+            operadoresList.forEach(colab => {
+                let pCount = 0; let fCount = 0; let fgCount = 0; let atCount = 0;
+                let colabData = livePresenca[colab] || {};
+
+                html += `<tr><td>${colab}</td>`;
+                
+                for(let d = 1; d <= daysCount; d++) {
+                    let val = colabData[d] || '';
+                    if(val === 'P') pCount++; if(val === 'F') fCount++; if(val === 'FG') fgCount++; if(val === 'AT') atCount++;
+                    let badgeClass = val ? `badge-${val}` : 'badge-empty';
+                    let displayVal = val || '';
+                    let clickEvent = isAdm ? `onclick="openPresPopup('${colab}', ${d}, event)"` : '';
+                    html += `<td class="pres-cell" ${clickEvent}><div class="badge-pres ${badgeClass}">${displayVal}</div></td>`;
+                }
+                html += `<td class="tot-col tot-P">${pCount}</td><td class="tot-col tot-F">${fCount}</td><td class="tot-col tot-FG">${fgCount}</td><td class="tot-col tot-AT">${atCount}</td></tr>`;
+            });
+            tbody.innerHTML = html;
+        }
+
+        function openPresPopup(colab, dia, event) {
+            activePresColab = colab; activePresDia = dia;
+            const popup = document.getElementById('pres-popup');
+            popup.classList.remove('hidden');
+            
+            let x = event.pageX - 70; let y = event.pageY + 15;
+            popup.style.left = x + 'px'; popup.style.top = y + 'px';
+        }
+
+        function setPresenca(val) {
+            if(!livePresenca[activePresColab]) livePresenca[activePresColab] = {};
+            livePresenca[activePresColab][activePresDia] = val;
+            
+            if(val === '') { delete livePresenca[activePresColab][activePresDia]; }
+            dbFirebase.ref('shopee_presenca_live/' + currentPresMes).set(livePresenca);
+            document.getElementById('pres-popup').classList.add('hidden');
+        }
+
+        document.addEventListener('click', function(e) {
+            const popup = document.getElementById('pres-popup');
+            if(!popup.classList.contains('hidden') && !e.target.closest('.pres-cell') && !e.target.closest('#pres-popup')) {
+                popup.classList.add('hidden');
+            }
+        });
+
+    </script>
+</body>
+</html>
