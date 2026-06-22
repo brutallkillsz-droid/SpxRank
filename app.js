@@ -22,13 +22,15 @@ let dailyData = [];
 let ctrlData = initCtrl();
 let globalProdData = {}; 
 
+// CONFIGURAÇÃO DOS DIAS ATUALIZADA (SEGUNDA A DOMINGO)
 const escDiasConf = [
+    { id: 'segunda', nome: 'ESCALA SEGUNDA', bg: '#5c6e85', cor: '#fff' },
+    { id: 'terca', nome: 'ESCALA TERÇA', bg: '#b4a7d6', cor: '#000' },
     { id: 'quarta', nome: 'ESCALA QUARTA', bg: '#c2deb0', cor: '#000' },
     { id: 'quinta', nome: 'ESCALA QUINTA', bg: '#ff9900', cor: '#000' },
     { id: 'sexta', nome: 'ESCALA SEXTA', bg: '#8ea9db', cor: '#000' },
     { id: 'sabado', nome: 'ESCALA SÁBADO', bg: '#ffe699', cor: '#000' },
-    { id: 'domingo', nome: 'ESCALA DOMINGO', bg: '#f4b084', cor: '#000' },
-    { id: 'segunda', nome: 'ESCALA SEGUNDA', bg: '#5c6e85', cor: '#fff' } 
+    { id: 'domingo', nome: 'ESCALA DOMINGO', bg: '#f4b084', cor: '#000' }
 ];
 
 const escRows = ['ABASTECEDOR', 'BIPADOR', 'ETIQUETADOR', 'SORTING MESA', 'SORTING RUAS'];
@@ -57,10 +59,10 @@ let defaultOperadores = [
 ];
 
 let liveEscalaSemana = {};
-let currentSidebarDay = 'quarta';
+let currentSidebarDay = 'segunda';
 
 let liveEscalaDcSemana = {};
-let currentSidebarDcDay = 'quarta';
+let currentSidebarDcDay = 'segunda';
 
 let livePresenca = {};
 let currentPresMes = ""; 
@@ -119,9 +121,9 @@ async function renderSiteliderDashboard() {
     let simple = new Date(year, 0, 1 + (week - 1) * 7); let dow = simple.getDay(); let ISOweekStart = simple;
     if (dow <= 4) ISOweekStart.setDate(simple.getDate() - simple.getDay() + 1); else ISOweekStart.setDate(simple.getDate() + 8 - simple.getDay());
 
-    let weekDates = []; let offsets = [2, 3, 4, 5, 6, 7]; 
+    let weekDates = []; let offsets = [0, 1, 2, 3, 4, 5, 6]; 
     offsets.forEach(off => { let d = new Date(ISOweekStart.getTime()); d.setDate(d.getDate() + off); weekDates.push(d); });
-    let friday = weekDates[2]; let refMonthStr = friday.getFullYear() + '-' + String(friday.getMonth() + 1).padStart(2, '0');
+    let friday = weekDates[4]; let refMonthStr = friday.getFullYear() + '-' + String(friday.getMonth() + 1).padStart(2, '0');
     
     let monthPresData = {};
     if(refMonthStr === currentPresMes) { monthPresData = livePresenca; } else {
@@ -162,8 +164,8 @@ async function renderSiteliderDashboard() {
 
     let weekData = historyDataCache[weekVal];
     let isWeekActiveTab = false;
-    if(liveEscalaSemana && liveEscalaSemana['quarta'] && liveEscalaSemana['quarta'].dataDia) {
-         let [dd, mm] = liveEscalaSemana['quarta'].dataDia.split('/');
+    if(liveEscalaSemana && liveEscalaSemana['segunda'] && liveEscalaSemana['segunda'].dataDia) {
+         let [dd, mm] = liveEscalaSemana['segunda'].dataDia.split('/');
          if(dd && mm) {
              let wStart = weekDates[0];
              if(parseInt(dd) === wStart.getDate() && parseInt(mm) === (wStart.getMonth() + 1)) { isWeekActiveTab = true; }
@@ -375,7 +377,7 @@ function processData(allFilesData, isSingleImport) {
             }
         }
     });
-    dailyData = Object.values(map); saveDailyToCloud(); 
+    dailyData = Object.values(map); saveDailyToCloud(); renderDaily(); 
     if (isSingleImport && currentUser && currentUser.r === 'admin') dbFirebase.ref('shopee_ctrl_live').set(ctrlData);
 }
 
@@ -580,7 +582,7 @@ function updateDatesFromWeek(inputId, tipo) {
     const week = parseInt(parts[1]);
     const monday = getDateOfISOWeek(week, year);
 
-    const offsets = { 'quarta': 2, 'quinta': 3, 'sexta': 4, 'sabado': 5, 'domingo': 6, 'segunda': 7 };
+    const offsets = { 'segunda': 0, 'terca': 1, 'quarta': 2, 'quinta': 3, 'sexta': 4, 'sabado': 5, 'domingo': 6 };
     let objAlvo = tipo === 'lugares' ? liveEscalaSemana : liveEscalaDcSemana;
 
     for (let diaId in offsets) {
@@ -651,10 +653,10 @@ function clearEscalaSemana() {
     }
 }
 
-window.replicateWednesday = function() {
-    if(!confirm("Isso vai copiar a escala de QUARTA-FEIRA para todos os outros dias da semana. Deseja continuar?")) return;
-    let baseGrid = liveEscalaSemana['quarta']?.grid;
-    if(!baseGrid || Object.keys(baseGrid).length === 0) return showToast("A escala de Quarta está vazia!");
+window.replicateMonday = function() {
+    if(!confirm("Isso vai copiar a escala de SEGUNDA-FEIRA para todos os outros dias da semana. Deseja continuar?")) return;
+    let baseGrid = liveEscalaSemana['segunda']?.grid;
+    if(!baseGrid || Object.keys(baseGrid).length === 0) return showToast("A escala de Segunda está vazia!");
 
     escDiasConf.forEach((d, idx) => {
         if (idx === 0) return; let diaId = d.id;
@@ -671,7 +673,7 @@ window.replicateWednesday = function() {
         }
         liveEscalaSemana[diaId].grid = clonedGrid;
     });
-    dbFirebase.ref('shopee_escala_semana_live').set(liveEscalaSemana).then(() => { showToast("Semana preenchida baseada na Quarta!"); });
+    dbFirebase.ref('shopee_escala_semana_live').set(liveEscalaSemana).then(() => { showToast("Semana preenchida baseada na Segunda!"); });
 };
 
 function toggleDayVisibility(diaId) {
@@ -1155,8 +1157,8 @@ function renderHistEscala(tipo) {
         
         let kpis = '';
         if(tipo === 'lugares') {
-            let resumo = semanaData['quarta'] || {hc:'0', pct:'0', dw:'0'};
-            kpis = `<div style="display:grid; grid-template-columns: repeat(3, 1fr); gap: 15px;"><div class="si"><div class="si-l">Headcount (Quarta)</div><div class="si-v" style="font-size: 1.2rem;">${resumo.hc}</div></div><div class="si"><div class="si-l">Pct Proc. (Quarta)</div><div class="si-v" style="color:var(--success); font-size: 1.2rem;">${resumo.pct}</div></div><div class="si"><div class="si-l">Nec. DW (Quarta)</div><div class="si-v" style="color:var(--danger); font-size: 1.2rem;">${resumo.dw}</div></div></div>`;
+            let resumo = semanaData['segunda'] || {hc:'0', pct:'0', dw:'0'};
+            kpis = `<div style="display:grid; grid-template-columns: repeat(3, 1fr); gap: 15px;"><div class="si"><div class="si-l">Headcount (Segunda)</div><div class="si-v" style="font-size: 1.2rem;">${resumo.hc}</div></div><div class="si"><div class="si-l">Pct Proc. (Segunda)</div><div class="si-v" style="color:var(--success); font-size: 1.2rem;">${resumo.pct}</div></div><div class="si"><div class="si-l">Nec. DW (Segunda)</div><div class="si-v" style="color:var(--danger); font-size: 1.2rem;">${resumo.dw}</div></div></div>`;
         }
 
         div.innerHTML = `
