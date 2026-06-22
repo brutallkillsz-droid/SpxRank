@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel Liderança | HUB LMG-48</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div id="toast" class="toast">Notificação</div>
+
+    <div id="pres-popup" class="hidden">
+        <button class="pres-btn p-btn" onclick="setPresenca('P')">P</button>
+        <button class="pres-btn f-btn" onclick="setPresenca('F')">F</button>
+        <button class="pres-btn fg-btn" onclick="setPresenca('FG')">FG</button>
+        <button class="pres-btn at-btn" onclick="setPresenca('AT')">AT</button>
+        <button class="pres-btn empty-btn" onclick="setPresenca('')" title="Limpar Dia"><i class="fas fa-eraser"></i></button>
+    </div>
+
+    <div id="dc-modal-overlay" class="hidden">
+        <div class="dc-modal-content">
+            <div class="dc-modal-title">DOBLECHECK</div>
+            <div class="dc-modal-name" id="dc-modal-driver-name">NOME DO MOTORISTA</div>
+            <div class="dc-grid-btns">
+                <button class="dc-btn" onclick="applyDc(1)">1</button>
+                <button class="dc-btn" onclick="applyDc(2)">2</button>
+                <button class="dc-btn" onclick="applyDc(3)">3</button>
+                <button class="dc-btn" onclick="applyDc(4)">4</button>
+                <button class="dc-btn" onclick="applyDc(5)">5</button>
+                <button class="dc-btn" onclick="applyDc(6)">6</button>
+                <button class="dc-btn" onclick="applyDc(7)">7</button>
+                <button class="dc-btn" onclick="applyDc(8)">8</button>
+                <button class="dc-btn dc-btn-zero" onclick="applyDc(0)">0 (Zerar)</button>
+            </div>
+            <button class="btn-ghost" style="width:100%; padding: 12px;" onclick="closeDcModal()">CANCELAR</button>
+        </div>
+    </div>
+
+    <div id="shift-modal-overlay" class="hidden">
+        <div class="dc-modal-content">
+            <div class="dc-modal-title">TURNO DE IMPORTAÇÃO</div>
+            <div class="dc-modal-name" style="margin-bottom: 25px; color: var(--text-muted); font-size: 0.9rem;">Selecione o turno para carregar os dados de Produtividade:</div>
+            <div style="display: flex; gap: 15px; margin-bottom: 20px;">
+                <button class="dc-btn" style="flex: 1; border-color: #fbbf24;" onclick="confirmShift('AM')">
+                    <i class="fas fa-sun" style="color:#fbbf24; margin-bottom: 8px; display: block; font-size: 1.8rem;"></i> AM
+                </button>
+                <button class="dc-btn" style="flex: 1; border-color: #94a3b8;" onclick="confirmShift('PM')">
+                    <i class="fas fa-moon" style="color:#94a3b8; margin-bottom: 8px; display: block; font-size: 1.8rem;"></i> PM
+                </button>
+            </div>
+            <button class="btn-ghost" style="width:100%; padding: 12px;" onclick="closeShiftModal()">CANCELAR</button>
+        </div>
+    </div>
+
+    <div id="login-screen">
+        <div class="login-card">
+            <div class="brand-title">LOGISTICS ELITE</div>
+            <input type="text" id="user" class="login-input" placeholder="ID Usuário">
+            <input type="password" id="pass" class="login-input" placeholder="Senha">
+            <button class="btn-primary" onclick="login()">Entrar no Sistema</button>
+            <p id="login-err" style="color:var(--danger); margin-top:20px; font-size:0.85rem; display:none;">Credenciais Inválidas</p>
+        </div>
+    </div>
+
+    <div id="app-shell">
+        
+        <aside class="sidebar">
+            <div class="nav-logo">
+                <i class="fas fa-rocket"></i> PAINEL LIDERANÇA
+            </div>
+            <div class="user-panel">
+                <span id="display-user" style="font-weight:700; color:var(--primary);">USER</span> 
+                <i class="fas fa-sign-out-alt" style="cursor:pointer; color:var(--text-muted);" onclick="logout()" title="Sair"></i>
+            </div>
+
+            <div class="menu-group admin-only block-container">
+                <div class="menu-header open" onclick="toggleMenu('menu-sitelider', this)">
+                    <span><i class="fas fa-user-tie"></i> Sitelider Análises</span>
+                    <i class="fas fa-chevron-down"></i>
+                </div>
+                <div class="menu-items open" id="menu-sitelider">
+                    <div class="menu-item" id="btn-sitelider" onclick="switchTab('sitelider')">Dashboard PHD & ABS</div>
+                </div>
+            </div>
+
+            <div class="menu-group">
+                <div class="menu-header open" onclick="toggleMenu('menu-escalas', this)">
+                    <span><i class="fas fa-calendar-alt"></i> Escalas</span>
+                    <i class="fas fa-chevron-down"></i>
+                </div>
+                <div class="menu-items open" id="menu-escalas">
+                    <div class="menu-item active" id="btn-escala" onclick="switchTab('escala')">Escala de Lugares</div>
+                    <div class="menu-item" id="btn-escala-dc" onclick="switchTab('escala-dc')">Escala Doblecheck</div>
+                    <div class="menu-item admin-only block-container" id="btn-hist-escala" onclick="switchTab('hist-escala')">Histórico de Escala</div>
+                    <div class="menu-item admin-only block-container" id="btn-hist-escala-dc" onclick="switchTab('hist-escala-dc')">Histórico Doblecheck</div>
+                    <div class="menu-item admin-only block-container" id="btn-presenca" onclick="switchTab('presenca')">Presença Mensal</div>
+                </div>
+            </div>
+
+            <div class="menu-group">
+                <div class="menu-header open" onclick="toggleMenu('menu-ranks', this)">
+                    <span><i class="fas fa-trophy"></i> Ranks</span>
+                    <i class="fas fa-chevron-down"></i>
+                </div>
+                <div class="menu-items open" id="menu-ranks">
+                    <div class="menu-item" id="btn-dia" onclick="switchTab('dia')">Ranking Diário</div>
+                    <div class="menu-item" id="btn-rankprod" onclick="switchTab('rankprod')">Rank Produtividade</div>
+                    <div class="menu-item admin-only block-container" id="btn-prod" onclick="switchTab('prod')">Produtividade (H/H)</div>
+                    <div class="menu-item admin-only block-container" id="btn-mes" onclick="switchTab('mes')">Consolidado Mensal</div>
+                </div>
+            </div>
+
+            <div class="menu-group admin-only block-container">
+                <div class="menu-header open" onclick="toggleMenu('menu-acomp', this)">
+                    <span><i class="fas fa-chart-line"></i> Acompanhamento</span>
+                    <i class="fas fa-chevron-down"></i>
+                </div>
+                <div class="menu-items open" id="menu-acomp">
+                    <div class="menu-item" id="btn-ctrl" onclick="switchTab('ctrl')">Controle HUB</div>
+                    <div class="menu-item" id="btn-bi" onclick="switchTab('bi')">Gráfico Geral</div>
+                </div>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            
+            <section id="view-sitelider" class="hidden">
+                <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+                    <div>
+                        <h2 style="font-weight: 800; letter-spacing: -1px; margin-bottom: 5px;">Dashboard Gestão Executiva</h2>
+                        <div style="font-size: 0.85rem; color: var(--text-muted);">Acompanhamento de PHD e Absenteísmo (Mês Vigente / Semana)</div>
+                    </div>
+                    <div class="admin-only flex-container" style="display:flex; align-items: center; gap: 10px;">
+                        <label style="color: var(--text-muted); font-size: 0.8rem; font-weight: 700;">SEMANA REFERÊNCIA:</label>
+                        <input type="week" id="sl-week-select" class="btn-ghost" style="background: rgba(255,255,255,0.05); color: #fff; border-color: var(--primary);" onchange="renderSiteliderDashboard()">
+                        <button class="btn-ghost" onclick="renderSiteliderDashboard()"><i class="fas fa-sync"></i> Atualizar Dados</button>
+                    </div>
+                </div>
+                
+                <h3 style="font-size: 1rem; color: #fff; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px;">Análise de PHD</h3>
+                <div class="bento-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 30px;">
+                    <div class="stat-card sl-phd">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                            <div class="sc-name">PHD Diário</div>
+                            <div class="sc-rank"><i class="fas fa-bolt" style="color:var(--primary);"></i></div>
+                        </div>
+                        <div class="sc-hero"><div class="sc-val" id="sl-phd-dia">0</div><div class="sc-lbl">ÚLTIMO REGISTRADO NA SEMANA</div></div>
+                    </div>
+                    <div class="stat-card sl-phd">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                            <div class="sc-name">PHD Semanal</div>
+                            <div class="sc-rank"><i class="fas fa-calendar-week" style="color:var(--primary);"></i></div>
+                        </div>
+                        <div class="sc-hero"><div class="sc-val" id="sl-phd-sem">0</div><div class="sc-lbl">MÉDIA DA SEMANA SELECIONADA</div></div>
+                    </div>
+                    <div class="stat-card sl-phd">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                            <div class="sc-name">PHD Mensal</div>
+                            <div class="sc-rank"><i class="fas fa-chart-area" style="color:var(--primary);"></i></div>
+                        </div>
+                        <div class="sc-hero"><div class="sc-val" id="sl-phd-mes">0</div><div class="sc-lbl">MÉDIA DO MÊS DE REFERÊNCIA</div></div>
+                    </div>
+                </div>
+
+                <h3 style="font-size: 1rem; color: #fff; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px;">Análise de Absenteísmo</h3>
+                <div class="bento-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 30px;">
+                    <div class="stat-card sl-abs">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                            <div class="sc-name">ABS Diário</div>
+                            <div class="sc-rank"><i class="fas fa-user-clock" style="color:var(--danger);"></i></div>
+                        </div>
+                        <div class="sc-hero"><div class="sc-val" id="sl-abs-dia">0%</div><div class="sc-lbl">TAXA DE FALTAS/AT DA SEXTA</div></div>
+                    </div>
+                    <div class="stat-card sl-abs">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                            <div class="sc-name">ABS Semanal</div>
+                            <div class="sc-rank"><i class="fas fa-users-slash" style="color:var(--danger);"></i></div>
+                        </div>
+                        <div class="sc-hero"><div class="sc-val" id="sl-abs-sem">0%</div><div class="sc-lbl">TAXA DA SEMANA SELECIONADA</div></div>
+                    </div>
+                    <div class="stat-card sl-abs">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                            <div class="sc-name">ABS Mensal</div>
+                            <div class="sc-rank"><i class="fas fa-chart-pie" style="color:var(--danger);"></i></div>
+                        </div>
+                        <div class="sc-hero"><div class="sc-val" id="sl-abs-mes">0%</div><div class="sc-lbl">TAXA DO MÊS DE REFERÊNCIA</div></div>
+                    </div>
+                </div>
+
+                <div class="bento-grid" style="grid-template-columns: 1fr 1fr;">
+                    <div class="stat-card" style="padding: 20px; height: 350px;">
+                        <canvas id="slChartPHD"></canvas>
+                    </div>
+                    <div class="stat-card" style="padding: 20px; height: 350px;">
+                        <canvas id="slChartABS"></canvas>
+                    </div>
+                </div>
+            </section>
+            
+            <section id="view-dia" class="hidden">
+                <div class="upload-compact">
+                    <div class="mini-drop">
+                        <i class="fas fa-file-upload" style="font-size:1.2rem; color:var(--primary);"></i>
+                        <div class="md-text">
+                            <div class="md-title">Importação Única</div>
+                            <div class="md-sub" id="st-single">Selecionar CSV (Diário)</div>
+                        </div>
+                        <input type="file" id="file-single" accept=".csv" onclick="this.value=null" onchange="handleSingleFile(this)">
+                    </div>
+                    <div class="mini-drop admin-only flex-container">
+                        <i class="fas fa-boxes-stacked" style="font-size:1.2rem; color:var(--accent);"></i>
+                        <div class="md-text">
+                            <div class="md-title">Massa (Admin)</div>
+                            <div class="md-sub" id="st-mass">Múltiplos arquivos .CSV</div>
+                        </div>
+                        <input type="file" id="file-mass" accept=".csv" multiple onclick="this.value=null" onchange="handleMassFiles(this)">
+                    </div>
+                </div>
+                <div style="display:flex; justify-content:center; gap:15px; margin-bottom:50px;">
+                    <button class="btn-ghost" onclick="clearData()">Limpar Visualização</button>
+                    <button class="btn-primary admin-only block-container" style="width:auto; padding: 10px 30px;" onclick="saveToMonthly()">Arquivar no Mensal</button>
+                </div>
+                <div id="grid-diario" class="bento-grid"></div>
+            </section>
+
+            <section id="view-rankprod" class="hidden">
+                <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+                    <h2 style="font-weight: 800; letter-spacing: -1px;">Ranking de Produtividade Diário (Sorting / Etiquetagem)</h2>
+                </div>
+                <div id="rankprod-list" class="m-list"></div>
+            </section>
+
+            <section id="view-prod" class="hidden">
+                <div style="margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+                    <button onclick="openShiftModal()" style="cursor:pointer; background:#002f6c; color:white; padding:8px 15px; font-size:12px; font-weight:bold; border-radius:4px; border:none; transition: 0.2s;">
+                        <i class="fas fa-upload"></i> Importar Dados e Preencher Estações
+                    </button>
+                    <input type="file" id="file-prod" accept=".csv, .xlsx" style="display:none;" onclick="this.value=null" onchange="importProdData(this)">
+                    <span style="font-size: 11px; color: #666; font-style: italic;">* Data, Horários, Backlog, XPT, Volume Rot. e Células são editáveis!</span>
+                </div>
+                <div class="spx-header-container">
+                    <div class="spx-logo-text">SPX</div>
+                    <div style="flex-grow: 1; text-align: center;">LMHUB LMG-48 - Uberaba <span id="shift-display" style="color: #ff0000; font-weight: 900; margin-left: 10px;"></span></div>
+                    <div style="width: 20px;"></div>
+                </div>
+                <table class="spx-table" style="border-bottom:none;">
+                    <tr><td colspan="15" class="spx-navy" style="font-size:12px;">Etiquetagem e 1º Sorting</td></tr>
+                    <tr>
+                        <td class="spx-gray-light" style="width:6%">Data</td>
+                        <td style="width:6%; padding:0; position:relative; cursor:pointer;">
+                            <input type="date" class="date-input-field" id="p-data" value="" onchange="saveProdState()">
+                        </td>
+                        <td rowspan="2" class="spx-gray-light" style="width:6%">Backlog</td>
+                        <td rowspan="2" class="spx-orange editable-cell" style="width:6%" contenteditable="true" id="p-backlog" onblur="calculateProdTotals(true)">0</td>
+                        <td rowspan="2" class="spx-gray-light" style="width:6%">XPT</td>
+                        <td rowspan="2" class="spx-orange editable-cell" style="width:6%" contenteditable="true" id="p-xpt" onblur="calculateProdTotals(true)">0</td>
+                        <td class="spx-gray-light" style="width:8%">Horário início</td>
+                        <td style="width:6%; padding:0; position:relative; cursor:pointer;">
+                            <input type="time" class="date-input-field" id="p-hora-ini" value="00:00" onchange="saveProdState()">
+                        </td>
+                        <td class="spx-gray-light" style="width:8%">Qtd realizada</td>
+                        <td class="spx-gray-dark" style="width:6%" id="p-realizada">0</td>
+                        <td class="spx-green" style="width:8%">% Etiquetado</td>
+                        <td style="width:6%" id="p-perc-etiquetado">0%</td>
+                        <td colspan="3" style="width:22%; text-align:left; padding-left:5px;">Obs:</td>
+                    </tr>
+                    <tr>
+                        <td class="spx-gray-light">Volume Rot.</td>
+                        <td class="editable-cell" contenteditable="true" id="p-vol-rot" onblur="calculateProdTotals(true)">0</td>
+                        <td class="spx-gray-light">Horário término</td>
+                        <td style="padding:0; position:relative; cursor:pointer;">
+                            <input type="time" class="date-input-field" id="p-hora-fim" value="00:00" onchange="saveProdState()">
+                        </td>
+                        <td class="spx-gray-light">Qtd pendente</td>
+                        <td id="p-pendente">0</td>
+                        <td class="spx-red" style="font-weight:900;">% Pendente</td>
+                        <td id="p-perc-pendente" style="color:red; font-weight: bold; background: #fff !important;">0%</td>
+                        <td colspan="3"></td>
+                    </tr>
+                </table>
+                <table class="spx-table" style="border-top:none;">
+                    <thead>
+                        <tr class="spx-navy">
+                            <th style="width: 7%;">Produtividade</th>
+                            <th style="width: 6.8%; padding:0;"><select id="station-select-1" class="station-dropdown" onchange="refreshProdGridData(); saveProdState();"><option value="">Estação 1</option></select></th>
+                            <th style="width: 6.8%; padding:0;"><select id="station-select-2" class="station-dropdown" onchange="refreshProdGridData(); saveProdState();"><option value="">Estação 2</option></select></th>
+                            <th style="width: 6.8%; padding:0;"><select id="station-select-3" class="station-dropdown" onchange="refreshProdGridData(); saveProdState();"><option value="">Estação 3</option></select></th>
+                            <th style="width: 6.8%; padding:0;"><select id="station-select-4" class="station-dropdown" onchange="refreshProdGridData(); saveProdState();"><option value="">Estação 4</option></select></th>
+                            <th style="width: 6.8%; padding:0;"><select id="station-select-5" class="station-dropdown" onchange="refreshProdGridData(); saveProdState();"><option value="">Estação 5</option></select></th>
+                            <th style="width: 6.8%; padding:0;"><select id="station-select-6" class="station-dropdown" onchange="refreshProdGridData(); saveProdState();"><option value="">Estação 6</option></select></th>
+                            <th style="width: 6.8%; padding:0;"><select id="station-select-7" class="station-dropdown" onchange="refreshProdGridData(); saveProdState();"><option value="">Estação 7</option></select></th>
+                            <th style="width: 6.8%; padding:0;"><select id="station-select-8" class="station-dropdown" onchange="refreshProdGridData(); saveProdState();"><option value="">Estação 8</option></select></th>
+                            <th style="width: 6.8%; padding:0;"><select id="station-select-9" class="station-dropdown" onchange="refreshProdGridData(); saveProdState();"><option value="">Estação 9</option></select></th>
+                            <th style="width: 6.8%; padding:0;"><select id="station-select-10" class="station-dropdown" onchange="refreshProdGridData(); saveProdState();"><option value="">Estação 10</option></select></th>
+                            <th style="width: 6.8%;">Total H.</th>
+                            <th style="width: 15%;">Percentual etiquetado</th>
+                        </tr>
+                    </thead>
+                    <tbody id="prod-body-grid"></tbody>
+                </table>
+            </section>
+
+            <section id="view-ctrl" class="hidden">
+                <div class="ctrl-container">
+                    <div class="shopee-header"><div class="logo-txt">Shopee <span style="color:#0f172a; font-style: normal;">XPRESS</span></div><div class="hub-txt">UBERABA | HUB LMG-48</div></div>
+                    <div style="background:#0f172a; color:rgba(255,255,255,0.8); padding:12px; font-weight:700; text-align:center; font-size:0.75rem; text-transform:uppercase; letter-spacing:2px;">Performance Tracking & Double Check</div>
+                    <div style="display: grid; grid-template-columns: 1.5fr 1fr;">
+                        <table class="tbl-ctrl"><tr><th>Data da Operação</th><td id="c-data">-</td></tr><tr><th>Volume Total</th><td id="c-vol">-</td></tr><tr><th>Total de Rotas</th><td id="c-rotas">-</td></tr><tr><th>Primeira Coleta</th><td id="c-ini">-</td></tr><tr><th>Última Coleta</th><td id="c-fim">-</td></tr><tr><th>Janela Operacional</th><td id="c-dur">-</td></tr></table>
+                        <div class="green-box"><div style="font-weight:800; font-size:0.7rem; opacity:0.6; text-transform:uppercase; margin-bottom:5px;">Tempo Médio / Coleta</div><div class="gb-time" id="c-avg-time">00:00:00</div></div>
+                    </div>
+                    <table class="tbl-ctrl">
+                        <tr style="background:#f8fafc;"><th style="color:#0f172a">Status</th><th>Rotas</th><th>Volume</th><th>Eficiência %</th></tr>
+                        <tr><td><span style="background:#dcfce7; color:#16a34a; padding:4px 12px; border-radius:8px; font-size:0.75rem;">FINALIZADO</span></td><td id="c-fin-rot">-</td><td id="c-fin-vol">-</td><td id="c-fin-perc" style="color:#16a34a; font-weight:800;">-</td></tr>
+                        <tr><td><span style="background:#fee2e2; color:#ef4444; padding:4px 12px; border-radius:8px; font-size:0.75rem;">PENDENTE</span></td><td id="c-pen-rot">-</td><td id="c-pen-vol">-</td><td id="c-pen-perc" style="color:#ef4444; font-weight:800;">-</td></tr>
+                    </table>
+                    <div style="padding: 20px; font-weight: 800; font-size: 0.8rem; background: #f8fafc; border-top: 1px solid #f1f5f9;">REPORT H/H</div>
+                    <table class="tbl-ctrl"><tbody id="c-hourly-body"></tbody></table>
+                </div>
+            </section>
+
+            <section id="view-bi" class="hidden">
+                <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <div>
+                        <h2 style="font-weight: 800; letter-spacing: -1px; margin-bottom: 5px;">Gráfico Geral</h2>
+                        <div style="font-size: 0.8rem; color: var(--text-muted);">Acompanhamento Horário de Volume e Rotas (Controle HUB)</div>
+                    </div>
+                    <button class="btn-ghost" onclick="renderBIChart()"><i class="fas fa-sync"></i> Atualizar Gráfico</button>
+                </div>
+                <div class="bento-grid" style="grid-template-columns: 1fr;">
+                    <div class="stat-card" style="height: 550px; padding: 20px;">
+                        <canvas id="biChartCanvas"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <section id="view-mes" class="hidden">
+                <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+                    <h2 style="font-weight: 800; letter-spacing: -1px;">Consolidado do Período (Rotas Diárias)</h2>
+                    <button class="btn-ghost" style="color:var(--danger); border-color:rgba(239, 68, 68, 0.2);" onclick="resetMonthly()">Zerar Banco de Dados</button>
+                </div>
+                <div id="monthly-list" class="m-list"></div>
+            </section>
+
+            <section id="view-escala" class="hidden esc-layout">
+                <div class="esc-main-content" style="padding: 0;">
+                    <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h2 style="font-weight: 800; letter-spacing: -1px;">Escala de Lugares Semanal (Quarta a Segunda)</h2>
+                        <div class="admin-only flex-container" style="display:flex; gap: 10px;">
+                            <button class="btn-ghost" style="border-color: #3b82f6; color: #3b82f6;" onclick="replicateWednesday()" title="Copia a escala de Quarta para todos os dias"><i class="fas fa-copy"></i> Replicar Quarta</button>
+                            <button class="btn-ghost" style="border-color: var(--accent); color: var(--accent);" onclick="autoDistributeAllLugares()">Sortear Semana Toda</button>
+                            <button class="btn-ghost" style="border-color: var(--danger); color: var(--danger);" onclick="clearEscalaSemana()"><i class="fas fa-trash"></i> Limpar Semana</button>
+                            <input type="week" id="hist-date-input" class="btn-ghost" style="background: rgba(255,255,255,0.05); color: #fff; border-color: var(--glass-border);" onchange="updateDatesFromWeek('hist-date-input', 'lugares')">
+                            <button class="btn-primary" style="width:auto; padding: 10px 30px;" onclick="archiveEscalaSemanal()">Salvar Histórico Semanal</button>
+                        </div>
+                    </div>
+                    <div class="esc-board" id="escala-semanal-container"></div>
+                </div>
+                
+                <div class="esc-sidebar admin-only flex-container">
+                    <div class="esc-sidebar-title">Novo Colaborador</div>
+                    <div style="margin-bottom: 20px; display: flex; gap: 8px;">
+                        <input type="text" id="new-worker-name" placeholder="Nome Completo" style="flex: 1; padding: 8px; border-radius: 8px; background: rgba(255,255,255,0.05); color: #fff; border: 1px solid var(--glass-border); font-size: 0.75rem; font-weight: 600;">
+                        <button onclick="addNewCollaborator('new-worker-name')" style="background: var(--primary); color: white; border: none; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 0.8rem; font-weight: bold;"><i class="fas fa-plus"></i></button>
+                    </div>
+                    <div class="esc-sidebar-title" style="margin-top: 10px; border-top: 1px solid var(--glass-border); padding-top: 15px;">Banco de Nomes</div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 10px;">Ver disponibilidade de:</div>
+                    <select id="sidebar-day-select" onchange="changeSidebarDay('lugares')" style="width: 100%; margin-bottom: 15px; padding: 10px; border-radius: 8px; background: rgba(255,255,255,0.05); color: #fff; border: 1px solid var(--glass-border); outline: none;">
+                        <option value="quarta">Escala Quarta</option>
+                        <option value="quinta">Escala Quinta</option>
+                        <option value="sexta">Escala Sexta</option>
+                        <option value="sabado">Escala Sábado</option>
+                        <option value="domingo">Escala Domingo</option>
+                        <option value="segunda">Escala Segunda</option>
+                    </select>
+                    <div style="font-size: 0.75rem; color: var(--success); font-weight: 700; margin-bottom: 10px;">Faltam alocar <span id="sidebar-count">(36)</span>:</div>
+                    <div id="sidebar-names-list" class="sidebar-names-list"></div>
+                </div>
+            </section>
+
+            <section id="view-escala-dc" class="hidden esc-layout">
+                <div class="esc-main-content" style="padding: 0;">
+                    <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h2 style="font-weight: 800; letter-spacing: -1px;">Escala Doblecheck (Alternada)</h2>
+                        <div class="admin-only flex-container" style="display:flex; gap: 10px;">
+                            <button class="btn-ghost" style="border-color: var(--accent); color: var(--accent);" onclick="autoDistributeAllDc()">Sortear Semana Toda</button>
+                            <button class="btn-ghost" style="border-color: var(--danger); color: var(--danger);" onclick="clearEscalaDc()"><i class="fas fa-trash"></i> Limpar Semana</button>
+                            <input type="week" id="hist-date-input-dc" class="btn-ghost" style="background: rgba(255,255,255,0.05); color: #fff; border-color: var(--glass-border);" onchange="updateDatesFromWeek('hist-date-input-dc', 'dc')">
+                            <button class="btn-primary" style="width:auto; padding: 10px 30px;" onclick="archiveEscalaDc()">Salvar Histórico Semanal</button>
+                        </div>
+                    </div>
+                    <div class="esc-board" id="escala-dc-container"></div>
+                </div>
+                
+                <div class="esc-sidebar admin-only flex-container">
+                    <div class="esc-sidebar-title">Novo Colaborador</div>
+                    <div style="margin-bottom: 20px; display: flex; gap: 8px;">
+                        <input type="text" id="new-worker-name-dc" placeholder="Nome Completo" style="flex: 1; padding: 8px; border-radius: 8px; background: rgba(255,255,255,0.05); color: #fff; border: 1px solid var(--glass-border); font-size: 0.75rem; font-weight: 600;">
+                        <button onclick="addNewCollaborator('new-worker-name-dc')" style="background: var(--primary); color: white; border: none; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 0.8rem; font-weight: bold;"><i class="fas fa-plus"></i></button>
+                    </div>
+                    <div class="esc-sidebar-title" style="margin-top: 10px; border-top: 1px solid var(--glass-border); padding-top: 15px;">Banco de Nomes</div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 10px;">Ver disponibilidade de:</div>
+                    <select id="sidebar-day-select-dc" onchange="changeSidebarDay('dc')" style="width: 100%; margin-bottom: 15px; padding: 10px; border-radius: 8px; background: rgba(255,255,255,0.05); color: #fff; border: 1px solid var(--glass-border); outline: none;">
+                        <option value="quarta">Escala Quarta</option>
+                        <option value="quinta">Escala Quinta</option>
+                        <option value="sexta">Escala Sexta</option>
+                        <option value="sabado">Escala Sábado</option>
+                        <option value="domingo">Escala Domingo</option>
+                        <option value="segunda">Escala Segunda</option>
+                    </select>
+                    <div style="font-size: 0.75rem; color: var(--success); font-weight: 700; margin-bottom: 10px;">Faltam alocar <span id="sidebar-count-dc">(36)</span>:</div>
+                    <div id="sidebar-names-list-dc" class="sidebar-names-list"></div>
+                </div>
+            </section>
+
+            <section id="view-hist-escala" class="hidden">
+                <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+                    <h2 style="font-weight: 800; letter-spacing: -1px;">Histórico de Escalas Semanais (Lugares)</h2>
+                    <button class="btn-ghost admin-only block-container" style="color:var(--danger); border-color:rgba(239, 68, 68, 0.2);" onclick="clearEscalaHistory('lugares')"><i class="fas fa-trash"></i> Limpar Todo o Histórico</button>
+                </div>
+                <div id="hist-escala-list" class="m-list"></div>
+            </section>
+
+            <section id="view-hist-escala-dc" class="hidden">
+                <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+                    <h2 style="font-weight: 800; letter-spacing: -1px;">Histórico de Escalas Semanais (Doblecheck)</h2>
+                    <button class="btn-ghost admin-only block-container" style="color:var(--danger); border-color:rgba(239, 68, 68, 0.2);" onclick="clearEscalaHistory('dc')"><i class="fas fa-trash"></i> Limpar Todo o Histórico</button>
+                </div>
+                <div id="hist-escala-dc-list" class="m-list"></div>
+            </section>
+
+            <section id="view-presenca" class="hidden">
+                <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <div>
+                        <h2 style="font-weight: 800; letter-spacing: -1px; margin-bottom: 5px;">Painel de Presença e Frequência</h2>
+                        <div style="font-size: 0.8rem; color: var(--text-muted);">Controle visual de assiduidade dos operadores do HUB LMG-48</div>
+                    </div>
+                    <div class="admin-only flex-container" style="display:flex; align-items: center; gap: 10px;">
+                        <label style="color: var(--text-muted); font-size: 0.8rem; font-weight: 700;">MÊS REFERÊNCIA:</label>
+                        <input type="month" id="pres-month-select" class="btn-ghost" style="background: rgba(255,255,255,0.05); color: #fff; border-color: var(--primary);" onchange="changePresencaMonth()">
+                    </div>
+                </div>
+
+                <div class="nasa-board">
+                    <table class="nasa-table" id="presenca-table-body"></table>
+                </div>
+                
+                <div style="display: flex; gap: 15px; margin-top: 20px; font-size: 0.8rem; font-weight: 700; color: var(--text-muted); padding-left: 15px;">
+                    <div style="display: flex; align-items: center; gap: 6px;"><div class="badge-pres badge-P">P</div> Presença</div>
+                    <div style="display: flex; align-items: center; gap: 6px;"><div class="badge-pres badge-F">F</div> Falta</div>
+                    <div style="display: flex; align-items: center; gap: 6px;"><div class="badge-pres badge-FG">FG</div> Folga</div>
+                    <div style="display: flex; align-items: center; gap: 6px;"><div class="badge-pres badge-AT">AT</div> Atestado</div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
