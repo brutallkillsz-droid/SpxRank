@@ -5,18 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Painel Liderança | HUB LMG-48</title>
     
+    <!-- Bibliotecas Externas -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
 
+    <!-- Framework FIREBASE -->
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
 
+    <!-- CSS -->
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
+    <!-- POPUPS E TOASTS GLOBAIS -->
     <div id="toast" class="toast">Notificação</div>
 
     <div id="pres-popup" class="hidden">
@@ -27,6 +31,7 @@
         <button class="pres-btn empty-btn" onclick="setPresenca('')" title="Limpar Dia"><i class="fas fa-eraser"></i></button>
     </div>
 
+    <!-- MODAL DOBLECHECK (RANKING DIÁRIO) -->
     <div id="dc-modal-overlay" class="hidden">
         <div class="dc-modal-content">
             <div class="dc-modal-title">DOBLECHECK</div>
@@ -46,6 +51,7 @@
         </div>
     </div>
 
+    <!-- MODAL SELEÇÃO DE TURNO (PRODUTIVIDADE) -->
     <div id="shift-modal-overlay" class="hidden">
         <div class="dc-modal-content">
             <div class="dc-modal-title">TURNO DE IMPORTAÇÃO</div>
@@ -62,6 +68,7 @@
         </div>
     </div>
 
+    <!-- TELA DE LOGIN -->
     <div id="login-screen">
         <div class="login-card">
             <div class="brand-title">LOGISTICS ELITE</div>
@@ -72,8 +79,10 @@
         </div>
     </div>
 
+    <!-- CONTAINER PRINCIPAL DO APLICATIVO -->
     <div id="app-shell">
         
+        <!-- SIDEBAR DE NAVEGAÇÃO -->
         <aside class="sidebar">
             <div class="nav-logo">
                 <i class="fas fa-rocket"></i> PAINEL LIDERANÇA
@@ -132,6 +141,7 @@
             </div>
         </aside>
 
+        <!-- ÁREA DE CONTEÚDO PRINCIPAL (MAIN) -->
         <main class="main-content">
             
             <section id="view-sitelider" class="hidden">
@@ -258,7 +268,7 @@
                     <tr>
                         <td class="spx-gray-light" style="width:6%">Data</td>
                         <td style="width:6%; padding:0; position:relative; cursor:pointer;">
-                            <input type="date" class="date-input-field" id="p-data" value="" onchange="saveProdState()">
+                            <input type="date" class="date-input-field" id="p-data" value="" onchange="saveProdState()" onclick="try{this.showPicker()}catch(e){}">
                         </td>
                         <td rowspan="2" class="spx-gray-light" style="width:6%">Backlog</td>
                         <td rowspan="2" class="spx-orange editable-cell" style="width:6%" contenteditable="true" id="p-backlog" onblur="calculateProdTotals(true)">0</td>
@@ -266,7 +276,7 @@
                         <td rowspan="2" class="spx-orange editable-cell" style="width:6%" contenteditable="true" id="p-xpt" onblur="calculateProdTotals(true)">0</td>
                         <td class="spx-gray-light" style="width:8%">Horário início</td>
                         <td style="width:6%; padding:0; position:relative; cursor:pointer;">
-                            <input type="time" class="date-input-field" id="p-hora-ini" value="00:00" onchange="saveProdState()">
+                            <input type="time" class="date-input-field" id="p-hora-ini" value="00:00" onchange="saveProdState()" onclick="try{this.showPicker()}catch(e){}">
                         </td>
                         <td class="spx-gray-light" style="width:8%">Qtd realizada</td>
                         <td class="spx-gray-dark" style="width:6%" id="p-realizada">0</td>
@@ -279,7 +289,7 @@
                         <td class="editable-cell" contenteditable="true" id="p-vol-rot" onblur="calculateProdTotals(true)">0</td>
                         <td class="spx-gray-light">Horário término</td>
                         <td style="padding:0; position:relative; cursor:pointer;">
-                            <input type="time" class="date-input-field" id="p-hora-fim" value="00:00" onchange="saveProdState()">
+                            <input type="time" class="date-input-field" id="p-hora-fim" value="00:00" onchange="saveProdState()" onclick="try{this.showPicker()}catch(e){}">
                         </td>
                         <td class="spx-gray-light">Qtd pendente</td>
                         <td id="p-pendente">0</td>
@@ -351,15 +361,16 @@
                 <div id="monthly-list" class="m-list"></div>
             </section>
 
+            <!-- ABA: ESCALA DE LUGARES -->
             <section id="view-escala" class="hidden esc-layout">
                 <div class="esc-main-content" style="padding: 0;">
                     <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <h2 style="font-weight: 800; letter-spacing: -1px;">Escala de Lugares Semanal (Quarta a Segunda)</h2>
+                        <h2 style="font-weight: 800; letter-spacing: -1px;">Escala de Lugares Semanal (Segunda a Domingo)</h2>
                         <div class="admin-only flex-container" style="display:flex; gap: 10px;">
-                            <button class="btn-ghost" style="border-color: #3b82f6; color: #3b82f6;" onclick="replicateWednesday()" title="Copia a escala de Quarta para todos os dias"><i class="fas fa-copy"></i> Replicar Quarta</button>
+                            <button class="btn-ghost" style="border-color: #3b82f6; color: #3b82f6;" onclick="replicateMonday()" title="Copia a escala de Segunda para todos os dias"><i class="fas fa-copy"></i> Replicar Segunda</button>
                             <button class="btn-ghost" style="border-color: var(--accent); color: var(--accent);" onclick="autoDistributeAllLugares()">Sortear Semana Toda</button>
                             <button class="btn-ghost" style="border-color: var(--danger); color: var(--danger);" onclick="clearEscalaSemana()"><i class="fas fa-trash"></i> Limpar Semana</button>
-                            <input type="week" id="hist-date-input" class="btn-ghost" style="background: rgba(255,255,255,0.05); color: #fff; border-color: var(--glass-border);" onchange="updateDatesFromWeek('hist-date-input', 'lugares')">
+                            <input type="week" id="hist-date-input" class="btn-ghost" style="background: rgba(255,255,255,0.05); color: #fff; border-color: var(--glass-border);" onchange="updateDatesFromWeek('hist-date-input', 'lugares')" onclick="try{this.showPicker()}catch(e){}">
                             <button class="btn-primary" style="width:auto; padding: 10px 30px;" onclick="archiveEscalaSemanal()">Salvar Histórico Semanal</button>
                         </div>
                     </div>
@@ -375,26 +386,28 @@
                     <div class="esc-sidebar-title" style="margin-top: 10px; border-top: 1px solid var(--glass-border); padding-top: 15px;">Banco de Nomes</div>
                     <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 10px;">Ver disponibilidade de:</div>
                     <select id="sidebar-day-select" onchange="changeSidebarDay('lugares')" style="width: 100%; margin-bottom: 15px; padding: 10px; border-radius: 8px; background: rgba(255,255,255,0.05); color: #fff; border: 1px solid var(--glass-border); outline: none;">
+                        <option value="segunda">Escala Segunda</option>
+                        <option value="terca">Escala Terça</option>
                         <option value="quarta">Escala Quarta</option>
                         <option value="quinta">Escala Quinta</option>
                         <option value="sexta">Escala Sexta</option>
                         <option value="sabado">Escala Sábado</option>
                         <option value="domingo">Escala Domingo</option>
-                        <option value="segunda">Escala Segunda</option>
                     </select>
                     <div style="font-size: 0.75rem; color: var(--success); font-weight: 700; margin-bottom: 10px;">Faltam alocar <span id="sidebar-count">(36)</span>:</div>
                     <div id="sidebar-names-list" class="sidebar-names-list"></div>
                 </div>
             </section>
 
+            <!-- ABA: ESCALA DOBLECHECK (ALTERNADA) -->
             <section id="view-escala-dc" class="hidden esc-layout">
                 <div class="esc-main-content" style="padding: 0;">
                     <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <h2 style="font-weight: 800; letter-spacing: -1px;">Escala Doblecheck (Alternada)</h2>
+                        <h2 style="font-weight: 800; letter-spacing: -1px;">Escala Doblecheck (Segunda a Domingo)</h2>
                         <div class="admin-only flex-container" style="display:flex; gap: 10px;">
                             <button class="btn-ghost" style="border-color: var(--accent); color: var(--accent);" onclick="autoDistributeAllDc()">Sortear Semana Toda</button>
                             <button class="btn-ghost" style="border-color: var(--danger); color: var(--danger);" onclick="clearEscalaDc()"><i class="fas fa-trash"></i> Limpar Semana</button>
-                            <input type="week" id="hist-date-input-dc" class="btn-ghost" style="background: rgba(255,255,255,0.05); color: #fff; border-color: var(--glass-border);" onchange="updateDatesFromWeek('hist-date-input-dc', 'dc')">
+                            <input type="week" id="hist-date-input-dc" class="btn-ghost" style="background: rgba(255,255,255,0.05); color: #fff; border-color: var(--glass-border);" onchange="updateDatesFromWeek('hist-date-input-dc', 'dc')" onclick="try{this.showPicker()}catch(e){}">
                             <button class="btn-primary" style="width:auto; padding: 10px 30px;" onclick="archiveEscalaDc()">Salvar Histórico Semanal</button>
                         </div>
                     </div>
@@ -410,12 +423,13 @@
                     <div class="esc-sidebar-title" style="margin-top: 10px; border-top: 1px solid var(--glass-border); padding-top: 15px;">Banco de Nomes</div>
                     <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 10px;">Ver disponibilidade de:</div>
                     <select id="sidebar-day-select-dc" onchange="changeSidebarDay('dc')" style="width: 100%; margin-bottom: 15px; padding: 10px; border-radius: 8px; background: rgba(255,255,255,0.05); color: #fff; border: 1px solid var(--glass-border); outline: none;">
+                        <option value="segunda">Escala Segunda</option>
+                        <option value="terca">Escala Terça</option>
                         <option value="quarta">Escala Quarta</option>
                         <option value="quinta">Escala Quinta</option>
                         <option value="sexta">Escala Sexta</option>
                         <option value="sabado">Escala Sábado</option>
                         <option value="domingo">Escala Domingo</option>
-                        <option value="segunda">Escala Segunda</option>
                     </select>
                     <div style="font-size: 0.75rem; color: var(--success); font-weight: 700; margin-bottom: 10px;">Faltam alocar <span id="sidebar-count-dc">(36)</span>:</div>
                     <div id="sidebar-names-list-dc" class="sidebar-names-list"></div>
@@ -446,7 +460,7 @@
                     </div>
                     <div class="admin-only flex-container" style="display:flex; align-items: center; gap: 10px;">
                         <label style="color: var(--text-muted); font-size: 0.8rem; font-weight: 700;">MÊS REFERÊNCIA:</label>
-                        <input type="month" id="pres-month-select" class="btn-ghost" style="background: rgba(255,255,255,0.05); color: #fff; border-color: var(--primary);" onchange="changePresencaMonth()">
+                        <input type="month" id="pres-month-select" class="btn-ghost" style="background: rgba(255,255,255,0.05); color: #fff; border-color: var(--primary);" onchange="changePresencaMonth()" onclick="try{this.showPicker()}catch(e){}">
                     </div>
                 </div>
 
