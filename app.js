@@ -22,7 +22,6 @@ let dailyData = [];
 let ctrlData = initCtrl();
 let globalProdData = {}; 
 
-// CONFIGURAÇÃO DOS DIAS ATUALIZADA (SEGUNDA A DOMINGO)
 const escDiasConf = [
     { id: 'segunda', nome: 'ESCALA SEGUNDA', bg: '#5c6e85', cor: '#fff' },
     { id: 'terca', nome: 'ESCALA TERÇA', bg: '#b4a7d6', cor: '#000' },
@@ -176,9 +175,11 @@ async function renderSiteliderDashboard() {
     let percSem = absSem.sch > 0 ? (absSem.abs / absSem.sch * 100).toFixed(1) : "0.0";
     let percDia = absDia.sch > 0 ? (absDia.abs / absDia.sch * 100).toFixed(1) : "0.0";
 
-    document.getElementById('sl-abs-mes').innerText = percMes + "%";
-    document.getElementById('sl-abs-sem').innerText = percSem + "%";
-    document.getElementById('sl-abs-dia').innerText = percDia + "%";
+    if(document.getElementById('sl-abs-mes')) {
+        document.getElementById('sl-abs-mes').innerText = percMes + "%";
+        document.getElementById('sl-abs-sem').innerText = percSem + "%";
+        document.getElementById('sl-abs-dia').innerText = percDia + "%";
+    }
 
     let dataAbsChart = [];
     for(let d=1; d<=daysInMonth; d++) { let val = diaChartAbs[d].sch > 0 ? (diaChartAbs[d].abs / diaChartAbs[d].sch * 100) : 0; dataAbsChart.push(val.toFixed(1)); }
@@ -774,7 +775,7 @@ async function renderBIChart() {
 }
 
 // =========================================================
-// ESCALA (LUGARES E DOBLECHECK)
+// ESCALA DE LÓGICAS (PROCESSAMENTO E DC)
 // =========================================================
 function updateDatesFromWeek(inputId, tipo) {
     if (!currentUser || currentUser.r !== 'admin') return;
@@ -848,10 +849,10 @@ function removeCollaborator(name) {
 }
 
 // ==========================================
-// LÓGICA: ESCALA DE LUGARES
+// LÓGICA: ESCALA DE PROCESSAMENTO
 // ==========================================
 function clearEscalaSemana() {
-    if(confirm("Tem certeza que deseja limpar TODA a escala de Lugares?")) {
+    if(confirm("Tem certeza que deseja limpar TODA a escala de Processamento?")) {
         let oldData = {...liveEscalaSemana}; liveEscalaSemana = {};
         escDiasConf.forEach(d => { let prevData = oldData[d.id] ? oldData[d.id].dataDia : '(inserir data)'; let prevVis = oldData[d.id] && oldData[d.id].visible !== undefined ? oldData[d.id].visible : false; liveEscalaSemana[d.id] = { hc: '16', pct: '0', cap: '16980', dw: '0', phd: '0', capphd: '630', dataDia: prevData, visible: prevVis, grid: {} }; });
         dbFirebase.ref('shopee_escala_semana_live').set(liveEscalaSemana).then(() => { showToast("Escala limpa com sucesso!"); }).catch(e => console.error(e));
@@ -1319,7 +1320,7 @@ async function archiveEscalaDc() {
 }
 
 function clearEscalaHistory(tipo) {
-    let desc = tipo === 'lugares' ? 'LUGARES' : 'DOBLECHECK';
+    let desc = tipo === 'lugares' ? 'PROCESSAMENTO' : 'DOBLECHECK';
     let refNode = tipo === 'lugares' ? 'shopee_escala_history' : 'shopee_escala_dc_history';
     if(confirm(`ATENÇÃO: Deseja apagar permanentemente TODO o histórico de escalas ${desc}? Esta ação não pode ser desfeita.`)) {
         dbFirebase.ref(refNode).remove().then(() => { renderHistEscala(tipo); showToast("Histórico apagado!"); }).catch(e => console.error(e));
