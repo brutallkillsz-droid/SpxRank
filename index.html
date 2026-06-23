@@ -5,22 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Painel Liderança | HUB LMG-48</title>
     
-    <!-- Bibliotecas Externas -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
 
-    <!-- Framework FIREBASE -->
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
 
-    <!-- CSS -->
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <!-- POPUPS E TOASTS GLOBAIS -->
     <div id="toast" class="toast">Notificação</div>
 
     <div id="pres-popup" class="hidden">
@@ -31,7 +27,6 @@
         <button class="pres-btn empty-btn" onclick="setPresenca('')" title="Limpar Dia"><i class="fas fa-eraser"></i></button>
     </div>
 
-    <!-- MODAL DOBLECHECK (RANKING DIÁRIO) -->
     <div id="dc-modal-overlay" class="hidden">
         <div class="dc-modal-content">
             <div class="dc-modal-title">DOBLECHECK</div>
@@ -51,7 +46,6 @@
         </div>
     </div>
 
-    <!-- MODAL SELEÇÃO DE TURNO (PRODUTIVIDADE) -->
     <div id="shift-modal-overlay" class="hidden">
         <div class="dc-modal-content">
             <div class="dc-modal-title">TURNO DE IMPORTAÇÃO</div>
@@ -68,7 +62,6 @@
         </div>
     </div>
 
-    <!-- TELA DE LOGIN -->
     <div id="login-screen">
         <div class="login-card">
             <div class="brand-title">LOGISTICS ELITE</div>
@@ -79,10 +72,8 @@
         </div>
     </div>
 
-    <!-- CONTAINER PRINCIPAL DO APLICATIVO -->
     <div id="app-shell">
         
-        <!-- SIDEBAR DE NAVEGAÇÃO -->
         <aside class="sidebar">
             <div class="nav-logo">
                 <i class="fas fa-rocket"></i> PAINEL LIDERANÇA
@@ -141,7 +132,6 @@
             </div>
         </aside>
 
-        <!-- ÁREA DE CONTEÚDO PRINCIPAL (MAIN) -->
         <main class="main-content">
             
             <section id="view-sitelider" class="hidden">
@@ -167,21 +157,21 @@
                             <div class="sc-name">PHD Diário</div>
                             <div class="sc-rank"><i class="fas fa-bolt" style="color:var(--primary);"></i></div>
                         </div>
-                        <div class="sc-hero"><div class="sc-val" id="sl-phd-dia">0</div><div class="sc-lbl">ÚLTIMO REGISTRADO NA SEMANA</div></div>
+                        <div class="sc-hero"><div class="sc-val" id="sl-phd-dia">0</div><div class="sc-lbl" id="sl-phd-dia-lbl">ÚLTIMO REGISTRADO NA SEMANA</div></div>
                     </div>
                     <div class="stat-card sl-phd">
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
                             <div class="sc-name">PHD Semanal</div>
                             <div class="sc-rank"><i class="fas fa-calendar-week" style="color:var(--primary);"></i></div>
                         </div>
-                        <div class="sc-hero"><div class="sc-val" id="sl-phd-sem">0</div><div class="sc-lbl">MÉDIA DA SEMANA SELECIONADA</div></div>
+                        <div class="sc-hero"><div class="sc-val" id="sl-phd-sem">0</div><div class="sc-lbl" id="sl-phd-sem-lbl">MÉDIA DA SEMANA SELECIONADA</div></div>
                     </div>
                     <div class="stat-card sl-phd">
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
                             <div class="sc-name">PHD Mensal</div>
                             <div class="sc-rank"><i class="fas fa-chart-area" style="color:var(--primary);"></i></div>
                         </div>
-                        <div class="sc-hero"><div class="sc-val" id="sl-phd-mes">0</div><div class="sc-lbl">MÉDIA DO MÊS DE REFERÊNCIA</div></div>
+                        <div class="sc-hero"><div class="sc-val" id="sl-phd-mes">0</div><div class="sc-lbl" id="sl-phd-mes-lbl">MÉDIA DO MÊS DE REFERÊNCIA</div></div>
                     </div>
                 </div>
 
@@ -364,7 +354,6 @@
                 <div id="monthly-list" class="m-list"></div>
             </section>
 
-            <!-- ABA: ESCALA DE LUGARES -->
             <section id="view-escala" class="hidden esc-layout">
                 <div class="esc-main-content" style="padding: 0;">
                     <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
@@ -402,7 +391,6 @@
                 </div>
             </section>
 
-            <!-- ABA: ESCALA DOBLECHECK (ALTERNADA) -->
             <section id="view-escala-dc" class="hidden esc-layout">
                 <div class="esc-main-content" style="padding: 0;">
                     <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
@@ -482,7 +470,6 @@
         </main>
     </div>
 
-    <!-- Vinculação do motor JavaScript externo -->
     <script src="app.js"></script>
 </body>
 </html>
