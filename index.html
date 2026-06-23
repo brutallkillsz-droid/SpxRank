@@ -5,18 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Painel Liderança | HUB LMG-48</title>
     
+    <!-- Bibliotecas Externas -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
 
+    <!-- Framework FIREBASE -->
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
 
+    <!-- CSS -->
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
+    <!-- POPUPS E TOASTS GLOBAIS -->
     <div id="toast" class="toast">Notificação</div>
 
     <div id="pres-popup" class="hidden">
@@ -27,6 +31,7 @@
         <button class="pres-btn empty-btn" onclick="setPresenca('')" title="Limpar Dia"><i class="fas fa-eraser"></i></button>
     </div>
 
+    <!-- MODAL DOBLECHECK (RANKING DIÁRIO) -->
     <div id="dc-modal-overlay" class="hidden">
         <div class="dc-modal-content">
             <div class="dc-modal-title">DOBLECHECK</div>
@@ -46,6 +51,7 @@
         </div>
     </div>
 
+    <!-- MODAL SELEÇÃO DE TURNO (PRODUTIVIDADE) -->
     <div id="shift-modal-overlay" class="hidden">
         <div class="dc-modal-content">
             <div class="dc-modal-title">TURNO DE IMPORTAÇÃO</div>
@@ -62,6 +68,7 @@
         </div>
     </div>
 
+    <!-- TELA DE LOGIN -->
     <div id="login-screen">
         <div class="login-card">
             <div class="brand-title">LOGISTICS ELITE</div>
@@ -72,8 +79,10 @@
         </div>
     </div>
 
+    <!-- CONTAINER PRINCIPAL DO APLICATIVO -->
     <div id="app-shell">
         
+        <!-- SIDEBAR DE NAVEGAÇÃO -->
         <aside class="sidebar">
             <div class="nav-logo">
                 <i class="fas fa-rocket"></i> PAINEL LIDERANÇA
@@ -90,6 +99,7 @@
                 </div>
                 <div class="menu-items open" id="menu-sitelider">
                     <div class="menu-item" id="btn-sitelider" onclick="switchTab('sitelider')">Dashboard PHD & ABS</div>
+                    <div class="menu-item" id="btn-sitelider-analise" onclick="switchTab('sitelider-analise')">Análise de GAP (Meta)</div>
                 </div>
             </div>
 
@@ -132,13 +142,15 @@
             </div>
         </aside>
 
+        <!-- ÁREA DE CONTEÚDO PRINCIPAL (MAIN) -->
         <main class="main-content">
             
+            <!-- ABA: DASHBOARD SITELIDER ANÁLISES -->
             <section id="view-sitelider" class="hidden">
                 <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
                     <div>
                         <h2 style="font-weight: 800; letter-spacing: -1px; margin-bottom: 5px;">Dashboard Gestão Executiva</h2>
-                        <div style="font-size: 0.85rem; color: var(--text-muted);">Acompanhamento de PHD e Absenteísmo</div>
+                        <div style="font-size: 0.85rem; color: var(--text-muted);">Acompanhamento de PHD e Absenteísmo (Mês Vigente / Semana)</div>
                     </div>
                     <div class="admin-only flex-container" style="display:flex; align-items: center; gap: 10px;">
                         <label style="color: var(--text-muted); font-size: 0.8rem; font-weight: 700;">META PHD:</label>
@@ -206,6 +218,88 @@
                     </div>
                     <div class="stat-card" style="padding: 20px; height: 350px;">
                         <canvas id="slChartABS"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <!-- NOVA ABA: ANÁLISE DE GAP (META PHD) -->
+            <section id="view-sitelider-analise" class="hidden">
+                <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+                    <div>
+                        <h2 style="font-weight: 800; letter-spacing: -1px; margin-bottom: 5px;">Análise de Desempenho (GAP de Meta)</h2>
+                        <div style="font-size: 0.85rem; color: var(--text-muted);">Comparativo detalhado de distância entre PHD Realizado e a Meta estabelecida.</div>
+                    </div>
+                    <div class="flex-container" style="display:flex; align-items: center; gap: 10px;">
+                        <label style="color: var(--text-muted); font-size: 0.8rem; font-weight: 700;">META NO SISTEMA:</label>
+                        <div style="font-size: 1.8rem; font-weight: 900; color: #fbbf24; background: rgba(251, 191, 36, 0.1); padding: 5px 20px; border-radius: 12px; border: 1px solid rgba(251, 191, 36, 0.3);" id="sa-meta-display">530</div>
+                    </div>
+                </div>
+
+                <div class="bento-grid" style="grid-template-columns: repeat(3, 1fr);">
+                    <!-- Diário -->
+                    <div class="stat-card" style="border-top: 4px solid var(--primary);">
+                        <h3 style="color: #fff; margin-bottom: 20px; font-size: 1.1rem;"><i class="fas fa-calendar-day" style="color:var(--primary); margin-right: 8px;"></i> Fechamento Diário</h3>
+                        <div style="display:flex; justify-content: space-between; margin-bottom: 12px; font-size: 1.1rem;">
+                            <span style="color: var(--text-muted);">PHD Realizado:</span>
+                            <span id="sa-dia-real" style="font-weight: 800; color: #fff;">0</span>
+                        </div>
+                        <div style="display:flex; justify-content: space-between; margin-bottom: 12px; font-size: 1.1rem;">
+                            <span style="color: var(--text-muted);">Meta Esperada:</span>
+                            <span id="sa-dia-meta" style="font-weight: 800; color: #fbbf24;">530</span>
+                        </div>
+                        <div style="display:flex; justify-content: space-between; margin-bottom: 12px; font-size: 1.1rem;">
+                            <span style="color: var(--text-muted);">Atingimento:</span>
+                            <span id="sa-dia-perc" style="font-weight: 800; color: #fff;">0%</span>
+                        </div>
+                        <div style="display:flex; justify-content: space-between; margin-top: 20px; padding-top: 15px; border-top: 1px dashed rgba(255,255,255,0.1); font-size: 1.2rem;">
+                            <span style="color: #fff; font-weight: 800;">GAP (Volume):</span>
+                            <span id="sa-dia-gap" style="font-weight: 900;">0</span>
+                        </div>
+                        <div style="text-align: center; margin-top: 25px; padding: 12px; border-radius: 12px; font-weight: 800; letter-spacing: 1px;" id="sa-dia-status">-</div>
+                    </div>
+
+                    <!-- Semanal -->
+                    <div class="stat-card" style="border-top: 4px solid var(--accent);">
+                        <h3 style="color: #fff; margin-bottom: 20px; font-size: 1.1rem;"><i class="fas fa-calendar-week" style="color:var(--accent); margin-right: 8px;"></i> Fechamento Semanal</h3>
+                        <div style="display:flex; justify-content: space-between; margin-bottom: 12px; font-size: 1.1rem;">
+                            <span style="color: var(--text-muted);">Média Realizada:</span>
+                            <span id="sa-sem-real" style="font-weight: 800; color: #fff;">0</span>
+                        </div>
+                        <div style="display:flex; justify-content: space-between; margin-bottom: 12px; font-size: 1.1rem;">
+                            <span style="color: var(--text-muted);">Meta Esperada:</span>
+                            <span id="sa-sem-meta" style="font-weight: 800; color: #fbbf24;">530</span>
+                        </div>
+                        <div style="display:flex; justify-content: space-between; margin-bottom: 12px; font-size: 1.1rem;">
+                            <span style="color: var(--text-muted);">Atingimento:</span>
+                            <span id="sa-sem-perc" style="font-weight: 800; color: #fff;">0%</span>
+                        </div>
+                        <div style="display:flex; justify-content: space-between; margin-top: 20px; padding-top: 15px; border-top: 1px dashed rgba(255,255,255,0.1); font-size: 1.2rem;">
+                            <span style="color: #fff; font-weight: 800;">GAP (Volume):</span>
+                            <span id="sa-sem-gap" style="font-weight: 900;">0</span>
+                        </div>
+                        <div style="text-align: center; margin-top: 25px; padding: 12px; border-radius: 12px; font-weight: 800; letter-spacing: 1px;" id="sa-sem-status">-</div>
+                    </div>
+
+                    <!-- Mensal -->
+                    <div class="stat-card" style="border-top: 4px solid var(--success);">
+                        <h3 style="color: #fff; margin-bottom: 20px; font-size: 1.1rem;"><i class="fas fa-calendar-alt" style="color:var(--success); margin-right: 8px;"></i> Fechamento Mensal</h3>
+                        <div style="display:flex; justify-content: space-between; margin-bottom: 12px; font-size: 1.1rem;">
+                            <span style="color: var(--text-muted);">Média Realizada:</span>
+                            <span id="sa-mes-real" style="font-weight: 800; color: #fff;">0</span>
+                        </div>
+                        <div style="display:flex; justify-content: space-between; margin-bottom: 12px; font-size: 1.1rem;">
+                            <span style="color: var(--text-muted);">Meta Esperada:</span>
+                            <span id="sa-mes-meta" style="font-weight: 800; color: #fbbf24;">530</span>
+                        </div>
+                        <div style="display:flex; justify-content: space-between; margin-bottom: 12px; font-size: 1.1rem;">
+                            <span style="color: var(--text-muted);">Atingimento:</span>
+                            <span id="sa-mes-perc" style="font-weight: 800; color: #fff;">0%</span>
+                        </div>
+                        <div style="display:flex; justify-content: space-between; margin-top: 20px; padding-top: 15px; border-top: 1px dashed rgba(255,255,255,0.1); font-size: 1.2rem;">
+                            <span style="color: #fff; font-weight: 800;">GAP (Volume):</span>
+                            <span id="sa-mes-gap" style="font-weight: 900;">0</span>
+                        </div>
+                        <div style="text-align: center; margin-top: 25px; padding: 12px; border-radius: 12px; font-weight: 800; letter-spacing: 1px;" id="sa-mes-status">-</div>
                     </div>
                 </div>
             </section>
@@ -470,6 +564,7 @@
         </main>
     </div>
 
+    <!-- Vinculação do motor JavaScript externo -->
     <script src="app.js"></script>
 </body>
 </html>
