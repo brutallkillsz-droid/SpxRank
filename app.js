@@ -43,27 +43,10 @@ const dcLayout = [
 ];
 
 let operadoresList = []; 
-let defaultOperadores = [
-    "ANA CARLA TEIXEIRA DE JESUS REIS", "ANA CLAUDIA DAIBERT TOSTA", "AURIETE DE JESUS SALES DOS SANTOS",
-    "EDUARDO MARTINS RAMALHO DOS SANTOS", "EDUARDO ROMARIO DE OLIVEIRA SILVA", "JEAN RODRIGUES FERREIRA SOUSA",
-    "JOSENICE MARINHO DO NASCIMENTO", "KAIQUE SILVA FERREIRA", "LUCAS VINICIUS DOS SANTOS",
-    "MARCELO APOLINARIO DE ALMEIDA", "OTAVIO JUNIO FERREIRA FREITAS", "REGIELI FELIPE SILVA",
-    "RIAN AUGUSTO DE CASTRO LEAL", "SOLANGE DE JESUS CAMPOS", "THAYNARA GONCALVES RIBEIRO",
-    "VITORIA VILACA MARRA", "GIOVANNA CARVALHO LOPES GONCALVES", "VITORIA CRISTIAN SILVA",
-    "MARCELA DA SILVA FARIA", "PEDRO ERICK FERREIRA MEDEIROS", "MATHEUS OTONI AVILA VELASCO",
-    "NYCOLLAS DERIK LISBOA GOMES", "EMANNUEL MARTINS MOREIRA", "PETHALLA ELIZABETH ANDIRA DAGMAR VIEIRA SILVA",
-    "RIZONEIDE ALVES DE SOUZA", "LAIANE FERREIRA DE SOUZA", "THAYNA BEATRIZ CARVALHO VERGINIO",
-    "WILLIAM RESENDE DOS SANTOS", "VICTOR HENRIQUE FERNANDES FREITAS", "IGOR HENRIQUE MATHEUS",
-    "ALAN HIDE NITTA", "ALICE ANA LAURA SILVA", "CAUA HENRIQUE ALVES PEREIRA",
-    "IDYANARA COSTA DE PAULA", "YASMIN SILVA NASCIMENTO", "CLEDSSA CARLA MARTINS DOS SANTOS"
-];
-
 let liveEscalaSemana = {};
 let currentSidebarDay = 'segunda';
-
 let liveEscalaDcSemana = {};
 let currentSidebarDcDay = 'segunda';
-
 let livePresenca = {};
 let currentPresMes = ""; 
 let presencaListener = null;
@@ -73,6 +56,8 @@ let activePresDia = '';
 let historyDataCache = {};
 let historyDcDataCache = {};
 let monthlyDataCache = {};
+
+let globalMetaPHD = 530; // Base padrão
 
 function initCtrl() { return { date: '', totalVol: 0, totalRotas: 0, minTime: null, maxTime: null, finRot: 0, finVol: 0, missRot: 0, missVol: 0, missingRot: 0, missingVol: 0, hourly: {}, sumDurHI: 0, countDurHI: 0 }; }
 
@@ -106,38 +91,54 @@ function switchTab(id) {
 }
 
 // =========================================================
-// CÉREBRO MATEMÁTICO: CÁLCULO DE PHD
+// CÉREBRO MATEMÁTICO: CÁLCULO DE PHD E SALVAMENTO DE META
 // =========================================================
 window.calcPHDAndSave = function(diaId) {
     if (!currentUser || currentUser.r !== 'admin') return;
     
-    // Captura os valores digitados nas caixas e converte para número
-    let hcText = document.getElementById(`esc-hc-${diaId}`).innerText.replace(/[^\d.,]/g, '').replace(',', '.');
-    let dwText = document.getElementById(`esc-dw-${diaId}`).innerText.replace(/[^\d.,]/g, '').replace(',', '.');
-    let pctText = document.getElementById(`esc-pct-${diaId}`).innerText.replace(/[^\d.,]/g, '').replace(',', '.');
+    // CORREÇÃO CRÍTICA: Lendo '.textContent' garante que ele pega os números mesmo se a aba fechar!
+    let hcText = document.getElementById(`esc-hc-${diaId}`).textContent.replace(/[^\d.,]/g, '').replace(',', '.');
+    let dwText = document.getElementById(`esc-dw-${diaId}`).textContent.replace(/[^\d.,]/g, '').replace(',', '.');
+    let pctText = document.getElementById(`esc-pct-${diaId}`).textContent.replace(/[^\d.,]/g, '').replace(',', '.');
     
     let hc = parseFloat(hcText) || 0;
     let dw = parseFloat(dwText) || 0;
     let pct = parseFloat(pctText) || 0;
     
-    // Matemática do Logístico: PCT Processados / (Quantidade HC + Necessidade DW)
     let totalEfetivo = hc + dw;
     let phdCalculado = 0;
+    if (totalEfetivo > 0) { phdCalculado = Math.round(pct / totalEfetivo); }
     
-    if (totalEfetivo > 0) {
-        phdCalculado = Math.round(pct / totalEfetivo);
-    }
-    
-    // Joga o resultado na tela (ele está bloqueado para digitação manual)
-    document.getElementById(`esc-phd-${diaId}`).innerText = phdCalculado;
-    
-    // Manda pra Nuvem
+    document.getElementById(`esc-phd-${diaId}`).textContent = phdCalculado;
     saveEscalaSemanaToCloud();
+};
+
+window.saveMetaPHD = function() {
+    if (!currentUser || currentUser.r !== 'admin') return;
+    let val = parseInt(document.getElementById('meta-phd-input').value) || 530;
+    dbFirebase.ref('shopee_meta_phd').set(val);
+    showToast("Meta PHD atualizada para " + val + "!");
 };
 
 // =========================================================
 // DASHBOARD SITELIDER
 // =========================================================
+function colorizePHD(elementId, value) {
+    let el = document.getElementById(elementId);
+    if(!el) return;
+    el.innerText = value;
+    // Lógica de Cores baseada na Meta: Verde (Bateu), Vermelho (Perdeu), Azul (Zero)
+    if(value >= globalMetaPHD && value > 0) {
+        el.style.background = 'linear-gradient(to bottom, #fff, #10b981)';
+    } else if (value > 0) {
+        el.style.background = 'linear-gradient(to bottom, #fff, #ef4444)';
+    } else {
+        el.style.background = 'linear-gradient(to bottom, #fff, #3b82f6)';
+    }
+    el.style.webkitBackgroundClip = 'text';
+    el.style.webkitTextFillColor = 'transparent';
+}
+
 async function renderSiteliderDashboard() {
     let weekInput = document.getElementById('sl-week-select');
     if(!weekInput.value) {
@@ -214,9 +215,12 @@ async function renderSiteliderDashboard() {
     });
 
     let avgPhdSemana = countPhdSemana > 0 ? Math.round(sumPhdSemana / countPhdSemana) : 0;
-    document.getElementById('sl-phd-dia').innerText = lastPhdDia;
-    document.getElementById('sl-phd-sem').innerText = avgPhdSemana;
+    
+    // Atualização com Cores
+    colorizePHD('sl-phd-dia', lastPhdDia);
+    colorizePHD('sl-phd-sem', avgPhdSemana);
 
+    let avgMesPHD = 0;
     try {
         let sumMesPHD = 0; let countMesPHD = 0;
         for(let wKey in historyDataCache) {
@@ -229,14 +233,37 @@ async function renderSiteliderDashboard() {
             }
         }
         if(isWeekActiveTab && refMonthStr === currentPresMes) { sumMesPHD += sumPhdSemana; countMesPHD += countPhdSemana; }
-        let avgMesPHD = countMesPHD > 0 ? Math.round(sumMesPHD / countMesPHD) : 0; document.getElementById('sl-phd-mes').innerText = avgMesPHD;
+        avgMesPHD = countMesPHD > 0 ? Math.round(sumMesPHD / countMesPHD) : 0; 
     } catch(e) { console.error("Erro PHD Mensal", e); }
+    
+    colorizePHD('sl-phd-mes', avgMesPHD);
 
     const ctxPHD = document.getElementById('slChartPHD').getContext('2d');
     if(window.slChartPHDInstance) window.slChartPHDInstance.destroy();
     window.slChartPHDInstance = new Chart(ctxPHD, {
         type: 'bar',
-        data: { labels: chartLabelsPhd.length > 0 ? chartLabelsPhd : ['Nenhum dado'], datasets: [{ label: 'PHD Atingido (Semana Selecionada)', data: dataPhdChart.length > 0 ? dataPhdChart : [0], backgroundColor: 'rgba(59, 130, 246, 0.8)', borderRadius: 4 }] },
+        data: { 
+            labels: chartLabelsPhd.length > 0 ? chartLabelsPhd : ['Nenhum dado'], 
+            datasets: [
+                {
+                    type: 'line',
+                    label: `Meta (${globalMetaPHD})`,
+                    data: chartLabelsPhd.map(() => globalMetaPHD),
+                    borderColor: '#fbbf24',
+                    borderWidth: 2,
+                    borderDash: [5, 5],
+                    fill: false,
+                    pointRadius: 0
+                },
+                { 
+                    type: 'bar',
+                    label: 'PHD Atingido (Semana)', 
+                    data: dataPhdChart.length > 0 ? dataPhdChart : [0], 
+                    backgroundColor: 'rgba(59, 130, 246, 0.8)', 
+                    borderRadius: 4 
+                }
+            ] 
+        },
         options: { responsive: true, maintainAspectRatio: false, scales: { y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } }, x: { ticks: { color: '#94a3b8' }, grid: { display: false } } }, plugins: { legend: { labels: { color: '#fff', font: { family: 'Outfit' } } } } }
     });
 
@@ -253,9 +280,17 @@ async function renderSiteliderDashboard() {
 // ESCUTADORES DA NUVEM MULTI-PC
 // =========================================================
 
+dbFirebase.ref('shopee_meta_phd').on('value', snap => {
+    if (snap.exists()) {
+        globalMetaPHD = snap.val();
+        let el = document.getElementById('meta-phd-input');
+        if (el) el.value = globalMetaPHD;
+        if(!document.getElementById('view-sitelider').classList.contains('hidden')) renderSiteliderDashboard();
+    }
+});
+
 dbFirebase.ref('shopee_colaboradores').on('value', snap => {
     if(snap.exists()) { operadoresList = Object.values(snap.val()).sort(); } 
-    else { let initialDb = {}; defaultOperadores.forEach(op => initialDb[op] = op); dbFirebase.ref('shopee_colaboradores').set(initialDb); operadoresList = [...defaultOperadores].sort(); }
     if(!document.getElementById('view-escala').classList.contains('hidden')) renderEscalaSemana(); 
     if(!document.getElementById('view-escala-dc').classList.contains('hidden')) renderEscalaDcSemana(); 
     if(!document.getElementById('view-presenca').classList.contains('hidden')) renderPresencaGrid(); 
@@ -325,7 +360,7 @@ presencaListener = dbFirebase.ref('shopee_presenca_live/' + currentPresMes).on('
 
 function saveProdState() {
     if (!currentUser || currentUser.r !== 'admin') return;
-    let state = { data: document.getElementById('p-data')?.value || '', horaIni: document.getElementById('p-hora-ini')?.value || '', horaFim: document.getElementById('p-hora-fim')?.value || '', backlog: document.getElementById('p-backlog')?.innerText || '0', xpt: document.getElementById('p-xpt')?.innerText || '0', volRot: document.getElementById('p-vol-rot')?.innerText || '0', stations: [] };
+    let state = { data: document.getElementById('p-data')?.value || '', horaIni: document.getElementById('p-hora-ini')?.value || '', horaFim: document.getElementById('p-hora-fim')?.value || '', backlog: document.getElementById('p-backlog')?.textContent || '0', xpt: document.getElementById('p-xpt')?.textContent || '0', volRot: document.getElementById('p-vol-rot')?.textContent || '0', stations: [] };
     for(let j=1; j<=10; j++) { let sel = document.getElementById(`station-select-${j}`); state.stations.push(sel ? sel.value : ""); }
     dbFirebase.ref('shopee_prod_state').set(state);
 }
@@ -541,7 +576,7 @@ function updateDropdowns() {
 
 function refreshProdGridData() {
     for(let i = 0; i < 24; i++) {
-        let hourCell = document.getElementById(`p-hour-${i}`); let rawHour = hourCell ? hourCell.innerText.trim() : '';
+        let hourCell = document.getElementById(`p-hour-${i}`); let rawHour = hourCell ? hourCell.textContent.trim() : '';
         let hourRef = null; let match = rawHour.match(/^(\d{1,2})(:\d{2})?/); if(match) { hourRef = match[1].padStart(2, '0') + ":00"; }
         for(let j = 1; j <= 10; j++) {
             let select = document.getElementById(`station-select-${j}`); let name = select ? select.value : ''; let val = 0;
@@ -555,11 +590,11 @@ function refreshProdGridData() {
 function calculateProdTotals(triggerSave = false) {
     let colTotals = [0,0,0,0,0,0,0,0,0,0]; let grandTotal = 0;
     for(let i = 0; i < 24; i++) {
-        let rowTotal = 0; let hourCell = document.getElementById(`p-hour-${i}`); let rawHour = hourCell ? hourCell.innerText.trim() : '';
+        let rowTotal = 0; let hourCell = document.getElementById(`p-hour-${i}`); let rawHour = hourCell ? hourCell.textContent.trim() : '';
         let hourRef = null; let match = rawHour.match(/^(\d{1,2})(:\d{2})?/); if(match) hourRef = match[1].padStart(2, '0') + ":00";
         for(let j = 1; j <= 10; j++) {
             let cell = document.getElementById(`p-cell-${i}-${j}`); if(!cell) continue;
-            let strVal = cell.innerText.replace(/[^\d.,]/g, '').replace(',', '.'); let val = parseFloat(strVal) || 0; rowTotal += val; colTotals[j-1] += val;
+            let strVal = cell.textContent.replace(/[^\d.,]/g, '').replace(',', '.'); let val = parseFloat(strVal) || 0; rowTotal += val; colTotals[j-1] += val;
             let select = document.getElementById(`station-select-${j}`);
             if(select && triggerSave) { let name = select.value; if(name && hourRef) { if(!globalProdData[name]) globalProdData[name] = {}; globalProdData[name][hourRef] = val; } }
         }
@@ -567,9 +602,9 @@ function calculateProdTotals(triggerSave = false) {
     }
     for(let j = 1; j <= 10; j++) { let colEl = document.getElementById(`p-col-total-${j}`); if(colEl) colEl.innerText = colTotals[j-1] || '0'; }
     let grandTotalCell = document.getElementById('p-grand-total'); if(grandTotalCell) grandTotalCell.innerText = grandTotal.toLocaleString('pt-BR');
-    let volRotEl = document.getElementById('p-vol-rot'); let volRot = volRotEl ? (parseInt(volRotEl.innerText.replace(/\D/g, '')) || 0) : 0;
-    let backlogEl = document.getElementById('p-backlog'); let backlog = backlogEl ? (parseInt(backlogEl.innerText.replace(/\D/g, '')) || 0) : 0;
-    let xptEl = document.getElementById('p-xpt'); let xpt = xptEl ? (parseInt(xptEl.innerText.replace(/\D/g, '')) || 0) : 0;
+    let volRotEl = document.getElementById('p-vol-rot'); let volRot = volRotEl ? (parseInt(volRotEl.textContent.replace(/\D/g, '')) || 0) : 0;
+    let backlogEl = document.getElementById('p-backlog'); let backlog = backlogEl ? (parseInt(backlogEl.textContent.replace(/\D/g, '')) || 0) : 0;
+    let xptEl = document.getElementById('p-xpt'); let xpt = xptEl ? (parseInt(xptEl.textContent.replace(/\D/g, '')) || 0) : 0;
     let totalAlvo = volRot; let qtdRealizada = grandTotal + backlog + xpt; 
     let pRealizada = document.getElementById('p-realizada'); if(pRealizada) pRealizada.innerText = qtdRealizada.toLocaleString('pt-BR');
     let pendente = totalAlvo - qtdRealizada; if(pendente < 0) pendente = 0; 
@@ -880,13 +915,13 @@ function saveEscalaSemanaToCloud() {
         
         let hcEl = document.getElementById(`esc-hc-${id}`);
         if(hcEl) {
-            liveEscalaSemana[id].hc = hcEl.innerText.trim(); 
-            liveEscalaSemana[id].pct = document.getElementById(`esc-pct-${id}`).innerText.trim(); 
-            liveEscalaSemana[id].cap = document.getElementById(`esc-cap-${id}`).innerText.trim(); 
-            liveEscalaSemana[id].dw = document.getElementById(`esc-dw-${id}`).innerText.trim(); 
-            liveEscalaSemana[id].phd = document.getElementById(`esc-phd-${id}`).innerText.trim(); 
-            liveEscalaSemana[id].capphd = document.getElementById(`esc-capphd-${id}`).innerText.trim(); 
-            liveEscalaSemana[id].dataDia = document.getElementById(`esc-datadia-${id}`).innerText.trim();
+            liveEscalaSemana[id].hc = hcEl.textContent.trim(); 
+            liveEscalaSemana[id].pct = document.getElementById(`esc-pct-${id}`).textContent.trim(); 
+            liveEscalaSemana[id].cap = document.getElementById(`esc-cap-${id}`).textContent.trim(); 
+            liveEscalaSemana[id].dw = document.getElementById(`esc-dw-${id}`).textContent.trim(); 
+            liveEscalaSemana[id].phd = document.getElementById(`esc-phd-${id}`).textContent.trim(); 
+            liveEscalaSemana[id].capphd = document.getElementById(`esc-capphd-${id}`).textContent.trim(); 
+            liveEscalaSemana[id].dataDia = document.getElementById(`esc-datadia-${id}`).textContent.trim();
         }
 
         escRows.forEach((cargo, rIdx) => {
@@ -1111,7 +1146,7 @@ function saveEscalaDcToCloud() {
         liveEscalaDcSemana[id].visible = currentVis;
         
         let dtEl = document.getElementById(`esc-dc-datadia-${id}`);
-        if(dtEl) liveEscalaDcSemana[id].dataDia = dtEl.innerText.trim();
+        if(dtEl) liveEscalaDcSemana[id].dataDia = dtEl.textContent.trim();
 
         dcLayout.forEach(sec => {
             let slots = sec.rows * sec.cols;
