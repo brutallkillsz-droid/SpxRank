@@ -106,6 +106,36 @@ function switchTab(id) {
 }
 
 // =========================================================
+// CÉREBRO MATEMÁTICO: CÁLCULO DE PHD
+// =========================================================
+window.calcPHDAndSave = function(diaId) {
+    if (!currentUser || currentUser.r !== 'admin') return;
+    
+    // Captura os valores digitados nas caixas e converte para número
+    let hcText = document.getElementById(`esc-hc-${diaId}`).innerText.replace(/[^\d.,]/g, '').replace(',', '.');
+    let dwText = document.getElementById(`esc-dw-${diaId}`).innerText.replace(/[^\d.,]/g, '').replace(',', '.');
+    let pctText = document.getElementById(`esc-pct-${diaId}`).innerText.replace(/[^\d.,]/g, '').replace(',', '.');
+    
+    let hc = parseFloat(hcText) || 0;
+    let dw = parseFloat(dwText) || 0;
+    let pct = parseFloat(pctText) || 0;
+    
+    // Matemática do Logístico: PCT Processados / (Quantidade HC + Necessidade DW)
+    let totalEfetivo = hc + dw;
+    let phdCalculado = 0;
+    
+    if (totalEfetivo > 0) {
+        phdCalculado = Math.round(pct / totalEfetivo);
+    }
+    
+    // Joga o resultado na tela (ele está bloqueado para digitação manual)
+    document.getElementById(`esc-phd-${diaId}`).innerText = phdCalculado;
+    
+    // Manda pra Nuvem
+    saveEscalaSemanaToCloud();
+};
+
+// =========================================================
 // DASHBOARD SITELIDER
 // =========================================================
 async function renderSiteliderDashboard() {
@@ -729,23 +759,28 @@ function renderEscalaSemana() {
         if (!isAdm && escDia.visible !== true) return; 
         renderedAny = true;
         
+        let prevDayName = "";
+        if (index > 0) prevDayName = escDiasConf[index - 1].nome.replace('ESCALA ', '');
+
+        let btnCopiar = (isAdm && index > 0) ? `<button class="esc-day-btn" style="border-color: #3b82f6; color: #3b82f6;" onclick="copyFromPreviousDay('${diaConf.id}')" title="Copiar Escala de ${prevDayName}"><i class="fas fa-copy"></i> Copiar Anter.</button>` : '';
         let btnSortear = isAdm ? `<button class="esc-day-btn" onclick="autoDistributeOperators('${diaConf.id}')" title="Sortear Vagas"><i class="fas fa-random"></i> Sortear</button>` : '';
         let eyeClass = escDia.visible ? 'esc-day-btn' : 'esc-day-btn eye-off'; let eyeIcon = escDia.visible ? 'fa-eye' : 'fa-eye-slash'; let eyeText = escDia.visible ? 'Visível' : 'Oculto';
         let btnEye = isAdm ? `<button class="${eyeClass}" onclick="toggleDayVisibility('${diaConf.id}')" title="Alternar Visibilidade da Mesa"><i class="fas ${eyeIcon}"></i> ${eyeText}</button>` : '';
-        let headerControls = isAdm ? `<div style="display:flex; gap:8px; align-items:center;">${btnSortear}${btnEye}</div>` : '';
+
+        let headerControls = isAdm ? `<div style="display:flex; gap:8px; align-items:center;">${btnCopiar}${btnSortear}${btnEye}</div>` : '';
 
         let html = `<div class="esc-block"><table class="esc-table" style="border-bottom:none; margin-bottom: 5px;">
                 <tr><td colspan="7" style="background-color: ${diaConf.bg} !important; color: ${diaConf.cor} !important; padding: 0;"><div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 15px;"><span style="font-size: 14px; font-weight: 800;">${diaConf.nome}</span>${headerControls}</div></td></tr>
                 <tr>
                     <td class="esc-gray-light ${editClass}" ${editAttr} id="esc-datadia-${diaConf.id}" onblur="saveEscalaSemanaToCloud()" style="text-align: left; padding-left: 10px; font-weight: bold; font-size: 11px; color: #002f6c; width:20%;">${escDia.dataDia || '(inserir data)'}</td>
-                    <td class="esc-gray-light" style="width:10%">Quantidade HC</td><td class="${editClass}" ${editAttr} id="esc-hc-${diaConf.id}" onblur="saveEscalaSemanaToCloud()" style="width:10%">${escDia.hc}</td>
-                    <td class="esc-gray-light" style="width:10%">PCT. PROCESSADOS</td><td class="esc-green ${editClass}" ${editAttr} id="esc-pct-${diaConf.id}" onblur="saveEscalaSemanaToCloud()" style="width:10%">${escDia.pct}</td>
+                    <td class="esc-gray-light" style="width:10%">Quantidade HC</td><td class="${editClass}" ${editAttr} id="esc-hc-${diaConf.id}" onblur="calcPHDAndSave('${diaConf.id}')" style="width:10%">${escDia.hc}</td>
+                    <td class="esc-gray-light" style="width:10%">PCT. PROCESSADOS</td><td class="esc-green ${editClass}" ${editAttr} id="esc-pct-${diaConf.id}" onblur="calcPHDAndSave('${diaConf.id}')" style="width:10%">${escDia.pct}</td>
                     <td class="esc-gray-light" style="width:10%">CAP PROCESSAMENTO</td><td class="esc-cyan ${editClass}" ${editAttr} id="esc-cap-${diaConf.id}" onblur="saveEscalaSemanaToCloud()" style="width:10%">${escDia.cap}</td>
                 </tr>
                 <tr>
                     <td class="esc-gray-light" style="text-align: left; padding-left: 10px; font-weight: normal; font-size: 10px; border-top: none;"></td>
-                    <td class="esc-gray-light">Necessidade DW</td><td class="esc-red-txt ${editClass}" ${editAttr} id="esc-dw-${diaConf.id}" onblur="saveEscalaSemanaToCloud()">${escDia.dw}</td>
-                    <td class="esc-gray-light esc-red-txt">PHD Atingido</td><td class="esc-red-txt ${editClass}" ${editAttr} id="esc-phd-${diaConf.id}" onblur="saveEscalaSemanaToCloud()">${escDia.phd}</td>
+                    <td class="esc-gray-light">Necessidade DW</td><td class="esc-red-txt ${editClass}" ${editAttr} id="esc-dw-${diaConf.id}" onblur="calcPHDAndSave('${diaConf.id}')">${escDia.dw}</td>
+                    <td class="esc-gray-light esc-red-txt">PHD Atingido</td><td class="esc-red-txt" id="esc-phd-${diaConf.id}">${escDia.phd}</td>
                     <td class="esc-gray-light">CAP PHD</td><td class="esc-cyan esc-red-txt ${editClass}" ${editAttr} id="esc-capphd-${diaConf.id}" onblur="saveEscalaSemanaToCloud()">${escDia.capphd}</td>
                 </tr>
             </table>
@@ -845,7 +880,13 @@ function saveEscalaSemanaToCloud() {
         
         let hcEl = document.getElementById(`esc-hc-${id}`);
         if(hcEl) {
-            liveEscalaSemana[id].hc = hcEl.innerText.trim(); liveEscalaSemana[id].pct = document.getElementById(`esc-pct-${id}`).innerText.trim(); liveEscalaSemana[id].cap = document.getElementById(`esc-cap-${id}`).innerText.trim(); liveEscalaSemana[id].dw = document.getElementById(`esc-dw-${id}`).innerText.trim(); liveEscalaSemana[id].phd = document.getElementById(`esc-phd-${id}`).innerText.trim(); liveEscalaSemana[id].capphd = document.getElementById(`esc-capphd-${id}`).innerText.trim(); liveEscalaSemana[id].dataDia = document.getElementById(`esc-datadia-${id}`).innerText.trim();
+            liveEscalaSemana[id].hc = hcEl.innerText.trim(); 
+            liveEscalaSemana[id].pct = document.getElementById(`esc-pct-${id}`).innerText.trim(); 
+            liveEscalaSemana[id].cap = document.getElementById(`esc-cap-${id}`).innerText.trim(); 
+            liveEscalaSemana[id].dw = document.getElementById(`esc-dw-${id}`).innerText.trim(); 
+            liveEscalaSemana[id].phd = document.getElementById(`esc-phd-${id}`).innerText.trim(); 
+            liveEscalaSemana[id].capphd = document.getElementById(`esc-capphd-${id}`).innerText.trim(); 
+            liveEscalaSemana[id].dataDia = document.getElementById(`esc-datadia-${id}`).innerText.trim();
         }
 
         escRows.forEach((cargo, rIdx) => {
