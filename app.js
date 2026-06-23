@@ -70,6 +70,13 @@ function toggleMenu(menuId, headerEl) {
 }
 
 function switchTab(id) {
+    // ÂNCORA DE SALVAMENTO DE SEGURANÇA: Força o salvamento cego ANTES de esconder a tela
+    if (currentUser && currentUser.r === 'admin') {
+        if (!document.getElementById('view-escala').classList.contains('hidden')) saveEscalaSemanaToCloud();
+        if (!document.getElementById('view-escala-dc').classList.contains('hidden')) saveEscalaDcToCloud();
+        if (!document.getElementById('view-prod').classList.contains('hidden')) saveProdState();
+    }
+
     document.querySelectorAll('section').forEach(s => s.classList.add('hidden'));
     document.querySelectorAll('.menu-item').forEach(b => b.classList.remove('active'));
     document.getElementById('view-'+id).classList.remove('hidden');
@@ -94,22 +101,7 @@ function switchTab(id) {
 // CÉREBRO MATEMÁTICO: CÁLCULO DE PHD E SALVAMENTO DE META
 // =========================================================
 window.calcPHDAndSave = function(diaId) {
-    if (!currentUser || currentUser.r !== 'admin') return;
-    
-    // CORREÇÃO CRÍTICA: Lendo '.textContent' garante que ele pega os números mesmo se a aba fechar!
-    let hcText = document.getElementById(`esc-hc-${diaId}`).textContent.replace(/[^\d.,]/g, '').replace(',', '.');
-    let dwText = document.getElementById(`esc-dw-${diaId}`).textContent.replace(/[^\d.,]/g, '').replace(',', '.');
-    let pctText = document.getElementById(`esc-pct-${diaId}`).textContent.replace(/[^\d.,]/g, '').replace(',', '.');
-    
-    let hc = parseFloat(hcText) || 0;
-    let dw = parseFloat(dwText) || 0;
-    let pct = parseFloat(pctText) || 0;
-    
-    let totalEfetivo = hc + dw;
-    let phdCalculado = 0;
-    if (totalEfetivo > 0) { phdCalculado = Math.round(pct / totalEfetivo); }
-    
-    document.getElementById(`esc-phd-${diaId}`).textContent = phdCalculado;
+    // O gatilho visual agora apenas aciona o motor master de salvamento
     saveEscalaSemanaToCloud();
 };
 
@@ -238,6 +230,15 @@ async function renderSiteliderDashboard() {
     
     colorizePHD('sl-phd-mes', avgMesPHD);
 
+    // Atualização Dinâmica das Etiquetas de %
+    let percDiaPHD = globalMetaPHD > 0 ? ((lastPhdDia / globalMetaPHD) * 100).toFixed(1) : "0.0";
+    let percSemPHD = globalMetaPHD > 0 ? ((avgPhdSemana / globalMetaPHD) * 100).toFixed(1) : "0.0";
+    let percMesPHD = globalMetaPHD > 0 ? ((avgMesPHD / globalMetaPHD) * 100).toFixed(1) : "0.0";
+
+    document.getElementById('sl-phd-dia-lbl').innerText = `ÚLTIMO REGISTRO (${percDiaPHD}% DA META)`;
+    document.getElementById('sl-phd-sem-lbl').innerText = `MÉDIA DA SEMANA (${percSemPHD}% DA META)`;
+    document.getElementById('sl-phd-mes-lbl').innerText = `MÉDIA DO MÊS (${percMesPHD}% DA META)`;
+
     const ctxPHD = document.getElementById('slChartPHD').getContext('2d');
     if(window.slChartPHDInstance) window.slChartPHDInstance.destroy();
     window.slChartPHDInstance = new Chart(ctxPHD, {
@@ -291,6 +292,7 @@ dbFirebase.ref('shopee_meta_phd').on('value', snap => {
 
 dbFirebase.ref('shopee_colaboradores').on('value', snap => {
     if(snap.exists()) { operadoresList = Object.values(snap.val()).sort(); } 
+    else { let initialDb = {}; defaultOperadores.forEach(op => initialDb[op] = op); dbFirebase.ref('shopee_colaboradores').set(initialDb); operadoresList = [...defaultOperadores].sort(); }
     if(!document.getElementById('view-escala').classList.contains('hidden')) renderEscalaSemana(); 
     if(!document.getElementById('view-escala-dc').classList.contains('hidden')) renderEscalaDcSemana(); 
     if(!document.getElementById('view-presenca').classList.contains('hidden')) renderPresencaGrid(); 
@@ -906,6 +908,7 @@ function updateSidebar() {
     container.innerHTML = html; document.getElementById('sidebar-count').innerText = `(${availableCount})`; document.getElementById('sidebar-day-select').value = currentSidebarDay;
 }
 
+// CORREÇÃO CRÍTICA APLICADA: Força o cálculo interno de PHD baseado nos inputs reais ANTES de jogar pro Firebase.
 function saveEscalaSemanaToCloud() {
     if(!currentUser || currentUser.r !== 'admin') return;
     escDiasConf.forEach(diaConf => {
@@ -915,12 +918,24 @@ function saveEscalaSemanaToCloud() {
         
         let hcEl = document.getElementById(`esc-hc-${id}`);
         if(hcEl) {
-            liveEscalaSemana[id].hc = hcEl.textContent.trim(); 
-            liveEscalaSemana[id].pct = document.getElementById(`esc-pct-${id}`).textContent.trim(); 
-            liveEscalaSemana[id].cap = document.getElementById(`esc-cap-${id}`).textContent.trim(); 
-            liveEscalaSemana[id].dw = document.getElementById(`esc-dw-${id}`).textContent.trim(); 
-            liveEscalaSemana[id].phd = document.getElementById(`esc-phd-${id}`).textContent.trim(); 
-            liveEscalaSemana[id].capphd = document.getElementById(`esc-capphd-${id}`).textContent.trim(); 
+            let hcText = hcEl.textContent.trim();
+            let dwText = document.getElementById(`esc-dw-${id}`).textContent.trim();
+            let pctText = document.getElementById(`esc-pct-${id}`).textContent.trim();
+
+            let hc = parseFloat(hcText.replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
+            let dw = parseFloat(dwText.replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
+            let pct = parseFloat(pctText.replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
+            let totalEfetivo = hc + dw;
+            let phdCalculado = totalEfetivo > 0 ? Math.round(pct / totalEfetivo) : 0;
+
+            document.getElementById(`esc-phd-${id}`).textContent = phdCalculado;
+
+            liveEscalaSemana[id].hc = hcText;
+            liveEscalaSemana[id].pct = pctText;
+            liveEscalaSemana[id].dw = dwText;
+            liveEscalaSemana[id].phd = phdCalculado.toString();
+            liveEscalaSemana[id].cap = document.getElementById(`esc-cap-${id}`).textContent.trim();
+            liveEscalaSemana[id].capphd = document.getElementById(`esc-capphd-${id}`).textContent.trim();
             liveEscalaSemana[id].dataDia = document.getElementById(`esc-datadia-${id}`).textContent.trim();
         }
 
