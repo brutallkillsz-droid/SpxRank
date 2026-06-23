@@ -22,6 +22,7 @@ let dailyData = [];
 let ctrlData = initCtrl();
 let globalProdData = {}; 
 
+// CONFIGURAÇÃO DOS DIAS ATUALIZADA (SEGUNDA A DOMINGO)
 const escDiasConf = [
     { id: 'segunda', nome: 'ESCALA SEGUNDA', bg: '#5c6e85', cor: '#fff' },
     { id: 'terca', nome: 'ESCALA TERÇA', bg: '#b4a7d6', cor: '#000' },
@@ -57,7 +58,7 @@ let historyDcDataCache = {};
 let monthlyDataCache = {};
 
 let globalMetaPHD = 530; 
-let prodHistoryCache = {}; // Novo Cache para histórico dos Bipadores
+let prodHistoryCache = {}; 
 
 function initCtrl() { return { date: '', totalVol: 0, totalRotas: 0, minTime: null, maxTime: null, finRot: 0, finVol: 0, missRot: 0, missVol: 0, missingRot: 0, missingVol: 0, hourly: {}, sumDurHI: 0, countDurHI: 0 }; }
 
@@ -269,16 +270,16 @@ async function renderSiteliderDashboard() {
             elGap.innerText = `+${gap}`; elGap.style.color = "var(--success)";
             elStatus.innerText = "META ATINGIDA / SUPERADA"; elStatus.style.background = "rgba(16, 185, 129, 0.1)"; elStatus.style.color = "var(--success)";
         } else {
-            elGap.innerText = gap; elGap.style.color = "var(--danger)";
+            elGap.innerText = gap; // já possui o sinal negativo
+            elGap.style.color = "var(--danger)";
             elStatus.innerText = "ABAIXO DA META"; elStatus.style.background = "rgba(239, 68, 68, 0.1)"; elStatus.style.color = "var(--danger)";
         }
     }
     updateGapCard('dia', lastPhdDia); updateGapCard('sem', avgPhdSemana); updateGapCard('mes', avgMesPHD);
 
     // ==================================================
-    // MELHORES DA PRODUTIVIDADE (ETIQUETAGEM)
+    // RANK DE BIPAGEM TOP 4 (AM)
     // ==================================================
-    let topDiaName = "-", topDiaVol = 0; let topSemName = "-", topSemVol = 0; let topMesName = "-", topMesVol = 0;
     let semTotals = {}; let mesTotals = {}; let latestDayWithData = null; let latestDayVolMap = {};
 
     weekDates.forEach(d => {
@@ -289,19 +290,48 @@ async function renderSiteliderDashboard() {
         }
     });
 
-    if (latestDayWithData) { for(let op in latestDayVolMap) { if (latestDayVolMap[op] > topDiaVol) { topDiaVol = latestDayVolMap[op]; topDiaName = op; } } }
-    for(let op in semTotals) { if (semTotals[op] > topSemVol) { topSemVol = semTotals[op]; topSemName = op; } }
     for(let dStr in prodHistoryCache) {
-        if (dStr.startsWith(refMonthStr)) { for(let op in prodHistoryCache[dStr]) { mesTotals[op] = (mesTotals[op] || 0) + prodHistoryCache[dStr][op]; } }
+        if (dStr.startsWith(refMonthStr)) { 
+            for(let op in prodHistoryCache[dStr]) { mesTotals[op] = (mesTotals[op] || 0) + prodHistoryCache[dStr][op]; } 
+        }
     }
-    for(let op in mesTotals) { if (mesTotals[op] > topMesVol) { topMesVol = mesTotals[op]; topMesName = op; } }
 
-    const el = (id) => document.getElementById(id);
-    if(el('sa-top-dia-name')) {
-        el('sa-top-dia-name').innerText = topDiaName; el('sa-top-dia-vol').innerText = topDiaVol.toLocaleString('pt-BR');
-        el('sa-top-sem-name').innerText = topSemName; el('sa-top-sem-vol').innerText = topSemVol.toLocaleString('pt-BR');
-        el('sa-top-mes-name').innerText = topMesName; el('sa-top-mes-vol').innerText = topMesVol.toLocaleString('pt-BR');
+    // Filtra, ordena os operadores pelo volume e pega os Top 4
+    function getTop4(obj) {
+        return Object.keys(obj).map(k => ({name: k, vol: obj[k]})).sort((a,b) => b.vol - a.vol).slice(0, 4);
     }
+
+    let topDia = getTop4(latestDayVolMap);
+    let topSem = getTop4(semTotals);
+    let topMes = getTop4(mesTotals);
+
+    // Renderiza as listas dinamicamente nos Cards
+    function renderTopList(elementId, arr) {
+        let el = document.getElementById(elementId);
+        if(!el) return;
+        if(arr.length === 0) { el.innerHTML = '<div style="color:var(--text-muted); font-size:0.85rem; text-align:center; padding: 20px 0;">Aguardando dados...</div>'; return; }
+        
+        let html = '';
+        arr.forEach((item, idx) => {
+            let icon = ''; let color = '';
+            if(idx===0) { icon = '🥇'; color = 'var(--gold)'; }
+            else if(idx===1) { icon = '🥈'; color = 'var(--silver)'; }
+            else if(idx===2) { icon = '🥉'; color = 'var(--bronze)'; }
+            else { icon = '4º'; color = '#fff'; }
+            
+            html += `<div style="display:flex; justify-content:space-between; align-items:center; background: rgba(0,0,0,0.2); padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.03);">
+                        <div style="font-size: 0.85rem; font-weight: 700; color: ${color}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 65%;">
+                            <span style="margin-right: 5px; font-size:1rem;">${icon}</span> ${item.name}
+                        </div>
+                        <div style="font-size: 0.95rem; color: var(--success); font-weight: 800;">${item.vol.toLocaleString('pt-BR')}</div>
+                     </div>`;
+        });
+        el.innerHTML = html;
+    }
+
+    renderTopList('sa-top-dia-list', topDia);
+    renderTopList('sa-top-sem-list', topSem);
+    renderTopList('sa-top-mes-list', topMes);
 
     // Geração de Gráficos
     const ctxPHD = document.getElementById('slChartPHD').getContext('2d');
@@ -420,7 +450,6 @@ function saveProdState() {
     for(let j=1; j<=10; j++) { let sel = document.getElementById(`station-select-${j}`); state.stations.push(sel ? sel.value : ""); }
     dbFirebase.ref('shopee_prod_state').set(state);
 
-    // Grava também no Histórico da Produtividade para gerar o Melhor do Mês
     if (dateVal && Object.keys(globalProdData).length > 0) {
         let dailyTotals = {};
         for(let name in globalProdData) {
@@ -671,7 +700,7 @@ async function importProdData(input) {
         }
         updateDropdowns(); 
         saveProdToCloud(); 
-        autoFillStations(); // Chama a nova automação
+        autoFillStations(); 
         showToast("Produtividade Processada!");
     } catch(e) { console.error("Erro na importação:", e); showToast("Erro."); }
 }
@@ -1017,7 +1046,6 @@ function updateSidebar() {
     container.innerHTML = html; document.getElementById('sidebar-count').innerText = `(${availableCount})`; document.getElementById('sidebar-day-select').value = currentSidebarDay;
 }
 
-// CORREÇÃO CRÍTICA APLICADA: Força o cálculo interno de PHD baseado nos inputs reais ANTES de jogar pro Firebase.
 function saveEscalaSemanaToCloud() {
     if(!currentUser || currentUser.r !== 'admin') return;
     escDiasConf.forEach(diaConf => {
