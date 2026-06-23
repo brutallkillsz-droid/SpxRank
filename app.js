@@ -22,7 +22,6 @@ let dailyData = [];
 let ctrlData = initCtrl();
 let globalProdData = {}; 
 
-// CONFIGURAÇÃO DOS DIAS ATUALIZADA (SEGUNDA A DOMINGO)
 const escDiasConf = [
     { id: 'segunda', nome: 'ESCALA SEGUNDA', bg: '#5c6e85', cor: '#fff' },
     { id: 'terca', nome: 'ESCALA TERÇA', bg: '#b4a7d6', cor: '#000' },
@@ -57,7 +56,8 @@ let historyDataCache = {};
 let historyDcDataCache = {};
 let monthlyDataCache = {};
 
-let globalMetaPHD = 530; // Base padrão
+let globalMetaPHD = 530; 
+let prodHistoryCache = {}; // Novo Cache para histórico dos Bipadores
 
 function initCtrl() { return { date: '', totalVol: 0, totalRotas: 0, minTime: null, maxTime: null, finRot: 0, finVol: 0, missRot: 0, missVol: 0, missingRot: 0, missingVol: 0, hourly: {}, sumDurHI: 0, countDurHI: 0 }; }
 
@@ -97,7 +97,7 @@ function switchTab(id) {
 }
 
 // =========================================================
-// CÉREBRO MATEMÁTICO: CÁLCULO DE PHD E SALVAMENTO DE META
+// CÉREBRO MATEMÁTICO E META PHD
 // =========================================================
 window.calcPHDAndSave = function(diaId) {
     saveEscalaSemanaToCloud();
@@ -111,7 +111,7 @@ window.saveMetaPHD = function() {
 };
 
 // =========================================================
-// DASHBOARD SITELIDER
+// DASHBOARD SITELIDER & ANÁLISE DE GAP E MELHORES DA PROD
 // =========================================================
 function colorizePHD(elementId, value) {
     let el = document.getElementById(elementId);
@@ -196,26 +196,17 @@ async function renderSiteliderDashboard() {
 
     let sumPhdSemana = 0; let countPhdSemana = 0; let lastPhdDia = 0;
     let chartLabelsPhd = []; let dataPhdChart = [];
-    
-    // Variáveis para rastrear a Data Diária do último preenchimento
-    let lastDayName = "SEM DADOS";
-    let lastDayDate = "--/--";
+    let lastDayName = "SEM DADOS"; let lastDayDate = "--/--";
 
     escDiasConf.forEach(dConf => {
         let p = weekData[dConf.id] ? parseFloat(weekData[dConf.id].phd) : 0;
         if(!isNaN(p) && p > 0) { 
-            sumPhdSemana += p; 
-            countPhdSemana++; 
-            lastPhdDia = p; 
-            lastDayName = dConf.nome.replace('ESCALA ', ''); // Pega o nome "SEGUNDA"
-            lastDayDate = weekData[dConf.id].dataDia || "--/--"; // Pega a data "23/06"
-            chartLabelsPhd.push(dConf.nome.replace('ESCALA ', '')); 
-            dataPhdChart.push(p); 
+            sumPhdSemana += p; countPhdSemana++; lastPhdDia = p; 
+            lastDayName = dConf.nome.replace('ESCALA ', ''); 
+            lastDayDate = weekData[dConf.id].dataDia || "--/--"; 
+            chartLabelsPhd.push(dConf.nome.replace('ESCALA ', '')); dataPhdChart.push(p); 
         } 
-        else if(weekData[dConf.id]) { 
-            chartLabelsPhd.push(dConf.nome.replace('ESCALA ', '')); 
-            dataPhdChart.push(0); 
-        }
+        else if(weekData[dConf.id]) { chartLabelsPhd.push(dConf.nome.replace('ESCALA ', '')); dataPhdChart.push(0); }
     });
 
     let avgPhdSemana = countPhdSemana > 0 ? Math.round(sumPhdSemana / countPhdSemana) : 0;
@@ -245,74 +236,74 @@ async function renderSiteliderDashboard() {
     let percSemPHD = globalMetaPHD > 0 ? ((avgPhdSemana / globalMetaPHD) * 100).toFixed(1) : "0.0";
     let percMesPHD = globalMetaPHD > 0 ? ((avgMesPHD / globalMetaPHD) * 100).toFixed(1) : "0.0";
 
-    document.getElementById('sl-phd-dia-lbl').innerText = `ÚLTIMO REGISTRO (${percDiaPHD}% DA META)`;
-    document.getElementById('sl-phd-sem-lbl').innerText = `MÉDIA DA SEMANA (${percSemPHD}% DA META)`;
-    document.getElementById('sl-phd-mes-lbl').innerText = `MÉDIA DO MÊS (${percMesPHD}% DA META)`;
+    if(document.getElementById('sl-phd-dia-lbl')){
+        document.getElementById('sl-phd-dia-lbl').innerText = `ÚLTIMO REGISTRO (${percDiaPHD}% DA META)`;
+        document.getElementById('sl-phd-sem-lbl').innerText = `MÉDIA DA SEMANA (${percSemPHD}% DA META)`;
+        document.getElementById('sl-phd-mes-lbl').innerText = `MÉDIA DO MÊS (${percMesPHD}% DA META)`;
+    }
 
-    // =========================================================================
-    // INJEÇÃO DOS TEXTOS COM DATAS NA ANÁLISE DE GAP (META PHD)
-    // =========================================================================
+    // ==================================================
+    // ANÁLISE DE GAP 
+    // ==================================================
     let elMetaDisplay = document.getElementById('sa-meta-display');
     if (elMetaDisplay) elMetaDisplay.innerText = globalMetaPHD;
 
-    // Atualiza o subtítulo Diário
     let elDiaData = document.getElementById('sa-dia-data');
     if (elDiaData) elDiaData.innerText = `REF: ${lastDayName} (${lastDayDate})`;
-
-    // Atualiza o subtítulo Semanal
     let elSemData = document.getElementById('sa-sem-data');
     if (elSemData) elSemData.innerText = `REF: SEMANA ${week} DE ${year}`;
-
-    // Atualiza o subtítulo Mensal
-    const monthNames = ["JANEIRO", "FEVEREIRO", "MARÇO", "ABRIL", "MAIO", "JUNHO", "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"];
-    let mIndex = parseInt(refMonthStr.split('-')[1]) - 1;
     let elMesData = document.getElementById('sa-mes-data');
-    if (elMesData) elMesData.innerText = `REF: ${monthNames[mIndex]} DE ${refMonthStr.split('-')[0]}`;
+    const monthNames = ["JANEIRO", "FEVEREIRO", "MARÇO", "ABRIL", "MAIO", "JUNHO", "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"];
+    if (elMesData) elMesData.innerText = `REF: ${monthNames[parseInt(refMonthStr.split('-')[1]) - 1]} DE ${refMonthStr.split('-')[0]}`;
 
-    // Atualiza os Valores do Gap
     function updateGapCard(prefix, realized) {
-        let elReal = document.getElementById(`sa-${prefix}-real`);
-        let elMeta = document.getElementById(`sa-${prefix}-meta`);
-        let elGap = document.getElementById(`sa-${prefix}-gap`);
-        let elStatus = document.getElementById(`sa-${prefix}-status`);
-        let elPerc = document.getElementById(`sa-${prefix}-perc`);
-
+        let elReal = document.getElementById(`sa-${prefix}-real`); let elMeta = document.getElementById(`sa-${prefix}-meta`); let elGap = document.getElementById(`sa-${prefix}-gap`); let elStatus = document.getElementById(`sa-${prefix}-status`); let elPerc = document.getElementById(`sa-${prefix}-perc`);
         if(!elReal) return;
-
-        elReal.innerText = realized;
-        elMeta.innerText = globalMetaPHD;
-
-        let gap = realized - globalMetaPHD;
-        let perc = globalMetaPHD > 0 ? ((realized / globalMetaPHD) * 100).toFixed(1) : 0;
-
+        elReal.innerText = realized; elMeta.innerText = globalMetaPHD;
+        let gap = realized - globalMetaPHD; let perc = globalMetaPHD > 0 ? ((realized / globalMetaPHD) * 100).toFixed(1) : 0;
         elPerc.innerText = `${perc}%`;
-
         if(realized === 0) {
-            elGap.innerText = "-";
-            elGap.style.color = "var(--text-muted)";
-            elStatus.innerText = "AGUARDANDO DADOS...";
-            elStatus.style.background = "rgba(255,255,255,0.05)";
-            elStatus.style.color = "var(--text-muted)";
+            elGap.innerText = "-"; elGap.style.color = "var(--text-muted)";
+            elStatus.innerText = "AGUARDANDO DADOS..."; elStatus.style.background = "rgba(255,255,255,0.05)"; elStatus.style.color = "var(--text-muted)";
         } else if (gap >= 0) {
-            elGap.innerText = `+${gap}`;
-            elGap.style.color = "var(--success)";
-            elStatus.innerText = "META ATINGIDA / SUPERADA";
-            elStatus.style.background = "rgba(16, 185, 129, 0.1)";
-            elStatus.style.color = "var(--success)";
+            elGap.innerText = `+${gap}`; elGap.style.color = "var(--success)";
+            elStatus.innerText = "META ATINGIDA / SUPERADA"; elStatus.style.background = "rgba(16, 185, 129, 0.1)"; elStatus.style.color = "var(--success)";
         } else {
-            elGap.innerText = gap; // já possui o sinal negativo
-            elGap.style.color = "var(--danger)";
-            elStatus.innerText = "ABAIXO DA META";
-            elStatus.style.background = "rgba(239, 68, 68, 0.1)";
-            elStatus.style.color = "var(--danger)";
+            elGap.innerText = gap; elGap.style.color = "var(--danger)";
+            elStatus.innerText = "ABAIXO DA META"; elStatus.style.background = "rgba(239, 68, 68, 0.1)"; elStatus.style.color = "var(--danger)";
         }
     }
+    updateGapCard('dia', lastPhdDia); updateGapCard('sem', avgPhdSemana); updateGapCard('mes', avgMesPHD);
 
-    updateGapCard('dia', lastPhdDia);
-    updateGapCard('sem', avgPhdSemana);
-    updateGapCard('mes', avgMesPHD);
+    // ==================================================
+    // MELHORES DA PRODUTIVIDADE (ETIQUETAGEM)
+    // ==================================================
+    let topDiaName = "-", topDiaVol = 0; let topSemName = "-", topSemVol = 0; let topMesName = "-", topMesVol = 0;
+    let semTotals = {}; let mesTotals = {}; let latestDayWithData = null; let latestDayVolMap = {};
 
+    weekDates.forEach(d => {
+        let dStr = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        if (prodHistoryCache[dStr]) {
+            latestDayWithData = dStr; latestDayVolMap = prodHistoryCache[dStr];
+            for(let op in prodHistoryCache[dStr]) { semTotals[op] = (semTotals[op] || 0) + prodHistoryCache[dStr][op]; }
+        }
+    });
 
+    if (latestDayWithData) { for(let op in latestDayVolMap) { if (latestDayVolMap[op] > topDiaVol) { topDiaVol = latestDayVolMap[op]; topDiaName = op; } } }
+    for(let op in semTotals) { if (semTotals[op] > topSemVol) { topSemVol = semTotals[op]; topSemName = op; } }
+    for(let dStr in prodHistoryCache) {
+        if (dStr.startsWith(refMonthStr)) { for(let op in prodHistoryCache[dStr]) { mesTotals[op] = (mesTotals[op] || 0) + prodHistoryCache[dStr][op]; } }
+    }
+    for(let op in mesTotals) { if (mesTotals[op] > topMesVol) { topMesVol = mesTotals[op]; topMesName = op; } }
+
+    const el = (id) => document.getElementById(id);
+    if(el('sa-top-dia-name')) {
+        el('sa-top-dia-name').innerText = topDiaName; el('sa-top-dia-vol').innerText = topDiaVol.toLocaleString('pt-BR');
+        el('sa-top-sem-name').innerText = topSemName; el('sa-top-sem-vol').innerText = topSemVol.toLocaleString('pt-BR');
+        el('sa-top-mes-name').innerText = topMesName; el('sa-top-mes-vol').innerText = topMesVol.toLocaleString('pt-BR');
+    }
+
+    // Geração de Gráficos
     const ctxPHD = document.getElementById('slChartPHD').getContext('2d');
     if(window.slChartPHDInstance) window.slChartPHDInstance.destroy();
     window.slChartPHDInstance = new Chart(ctxPHD, {
@@ -320,23 +311,8 @@ async function renderSiteliderDashboard() {
         data: { 
             labels: chartLabelsPhd.length > 0 ? chartLabelsPhd : ['Nenhum dado'], 
             datasets: [
-                {
-                    type: 'line',
-                    label: `Meta (${globalMetaPHD})`,
-                    data: chartLabelsPhd.map(() => globalMetaPHD),
-                    borderColor: '#fbbf24',
-                    borderWidth: 2,
-                    borderDash: [5, 5],
-                    fill: false,
-                    pointRadius: 0
-                },
-                { 
-                    type: 'bar',
-                    label: 'PHD Atingido (Semana)', 
-                    data: dataPhdChart.length > 0 ? dataPhdChart : [0], 
-                    backgroundColor: 'rgba(59, 130, 246, 0.8)', 
-                    borderRadius: 4 
-                }
+                { type: 'line', label: `Meta (${globalMetaPHD})`, data: chartLabelsPhd.map(() => globalMetaPHD), borderColor: '#fbbf24', borderWidth: 2, borderDash: [5, 5], fill: false, pointRadius: 0 },
+                { type: 'bar', label: 'PHD Atingido (Semana)', data: dataPhdChart.length > 0 ? dataPhdChart : [0], backgroundColor: 'rgba(59, 130, 246, 0.8)', borderRadius: 4 }
             ] 
         },
         options: { responsive: true, maintainAspectRatio: false, scales: { y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } }, x: { ticks: { color: '#94a3b8' }, grid: { display: false } } }, plugins: { legend: { labels: { color: '#fff', font: { family: 'Outfit' } } } } }
@@ -354,12 +330,15 @@ async function renderSiteliderDashboard() {
 // =========================================================
 // ESCUTADORES DA NUVEM MULTI-PC
 // =========================================================
+dbFirebase.ref('shopee_prod_history').on('value', snap => {
+    prodHistoryCache = snap.val() || {};
+    if(!document.getElementById('view-sitelider-analise').classList.contains('hidden')) renderSiteliderDashboard();
+});
 
 dbFirebase.ref('shopee_meta_phd').on('value', snap => {
     if (snap.exists()) {
         globalMetaPHD = snap.val();
-        let el = document.getElementById('meta-phd-input');
-        if (el) el.value = globalMetaPHD;
+        let el = document.getElementById('meta-phd-input'); if (el) el.value = globalMetaPHD;
         if(!document.getElementById('view-sitelider').classList.contains('hidden') || !document.getElementById('view-sitelider-analise').classList.contains('hidden')) renderSiteliderDashboard();
     }
 });
@@ -436,9 +415,21 @@ presencaListener = dbFirebase.ref('shopee_presenca_live/' + currentPresMes).on('
 
 function saveProdState() {
     if (!currentUser || currentUser.r !== 'admin') return;
-    let state = { data: document.getElementById('p-data')?.value || '', horaIni: document.getElementById('p-hora-ini')?.value || '', horaFim: document.getElementById('p-hora-fim')?.value || '', backlog: document.getElementById('p-backlog')?.textContent || '0', xpt: document.getElementById('p-xpt')?.textContent || '0', volRot: document.getElementById('p-vol-rot')?.textContent || '0', stations: [] };
+    let dateVal = document.getElementById('p-data')?.value || '';
+    let state = { data: dateVal, horaIni: document.getElementById('p-hora-ini')?.value || '', horaFim: document.getElementById('p-hora-fim')?.value || '', backlog: document.getElementById('p-backlog')?.textContent || '0', xpt: document.getElementById('p-xpt')?.textContent || '0', volRot: document.getElementById('p-vol-rot')?.textContent || '0', stations: [] };
     for(let j=1; j<=10; j++) { let sel = document.getElementById(`station-select-${j}`); state.stations.push(sel ? sel.value : ""); }
     dbFirebase.ref('shopee_prod_state').set(state);
+
+    // Grava também no Histórico da Produtividade para gerar o Melhor do Mês
+    if (dateVal && Object.keys(globalProdData).length > 0) {
+        let dailyTotals = {};
+        for(let name in globalProdData) {
+            let sum = 0;
+            for(let h in globalProdData[name]) sum += globalProdData[name][h];
+            if (sum > 0) dailyTotals[name] = sum;
+        }
+        dbFirebase.ref('shopee_prod_history/' + dateVal).set(dailyTotals);
+    }
 }
 
 function saveDailyToCloud() { if(currentUser && currentUser.r === 'admin') { dbFirebase.ref('shopee_daily_live').set(dailyData).catch(e => console.error(e)); } }
@@ -480,6 +471,47 @@ let selectedShiftTemp = '';
 function openShiftModal() { document.getElementById('shift-modal-overlay').classList.remove('hidden'); }
 function closeShiftModal() { document.getElementById('shift-modal-overlay').classList.add('hidden'); }
 function confirmShift(shift) { selectedShiftTemp = shift; document.getElementById('shift-display').innerText = "| TURNO: " + shift; closeShiftModal(); document.getElementById('file-prod').click(); }
+
+// =========================================================
+// PUXAR NOMES DA ESCALA PARA A PRODUTIVIDADE (AUTO-FILL)
+// =========================================================
+window.autoFillStations = function() {
+    let dateVal = document.getElementById('p-data').value;
+    if (!dateVal) return;
+    
+    let [y, m, d] = dateVal.split('-');
+    let dateObj = new Date(y, m - 1, d);
+    let daysMap = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
+    let dayStr = daysMap[dateObj.getDay()];
+
+    let escDia = liveEscalaSemana[dayStr];
+    if (escDia && escDia.grid) {
+        let bipadorRow = escDia.grid[1]; 
+        let etiquetadorRow = escDia.grid[2]; 
+
+        let changed = false;
+        for (let i = 0; i < 10; i++) {
+            let name = "";
+            if (bipadorRow && bipadorRow[i]) name = bipadorRow[i];
+            else if (etiquetadorRow && etiquetadorRow[i]) name = etiquetadorRow[i];
+
+            if (name) {
+                let select = document.getElementById(`station-select-${i+1}`);
+                if (select) {
+                    let exists = Array.from(select.options).some(opt => opt.value === name);
+                    if (!exists) { select.innerHTML += `<option value="${name}">${name}</option>`; }
+                    select.value = name;
+                    changed = true;
+                }
+            }
+        }
+        if(changed) {
+            refreshProdGridData();
+            saveProdState();
+            showToast("Nomes puxados da Escala com Sucesso!");
+        }
+    }
+};
 
 // =========================================================
 // DIÁRIO E CONTROLE 
@@ -637,7 +669,10 @@ async function importProdData(input) {
                 globalProdData[cleanName][mappedHour] = (globalProdData[cleanName][mappedHour] || 0) + val;
             }
         }
-        updateDropdowns(); saveProdToCloud(); showToast("Produtividade Processada!");
+        updateDropdowns(); 
+        saveProdToCloud(); 
+        autoFillStations(); // Chama a nova automação
+        showToast("Produtividade Processada!");
     } catch(e) { console.error("Erro na importação:", e); showToast("Erro."); }
 }
 
@@ -982,6 +1017,7 @@ function updateSidebar() {
     container.innerHTML = html; document.getElementById('sidebar-count').innerText = `(${availableCount})`; document.getElementById('sidebar-day-select').value = currentSidebarDay;
 }
 
+// CORREÇÃO CRÍTICA APLICADA: Força o cálculo interno de PHD baseado nos inputs reais ANTES de jogar pro Firebase.
 function saveEscalaSemanaToCloud() {
     if(!currentUser || currentUser.r !== 'admin') return;
     escDiasConf.forEach(diaConf => {
