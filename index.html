@@ -307,6 +307,31 @@
                         <div style="text-align: center; margin-top: 25px; padding: 12px; border-radius: 12px; font-weight: 800; letter-spacing: 1px;" id="sa-mes-status">-</div>
                     </div>
                 </div>
+
+                <!-- NOVIDADE: RANKING DE DESTAQUE (MELHOR BIPADOR) -->
+                <h3 style="color: #fff; margin-top: 40px; margin-bottom: 20px; font-size: 1.2rem; font-weight: 800; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px;">
+                    <i class="fas fa-medal" style="color: var(--gold); margin-right: 8px;"></i> Destaques de Produtividade (Melhor Bipador)
+                </h3>
+                <div class="bento-grid" style="grid-template-columns: repeat(3, 1fr);">
+                    <!-- Diário -->
+                    <div class="stat-card rank-2">
+                        <h4 style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; margin-bottom: 10px;">Campeão Diário</h4>
+                        <div id="sa-top-dia-name" style="font-size: 1.3rem; font-weight: 800; color: #fff;">-</div>
+                        <div style="font-size: 1rem; color: var(--success); font-weight: 700; margin-top: 5px;"><span id="sa-top-dia-vol">0</span> PCTs</div>
+                    </div>
+                    <!-- Semanal -->
+                    <div class="stat-card rank-1">
+                        <h4 style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; margin-bottom: 10px;">Campeão Semanal</h4>
+                        <div id="sa-top-sem-name" style="font-size: 1.4rem; font-weight: 900; color: var(--gold);">-</div>
+                        <div style="font-size: 1.1rem; color: var(--success); font-weight: 800; margin-top: 5px;"><span id="sa-top-sem-vol">0</span> PCTs</div>
+                    </div>
+                    <!-- Mensal -->
+                    <div class="stat-card rank-3">
+                        <h4 style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; margin-bottom: 10px;">Campeão Mensal</h4>
+                        <div id="sa-top-mes-name" style="font-size: 1.3rem; font-weight: 800; color: #fff;">-</div>
+                        <div style="font-size: 1rem; color: var(--success); font-weight: 700; margin-top: 5px;"><span id="sa-top-mes-vol">0</span> PCTs</div>
+                    </div>
+                </div>
             </section>
             
             <section id="view-dia" class="hidden">
@@ -344,9 +369,14 @@
 
             <section id="view-prod" class="hidden">
                 <div style="margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
-                    <button onclick="openShiftModal()" style="cursor:pointer; background:#002f6c; color:white; padding:8px 15px; font-size:12px; font-weight:bold; border-radius:4px; border:none; transition: 0.2s;">
-                        <i class="fas fa-upload"></i> Importar Dados e Preencher Estações
-                    </button>
+                    <div style="display:flex; gap:10px;">
+                        <button onclick="openShiftModal()" style="cursor:pointer; background:#002f6c; color:white; padding:8px 15px; font-size:12px; font-weight:bold; border-radius:4px; border:none; transition: 0.2s;">
+                            <i class="fas fa-upload"></i> Importar Dados Excel
+                        </button>
+                        <button class="admin-only flex-container" onclick="autoFillStations()" style="cursor:pointer; background:#10b981; color:white; padding:8px 15px; font-size:12px; font-weight:bold; border-radius:4px; border:none; transition: 0.2s;">
+                            <i class="fas fa-magic"></i> Puxar Nomes da Escala
+                        </button>
+                    </div>
                     <input type="file" id="file-prod" accept=".csv, .xlsx" style="display:none;" onclick="this.value=null" onchange="importProdData(this)">
                     <span style="font-size: 11px; color: #666; font-style: italic;">* Data, Horários, Backlog, XPT, Volume Rot. e Células são editáveis!</span>
                 </div>
@@ -360,7 +390,8 @@
                     <tr>
                         <td class="spx-gray-light" style="width:6%">Data</td>
                         <td style="width:6%; padding:0; position:relative; cursor:pointer;">
-                            <input type="date" class="date-input-field" id="p-data" value="" onchange="saveProdState()" onclick="try{this.showPicker()}catch(e){}">
+                            <!-- Atualizado para auto-puxar as estações se a data for mudada -->
+                            <input type="date" class="date-input-field" id="p-data" value="" onchange="saveProdState(); autoFillStations();" onclick="try{this.showPicker()}catch(e){}">
                         </td>
                         <td rowspan="2" class="spx-gray-light" style="width:6%">Backlog</td>
                         <td rowspan="2" class="spx-orange editable-cell" style="width:6%" contenteditable="true" id="p-backlog" onblur="calculateProdTotals(true)">0</td>
@@ -453,7 +484,6 @@
                 <div id="monthly-list" class="m-list"></div>
             </section>
 
-            <!-- ABA: ESCALA DE LUGARES -->
             <section id="view-escala" class="hidden esc-layout">
                 <div class="esc-main-content" style="padding: 0;">
                     <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
@@ -491,7 +521,6 @@
                 </div>
             </section>
 
-            <!-- ABA: ESCALA DOBLECHECK (ALTERNADA) -->
             <section id="view-escala-dc" class="hidden esc-layout">
                 <div class="esc-main-content" style="padding: 0;">
                     <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
