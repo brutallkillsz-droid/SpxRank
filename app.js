@@ -70,7 +70,6 @@ function toggleMenu(menuId, headerEl) {
 }
 
 function switchTab(id) {
-    // ÂNCORA DE SALVAMENTO DE SEGURANÇA: Força o salvamento cego ANTES de esconder a tela
     if (currentUser && currentUser.r === 'admin') {
         if (!document.getElementById('view-escala').classList.contains('hidden')) saveEscalaSemanaToCloud();
         if (!document.getElementById('view-escala-dc').classList.contains('hidden')) saveEscalaDcToCloud();
@@ -94,7 +93,6 @@ function switchTab(id) {
     if(id==='hist-escala-dc') renderHistEscala('dc');
     if(id==='presenca') loadPresencaData(); 
     if(id==='bi') renderBIChart(); 
-    // Atualiza ambas as telas de Sitelider Analises (A Principal e a de GAP)
     if(id==='sitelider' || id==='sitelider-analise') renderSiteliderDashboard(); 
 }
 
@@ -102,7 +100,6 @@ function switchTab(id) {
 // CÉREBRO MATEMÁTICO: CÁLCULO DE PHD E SALVAMENTO DE META
 // =========================================================
 window.calcPHDAndSave = function(diaId) {
-    // O gatilho visual agora apenas aciona o motor master de salvamento
     saveEscalaSemanaToCloud();
 };
 
@@ -120,7 +117,6 @@ function colorizePHD(elementId, value) {
     let el = document.getElementById(elementId);
     if(!el) return;
     el.innerText = value;
-    // Lógica de Cores baseada na Meta: Verde (Bateu), Vermelho (Perdeu), Azul (Zero)
     if(value >= globalMetaPHD && value > 0) {
         el.style.background = 'linear-gradient(to bottom, #fff, #10b981)';
     } else if (value > 0) {
@@ -200,16 +196,30 @@ async function renderSiteliderDashboard() {
 
     let sumPhdSemana = 0; let countPhdSemana = 0; let lastPhdDia = 0;
     let chartLabelsPhd = []; let dataPhdChart = [];
+    
+    // Variáveis para rastrear a Data Diária do último preenchimento
+    let lastDayName = "SEM DADOS";
+    let lastDayDate = "--/--";
 
     escDiasConf.forEach(dConf => {
         let p = weekData[dConf.id] ? parseFloat(weekData[dConf.id].phd) : 0;
-        if(!isNaN(p) && p > 0) { sumPhdSemana += p; countPhdSemana++; lastPhdDia = p; chartLabelsPhd.push(dConf.nome.replace('ESCALA ', '')); dataPhdChart.push(p); } 
-        else if(weekData[dConf.id]) { chartLabelsPhd.push(dConf.nome.replace('ESCALA ', '')); dataPhdChart.push(0); }
+        if(!isNaN(p) && p > 0) { 
+            sumPhdSemana += p; 
+            countPhdSemana++; 
+            lastPhdDia = p; 
+            lastDayName = dConf.nome.replace('ESCALA ', ''); // Pega o nome "SEGUNDA"
+            lastDayDate = weekData[dConf.id].dataDia || "--/--"; // Pega a data "23/06"
+            chartLabelsPhd.push(dConf.nome.replace('ESCALA ', '')); 
+            dataPhdChart.push(p); 
+        } 
+        else if(weekData[dConf.id]) { 
+            chartLabelsPhd.push(dConf.nome.replace('ESCALA ', '')); 
+            dataPhdChart.push(0); 
+        }
     });
 
     let avgPhdSemana = countPhdSemana > 0 ? Math.round(sumPhdSemana / countPhdSemana) : 0;
     
-    // Atualização com Cores
     colorizePHD('sl-phd-dia', lastPhdDia);
     colorizePHD('sl-phd-sem', avgPhdSemana);
 
@@ -231,7 +241,6 @@ async function renderSiteliderDashboard() {
     
     colorizePHD('sl-phd-mes', avgMesPHD);
 
-    // Atualização Dinâmica das Etiquetas de % na Tela Principal
     let percDiaPHD = globalMetaPHD > 0 ? ((lastPhdDia / globalMetaPHD) * 100).toFixed(1) : "0.0";
     let percSemPHD = globalMetaPHD > 0 ? ((avgPhdSemana / globalMetaPHD) * 100).toFixed(1) : "0.0";
     let percMesPHD = globalMetaPHD > 0 ? ((avgMesPHD / globalMetaPHD) * 100).toFixed(1) : "0.0";
@@ -241,11 +250,26 @@ async function renderSiteliderDashboard() {
     document.getElementById('sl-phd-mes-lbl').innerText = `MÉDIA DO MÊS (${percMesPHD}% DA META)`;
 
     // =========================================================================
-    // NOVA ABA: ANÁLISE DE GAP (META PHD)
+    // INJEÇÃO DOS TEXTOS COM DATAS NA ANÁLISE DE GAP (META PHD)
     // =========================================================================
     let elMetaDisplay = document.getElementById('sa-meta-display');
     if (elMetaDisplay) elMetaDisplay.innerText = globalMetaPHD;
 
+    // Atualiza o subtítulo Diário
+    let elDiaData = document.getElementById('sa-dia-data');
+    if (elDiaData) elDiaData.innerText = `REF: ${lastDayName} (${lastDayDate})`;
+
+    // Atualiza o subtítulo Semanal
+    let elSemData = document.getElementById('sa-sem-data');
+    if (elSemData) elSemData.innerText = `REF: SEMANA ${week} DE ${year}`;
+
+    // Atualiza o subtítulo Mensal
+    const monthNames = ["JANEIRO", "FEVEREIRO", "MARÇO", "ABRIL", "MAIO", "JUNHO", "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"];
+    let mIndex = parseInt(refMonthStr.split('-')[1]) - 1;
+    let elMesData = document.getElementById('sa-mes-data');
+    if (elMesData) elMesData.innerText = `REF: ${monthNames[mIndex]} DE ${refMonthStr.split('-')[0]}`;
+
+    // Atualiza os Valores do Gap
     function updateGapCard(prefix, realized) {
         let elReal = document.getElementById(`sa-${prefix}-real`);
         let elMeta = document.getElementById(`sa-${prefix}-meta`);
@@ -276,7 +300,7 @@ async function renderSiteliderDashboard() {
             elStatus.style.background = "rgba(16, 185, 129, 0.1)";
             elStatus.style.color = "var(--success)";
         } else {
-            elGap.innerText = gap; // already has negative sign
+            elGap.innerText = gap; // já possui o sinal negativo
             elGap.style.color = "var(--danger)";
             elStatus.innerText = "ABAIXO DA META";
             elStatus.style.background = "rgba(239, 68, 68, 0.1)";
@@ -958,7 +982,6 @@ function updateSidebar() {
     container.innerHTML = html; document.getElementById('sidebar-count').innerText = `(${availableCount})`; document.getElementById('sidebar-day-select').value = currentSidebarDay;
 }
 
-// CORREÇÃO CRÍTICA APLICADA: Força o cálculo interno de PHD baseado nos inputs reais ANTES de jogar pro Firebase.
 function saveEscalaSemanaToCloud() {
     if(!currentUser || currentUser.r !== 'admin') return;
     escDiasConf.forEach(diaConf => {
