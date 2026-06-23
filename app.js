@@ -94,7 +94,8 @@ function switchTab(id) {
     if(id==='hist-escala-dc') renderHistEscala('dc');
     if(id==='presenca') loadPresencaData(); 
     if(id==='bi') renderBIChart(); 
-    if(id==='sitelider') renderSiteliderDashboard(); 
+    // Atualiza ambas as telas de Sitelider Analises (A Principal e a de GAP)
+    if(id==='sitelider' || id==='sitelider-analise') renderSiteliderDashboard(); 
 }
 
 // =========================================================
@@ -230,7 +231,7 @@ async function renderSiteliderDashboard() {
     
     colorizePHD('sl-phd-mes', avgMesPHD);
 
-    // Atualização Dinâmica das Etiquetas de %
+    // Atualização Dinâmica das Etiquetas de % na Tela Principal
     let percDiaPHD = globalMetaPHD > 0 ? ((lastPhdDia / globalMetaPHD) * 100).toFixed(1) : "0.0";
     let percSemPHD = globalMetaPHD > 0 ? ((avgPhdSemana / globalMetaPHD) * 100).toFixed(1) : "0.0";
     let percMesPHD = globalMetaPHD > 0 ? ((avgMesPHD / globalMetaPHD) * 100).toFixed(1) : "0.0";
@@ -238,6 +239,55 @@ async function renderSiteliderDashboard() {
     document.getElementById('sl-phd-dia-lbl').innerText = `ÚLTIMO REGISTRO (${percDiaPHD}% DA META)`;
     document.getElementById('sl-phd-sem-lbl').innerText = `MÉDIA DA SEMANA (${percSemPHD}% DA META)`;
     document.getElementById('sl-phd-mes-lbl').innerText = `MÉDIA DO MÊS (${percMesPHD}% DA META)`;
+
+    // =========================================================================
+    // NOVA ABA: ANÁLISE DE GAP (META PHD)
+    // =========================================================================
+    let elMetaDisplay = document.getElementById('sa-meta-display');
+    if (elMetaDisplay) elMetaDisplay.innerText = globalMetaPHD;
+
+    function updateGapCard(prefix, realized) {
+        let elReal = document.getElementById(`sa-${prefix}-real`);
+        let elMeta = document.getElementById(`sa-${prefix}-meta`);
+        let elGap = document.getElementById(`sa-${prefix}-gap`);
+        let elStatus = document.getElementById(`sa-${prefix}-status`);
+        let elPerc = document.getElementById(`sa-${prefix}-perc`);
+
+        if(!elReal) return;
+
+        elReal.innerText = realized;
+        elMeta.innerText = globalMetaPHD;
+
+        let gap = realized - globalMetaPHD;
+        let perc = globalMetaPHD > 0 ? ((realized / globalMetaPHD) * 100).toFixed(1) : 0;
+
+        elPerc.innerText = `${perc}%`;
+
+        if(realized === 0) {
+            elGap.innerText = "-";
+            elGap.style.color = "var(--text-muted)";
+            elStatus.innerText = "AGUARDANDO DADOS...";
+            elStatus.style.background = "rgba(255,255,255,0.05)";
+            elStatus.style.color = "var(--text-muted)";
+        } else if (gap >= 0) {
+            elGap.innerText = `+${gap}`;
+            elGap.style.color = "var(--success)";
+            elStatus.innerText = "META ATINGIDA / SUPERADA";
+            elStatus.style.background = "rgba(16, 185, 129, 0.1)";
+            elStatus.style.color = "var(--success)";
+        } else {
+            elGap.innerText = gap; // already has negative sign
+            elGap.style.color = "var(--danger)";
+            elStatus.innerText = "ABAIXO DA META";
+            elStatus.style.background = "rgba(239, 68, 68, 0.1)";
+            elStatus.style.color = "var(--danger)";
+        }
+    }
+
+    updateGapCard('dia', lastPhdDia);
+    updateGapCard('sem', avgPhdSemana);
+    updateGapCard('mes', avgMesPHD);
+
 
     const ctxPHD = document.getElementById('slChartPHD').getContext('2d');
     if(window.slChartPHDInstance) window.slChartPHDInstance.destroy();
@@ -286,7 +336,7 @@ dbFirebase.ref('shopee_meta_phd').on('value', snap => {
         globalMetaPHD = snap.val();
         let el = document.getElementById('meta-phd-input');
         if (el) el.value = globalMetaPHD;
-        if(!document.getElementById('view-sitelider').classList.contains('hidden')) renderSiteliderDashboard();
+        if(!document.getElementById('view-sitelider').classList.contains('hidden') || !document.getElementById('view-sitelider-analise').classList.contains('hidden')) renderSiteliderDashboard();
     }
 });
 
@@ -330,7 +380,7 @@ dbFirebase.ref('shopee_gold_db').on('value', snap => { monthlyDataCache = snap.v
 dbFirebase.ref('shopee_escala_history').on('value', snap => {
     historyDataCache = snap.val() || {};
     if(!document.getElementById('view-hist-escala').classList.contains('hidden')) renderHistEscala('lugares');
-    if(!document.getElementById('view-sitelider').classList.contains('hidden')) renderSiteliderDashboard();
+    if(!document.getElementById('view-sitelider').classList.contains('hidden') || !document.getElementById('view-sitelider-analise').classList.contains('hidden')) renderSiteliderDashboard();
 });
 
 dbFirebase.ref('shopee_escala_dc_history').on('value', snap => {
@@ -341,7 +391,7 @@ dbFirebase.ref('shopee_escala_dc_history').on('value', snap => {
 dbFirebase.ref('shopee_escala_semana_live').on('value', (snapshot) => { 
     let data = snapshot.val(); if (data) liveEscalaSemana = data; else initEmptyEscalaSemana(); 
     if(!document.getElementById('view-escala').classList.contains('hidden')) renderEscalaSemana(); 
-    if(!document.getElementById('view-sitelider').classList.contains('hidden')) renderSiteliderDashboard(); 
+    if(!document.getElementById('view-sitelider').classList.contains('hidden') || !document.getElementById('view-sitelider-analise').classList.contains('hidden')) renderSiteliderDashboard(); 
 });
 
 dbFirebase.ref('shopee_escala_dc_live').on('value', (snapshot) => { 
@@ -357,7 +407,7 @@ presencaListener = dbFirebase.ref('shopee_presenca_live/' + currentPresMes).on('
     if(!document.getElementById('view-presenca').classList.contains('hidden')) renderPresencaGrid(); 
     if(!document.getElementById('view-escala').classList.contains('hidden')) { if(currentUser && currentUser.r === 'admin') { escDiasConf.forEach(d => updateDropdownsAvailability(d.id)); updateSidebar(); } }
     if(!document.getElementById('view-escala-dc').classList.contains('hidden')) { if(currentUser && currentUser.r === 'admin') { escDiasConf.forEach(d => updateDropdownsAvailabilityDc(d.id)); updateSidebarDc(); } }
-    if(!document.getElementById('view-sitelider').classList.contains('hidden')) renderSiteliderDashboard(); 
+    if(!document.getElementById('view-sitelider').classList.contains('hidden') || !document.getElementById('view-sitelider-analise').classList.contains('hidden')) renderSiteliderDashboard(); 
 });
 
 function saveProdState() {
@@ -1280,7 +1330,7 @@ function changePresencaMonth() {
             if(!document.getElementById('view-presenca').classList.contains('hidden')) renderPresencaGrid(); 
             if(!document.getElementById('view-escala').classList.contains('hidden')){ if(currentUser && currentUser.r === 'admin') { escDiasConf.forEach(d => updateDropdownsAvailability(d.id)); updateSidebar(); } }
             if(!document.getElementById('view-escala-dc').classList.contains('hidden')){ if(currentUser && currentUser.r === 'admin') { escDiasConf.forEach(d => updateDropdownsAvailabilityDc(d.id)); updateSidebarDc(); } }
-            if(!document.getElementById('view-sitelider').classList.contains('hidden')) renderSiteliderDashboard(); 
+            if(!document.getElementById('view-sitelider').classList.contains('hidden') || !document.getElementById('view-sitelider-analise').classList.contains('hidden')) renderSiteliderDashboard(); 
         });
     }
 }
