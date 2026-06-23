@@ -145,12 +145,11 @@
         <!-- ÁREA DE CONTEÚDO PRINCIPAL (MAIN) -->
         <main class="main-content">
             
-            <!-- ABA: DASHBOARD SITELIDER ANÁLISES -->
             <section id="view-sitelider" class="hidden">
                 <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
                     <div>
                         <h2 style="font-weight: 800; letter-spacing: -1px; margin-bottom: 5px;">Dashboard Gestão Executiva</h2>
-                        <div style="font-size: 0.85rem; color: var(--text-muted);">Acompanhamento de PHD e Absenteísmo (Mês Vigente / Semana)</div>
+                        <div style="font-size: 0.85rem; color: var(--text-muted);">Acompanhamento de PHD e Absenteísmo</div>
                     </div>
                     <div class="admin-only flex-container" style="display:flex; align-items: center; gap: 10px;">
                         <label style="color: var(--text-muted); font-size: 0.8rem; font-weight: 700;">META PHD:</label>
@@ -222,7 +221,7 @@
                 </div>
             </section>
 
-            <!-- NOVA ABA: ANÁLISE DE GAP (META PHD) -->
+            <!-- NOVA ABA: ANÁLISE DE GAP (META PHD) COM DATAS E RÓTULOS -->
             <section id="view-sitelider-analise" class="hidden">
                 <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
                     <div>
@@ -238,7 +237,9 @@
                 <div class="bento-grid" style="grid-template-columns: repeat(3, 1fr);">
                     <!-- Diário -->
                     <div class="stat-card" style="border-top: 4px solid var(--primary);">
-                        <h3 style="color: #fff; margin-bottom: 20px; font-size: 1.1rem;"><i class="fas fa-calendar-day" style="color:var(--primary); margin-right: 8px;"></i> Fechamento Diário</h3>
+                        <h3 style="color: #fff; margin-bottom: 5px; font-size: 1.1rem;"><i class="fas fa-calendar-day" style="color:var(--primary); margin-right: 8px;"></i> Fechamento Diário</h3>
+                        <div id="sa-dia-data" style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; margin-bottom: 20px; text-transform: uppercase;">REF: -</div>
+                        
                         <div style="display:flex; justify-content: space-between; margin-bottom: 12px; font-size: 1.1rem;">
                             <span style="color: var(--text-muted);">PHD Realizado:</span>
                             <span id="sa-dia-real" style="font-weight: 800; color: #fff;">0</span>
@@ -260,7 +261,9 @@
 
                     <!-- Semanal -->
                     <div class="stat-card" style="border-top: 4px solid var(--accent);">
-                        <h3 style="color: #fff; margin-bottom: 20px; font-size: 1.1rem;"><i class="fas fa-calendar-week" style="color:var(--accent); margin-right: 8px;"></i> Fechamento Semanal</h3>
+                        <h3 style="color: #fff; margin-bottom: 5px; font-size: 1.1rem;"><i class="fas fa-calendar-week" style="color:var(--accent); margin-right: 8px;"></i> Fechamento Semanal</h3>
+                        <div id="sa-sem-data" style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; margin-bottom: 20px; text-transform: uppercase;">REF: -</div>
+
                         <div style="display:flex; justify-content: space-between; margin-bottom: 12px; font-size: 1.1rem;">
                             <span style="color: var(--text-muted);">Média Realizada:</span>
                             <span id="sa-sem-real" style="font-weight: 800; color: #fff;">0</span>
@@ -282,7 +285,9 @@
 
                     <!-- Mensal -->
                     <div class="stat-card" style="border-top: 4px solid var(--success);">
-                        <h3 style="color: #fff; margin-bottom: 20px; font-size: 1.1rem;"><i class="fas fa-calendar-alt" style="color:var(--success); margin-right: 8px;"></i> Fechamento Mensal</h3>
+                        <h3 style="color: #fff; margin-bottom: 5px; font-size: 1.1rem;"><i class="fas fa-calendar-alt" style="color:var(--success); margin-right: 8px;"></i> Fechamento Mensal</h3>
+                        <div id="sa-mes-data" style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; margin-bottom: 20px; text-transform: uppercase;">REF: -</div>
+
                         <div style="display:flex; justify-content: space-between; margin-bottom: 12px; font-size: 1.1rem;">
                             <span style="color: var(--text-muted);">Média Realizada:</span>
                             <span id="sa-mes-real" style="font-weight: 800; color: #fff;">0</span>
@@ -448,6 +453,7 @@
                 <div id="monthly-list" class="m-list"></div>
             </section>
 
+            <!-- ABA: ESCALA DE LUGARES -->
             <section id="view-escala" class="hidden esc-layout">
                 <div class="esc-main-content" style="padding: 0;">
                     <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
@@ -485,6 +491,7 @@
                 </div>
             </section>
 
+            <!-- ABA: ESCALA DOBLECHECK (ALTERNADA) -->
             <section id="view-escala-dc" class="hidden esc-layout">
                 <div class="esc-main-content" style="padding: 0;">
                     <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
