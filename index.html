@@ -109,7 +109,7 @@
                     <i class="fas fa-chevron-down"></i>
                 </div>
                 <div class="menu-items open" id="menu-escalas">
-                    <div class="menu-item active" id="btn-escala" onclick="switchTab('escala')">Escala de Lugares</div>
+                    <div class="menu-item active" id="btn-escala" onclick="switchTab('escala')">Escala Processamento</div>
                     <div class="menu-item" id="btn-escala-dc" onclick="switchTab('escala-dc')">Escala Doblecheck</div>
                     <div class="menu-item admin-only block-container" id="btn-hist-escala" onclick="switchTab('hist-escala')">Histórico de Escala</div>
                     <div class="menu-item admin-only block-container" id="btn-hist-escala-dc" onclick="switchTab('hist-escala-dc')">Histórico Doblecheck</div>
@@ -221,7 +221,7 @@
                 </div>
             </section>
 
-            <!-- ABA: ANÁLISE DE GAP (META PHD) COM RANK DE BIPAGEM TOP 4 -->
+            <!-- NOVA ABA: ANÁLISE DE GAP (META PHD) COM RANK DE BIPAGEM TOP 4 -->
             <section id="view-sitelider-analise" class="hidden">
                 <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
                     <div>
@@ -308,7 +308,7 @@
                     </div>
                 </div>
 
-                <!-- NOVO: RANKING DE BIPAGEM TOP 4 -->
+                <!-- RANKING DE BIPAGEM TOP 4 -->
                 <h3 style="color: #fff; margin-top: 40px; margin-bottom: 20px; font-size: 1.2rem; font-weight: 800; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px;">
                     <i class="fas fa-medal" style="color: var(--gold); margin-right: 8px;"></i> Destaques de Produtividade (Bipagem)
                 </h3>
@@ -480,10 +480,11 @@
                 <div id="monthly-list" class="m-list"></div>
             </section>
 
+            <!-- ABA: ESCALA DE LUGARES -->
             <section id="view-escala" class="hidden esc-layout">
                 <div class="esc-main-content" style="padding: 0;">
                     <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <h2 style="font-weight: 800; letter-spacing: -1px;">Escala de Lugares Semanal (Segunda a Domingo)</h2>
+                        <h2 style="font-weight: 800; letter-spacing: -1px;">Escala Processamento Semanal (Segunda a Domingo)</h2>
                         <div class="admin-only flex-container" style="display:flex; gap: 10px;">
                             <button class="btn-ghost" style="border-color: #3b82f6; color: #3b82f6;" onclick="replicateMonday()" title="Copia a escala de Segunda para todos os dias"><i class="fas fa-copy"></i> Replicar Segunda</button>
                             <button class="btn-ghost" style="border-color: var(--accent); color: var(--accent);" onclick="autoDistributeAllLugares()">Sortear Semana Toda</button>
@@ -555,7 +556,7 @@
 
             <section id="view-hist-escala" class="hidden">
                 <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
-                    <h2 style="font-weight: 800; letter-spacing: -1px;">Histórico de Escalas Semanais (Lugares)</h2>
+                    <h2 style="font-weight: 800; letter-spacing: -1px;">Histórico de Escalas Semanais (Processamento)</h2>
                     <button class="btn-ghost admin-only block-container" style="color:var(--danger); border-color:rgba(239, 68, 68, 0.2);" onclick="clearEscalaHistory('lugares')"><i class="fas fa-trash"></i> Limpar Todo o Histórico</button>
                 </div>
                 <div id="hist-escala-list" class="m-list"></div>
