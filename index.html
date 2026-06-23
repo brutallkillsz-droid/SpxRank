@@ -148,12 +148,15 @@
                 <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
                     <div>
                         <h2 style="font-weight: 800; letter-spacing: -1px; margin-bottom: 5px;">Dashboard Gestão Executiva</h2>
-                        <div style="font-size: 0.85rem; color: var(--text-muted);">Acompanhamento de PHD e Absenteísmo (Mês Vigente / Semana)</div>
+                        <div style="font-size: 0.85rem; color: var(--text-muted);">Acompanhamento de PHD e Absenteísmo</div>
                     </div>
                     <div class="admin-only flex-container" style="display:flex; align-items: center; gap: 10px;">
-                        <label style="color: var(--text-muted); font-size: 0.8rem; font-weight: 700;">SEMANA REFERÊNCIA:</label>
-                        <input type="week" id="sl-week-select" class="btn-ghost" style="background: rgba(255,255,255,0.05); color: #fff; border-color: var(--primary);" onchange="renderSiteliderDashboard()">
-                        <button class="btn-ghost" onclick="renderSiteliderDashboard()"><i class="fas fa-sync"></i> Atualizar Dados</button>
+                        <label style="color: var(--text-muted); font-size: 0.8rem; font-weight: 700;">META PHD:</label>
+                        <input type="number" id="meta-phd-input" class="btn-ghost" style="width: 80px; background: rgba(255,255,255,0.05); color: #fbbf24; border-color: #fbbf24; font-weight: 800; text-align: center; font-size: 1rem; padding: 5px;" value="530" onblur="saveMetaPHD()">
+
+                        <label style="color: var(--text-muted); font-size: 0.8rem; font-weight: 700; margin-left: 10px;">SEMANA REFERÊNCIA:</label>
+                        <input type="week" id="sl-week-select" class="btn-ghost" style="background: rgba(255,255,255,0.05); color: #fff; border-color: var(--primary);" onchange="renderSiteliderDashboard()" onclick="try{this.showPicker()}catch(e){}">
+                        <button class="btn-ghost" onclick="renderSiteliderDashboard()"><i class="fas fa-sync"></i></button>
                     </div>
                 </div>
                 
@@ -479,6 +482,7 @@
         </main>
     </div>
 
+    <!-- Vinculação do motor JavaScript externo -->
     <script src="app.js"></script>
 </body>
 </html>
