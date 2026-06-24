@@ -109,7 +109,7 @@
                     <i class="fas fa-chevron-down"></i>
                 </div>
                 <div class="menu-items open" id="menu-escalas">
-                    <div class="menu-item active" id="btn-escala" onclick="switchTab('escala')">Escala Processamento</div>
+                    <div class="menu-item active" id="btn-escala" onclick="switchTab('escala')">Escala de Lugares</div>
                     <div class="menu-item" id="btn-escala-dc" onclick="switchTab('escala-dc')">Escala Doblecheck</div>
                     <div class="menu-item admin-only block-container" id="btn-hist-escala" onclick="switchTab('hist-escala')">Histórico de Escala</div>
                     <div class="menu-item admin-only block-container" id="btn-hist-escala-dc" onclick="switchTab('hist-escala-dc')">Histórico Doblecheck</div>
@@ -221,7 +221,7 @@
                 </div>
             </section>
 
-            <!-- NOVA ABA: ANÁLISE DE GAP (META PHD) COM RANK DE BIPAGEM TOP 4 -->
+            <!-- NOVA ABA: ANÁLISE DE GAP (META PHD) COM DATAS E RÓTULOS -->
             <section id="view-sitelider-analise" class="hidden">
                 <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
                     <div>
@@ -307,28 +307,6 @@
                         <div style="text-align: center; margin-top: 25px; padding: 12px; border-radius: 12px; font-weight: 800; letter-spacing: 1px;" id="sa-mes-status">-</div>
                     </div>
                 </div>
-
-                <!-- RANKING DE BIPAGEM TOP 4 -->
-                <h3 style="color: #fff; margin-top: 40px; margin-bottom: 20px; font-size: 1.2rem; font-weight: 800; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px;">
-                    <i class="fas fa-medal" style="color: var(--gold); margin-right: 8px;"></i> Destaques de Produtividade (Bipagem)
-                </h3>
-                <div class="bento-grid" style="grid-template-columns: repeat(3, 1fr);">
-                    <!-- Diário -->
-                    <div class="stat-card rank-2">
-                        <h4 style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; margin-bottom: 10px;">Rank de Bipagem Diário (AM)</h4>
-                        <div id="sa-top-dia-list" style="display:flex; flex-direction: column; gap: 8px; margin-top: 10px;"></div>
-                    </div>
-                    <!-- Semanal -->
-                    <div class="stat-card rank-1">
-                        <h4 style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; margin-bottom: 10px;">Rank de Bipagem Semanal (AM)</h4>
-                        <div id="sa-top-sem-list" style="display:flex; flex-direction: column; gap: 8px; margin-top: 10px;"></div>
-                    </div>
-                    <!-- Mensal -->
-                    <div class="stat-card rank-3">
-                        <h4 style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; margin-bottom: 10px;">Rank de Bipagem Mensal (AM)</h4>
-                        <div id="sa-top-mes-list" style="display:flex; flex-direction: column; gap: 8px; margin-top: 10px;"></div>
-                    </div>
-                </div>
             </section>
             
             <section id="view-dia" class="hidden">
@@ -366,14 +344,9 @@
 
             <section id="view-prod" class="hidden">
                 <div style="margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
-                    <div style="display:flex; gap:10px;">
-                        <button onclick="openShiftModal()" style="cursor:pointer; background:#002f6c; color:white; padding:8px 15px; font-size:12px; font-weight:bold; border-radius:4px; border:none; transition: 0.2s;">
-                            <i class="fas fa-upload"></i> Importar Dados Excel
-                        </button>
-                        <button class="admin-only flex-container" onclick="autoFillStations()" style="cursor:pointer; background:#10b981; color:white; padding:8px 15px; font-size:12px; font-weight:bold; border-radius:4px; border:none; transition: 0.2s;">
-                            <i class="fas fa-magic"></i> Puxar Nomes da Escala
-                        </button>
-                    </div>
+                    <button onclick="openShiftModal()" style="cursor:pointer; background:#002f6c; color:white; padding:8px 15px; font-size:12px; font-weight:bold; border-radius:4px; border:none; transition: 0.2s;">
+                        <i class="fas fa-upload"></i> Importar Dados e Preencher Estações
+                    </button>
                     <input type="file" id="file-prod" accept=".csv, .xlsx" style="display:none;" onclick="this.value=null" onchange="importProdData(this)">
                     <span style="font-size: 11px; color: #666; font-style: italic;">* Data, Horários, Backlog, XPT, Volume Rot. e Células são editáveis!</span>
                 </div>
@@ -387,7 +360,7 @@
                     <tr>
                         <td class="spx-gray-light" style="width:6%">Data</td>
                         <td style="width:6%; padding:0; position:relative; cursor:pointer;">
-                            <input type="date" class="date-input-field" id="p-data" value="" onchange="saveProdState(); autoFillStations();" onclick="try{this.showPicker()}catch(e){}">
+                            <input type="date" class="date-input-field" id="p-data" value="" onchange="saveProdState()" onclick="try{this.showPicker()}catch(e){}">
                         </td>
                         <td rowspan="2" class="spx-gray-light" style="width:6%">Backlog</td>
                         <td rowspan="2" class="spx-orange editable-cell" style="width:6%" contenteditable="true" id="p-backlog" onblur="calculateProdTotals(true)">0</td>
@@ -484,7 +457,7 @@
             <section id="view-escala" class="hidden esc-layout">
                 <div class="esc-main-content" style="padding: 0;">
                     <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <h2 style="font-weight: 800; letter-spacing: -1px;">Escala Processamento Semanal (Segunda a Domingo)</h2>
+                        <h2 style="font-weight: 800; letter-spacing: -1px;">Escala de Lugares Semanal (Segunda a Domingo)</h2>
                         <div class="admin-only flex-container" style="display:flex; gap: 10px;">
                             <button class="btn-ghost" style="border-color: #3b82f6; color: #3b82f6;" onclick="replicateMonday()" title="Copia a escala de Segunda para todos os dias"><i class="fas fa-copy"></i> Replicar Segunda</button>
                             <button class="btn-ghost" style="border-color: var(--accent); color: var(--accent);" onclick="autoDistributeAllLugares()">Sortear Semana Toda</button>
@@ -518,6 +491,7 @@
                 </div>
             </section>
 
+            <!-- ABA: ESCALA DOBLECHECK (ALTERNADA) -->
             <section id="view-escala-dc" class="hidden esc-layout">
                 <div class="esc-main-content" style="padding: 0;">
                     <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
@@ -556,7 +530,7 @@
 
             <section id="view-hist-escala" class="hidden">
                 <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
-                    <h2 style="font-weight: 800; letter-spacing: -1px;">Histórico de Escalas Semanais (Processamento)</h2>
+                    <h2 style="font-weight: 800; letter-spacing: -1px;">Histórico de Escalas Semanais (Lugares)</h2>
                     <button class="btn-ghost admin-only block-container" style="color:var(--danger); border-color:rgba(239, 68, 68, 0.2);" onclick="clearEscalaHistory('lugares')"><i class="fas fa-trash"></i> Limpar Todo o Histórico</button>
                 </div>
                 <div id="hist-escala-list" class="m-list"></div>
