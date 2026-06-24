@@ -65,24 +65,32 @@ function initCtrl() { return { date: '', totalVol: 0, totalRotas: 0, minTime: nu
 // SIDEBAR MENU & NAVEGAÇÃO
 // =========================================================
 function toggleMenu(menuId, headerEl) {
-    document.getElementById(menuId).classList.toggle('open');
-    headerEl.classList.toggle('open');
+    let el = document.getElementById(menuId);
+    if(el) el.classList.toggle('open');
+    if(headerEl) headerEl.classList.toggle('open');
 }
 
 function switchTab(id) {
     if (currentUser && currentUser.r === 'admin') {
         try {
-            if (!document.getElementById('view-escala').classList.contains('hidden')) saveEscalaSemanaToCloud();
-            if (!document.getElementById('view-escala-dc').classList.contains('hidden')) saveEscalaDcToCloud();
-            if (!document.getElementById('view-prod').classList.contains('hidden')) saveProdState();
-        } catch(e) { console.error("Erro ao auto-salvar na troca de aba:", e); }
+            let elEscala = document.getElementById('view-escala');
+            if (elEscala && !elEscala.classList.contains('hidden')) saveEscalaSemanaToCloud();
+            
+            let elDc = document.getElementById('view-escala-dc');
+            if (elDc && !elDc.classList.contains('hidden')) saveEscalaDcToCloud();
+            
+            let elProd = document.getElementById('view-prod');
+            if (elProd && !elProd.classList.contains('hidden')) saveProdState();
+        } catch(e) { console.error("Erro no auto-save da aba:", e); }
     }
 
     document.querySelectorAll('section').forEach(s => s.classList.add('hidden'));
     document.querySelectorAll('.menu-item').forEach(b => b.classList.remove('active'));
-    document.getElementById('view-'+id).classList.remove('hidden');
     
-    const btn = document.getElementById('btn-'+id);
+    let targetView = document.getElementById('view-'+id);
+    if(targetView) targetView.classList.remove('hidden');
+    
+    let btn = document.getElementById('btn-'+id);
     if(btn) btn.classList.add('active');
     
     if(id==='dia') renderDaily(); 
@@ -99,7 +107,7 @@ function switchTab(id) {
 }
 
 // =========================================================
-// MATH MASTER: PHD E META PHDS
+// CÉREBRO MATEMÁTICO E META PHD
 // =========================================================
 window.calcPHDAndSave = function(diaId) {
     saveEscalaSemanaToCloud();
@@ -107,7 +115,9 @@ window.calcPHDAndSave = function(diaId) {
 
 window.saveMetaPHD = function() {
     if (!currentUser || currentUser.r !== 'admin') return;
-    let val = parseInt(document.getElementById('meta-phd-input').value) || 530;
+    let inputEl = document.getElementById('meta-phd-input');
+    if(!inputEl) return;
+    let val = parseInt(inputEl.value) || 530;
     dbFirebase.ref('shopee_meta_phd').set(val);
     showToast("Meta PHD atualizada para " + val + "!");
 };
@@ -131,278 +141,301 @@ function colorizePHD(elementId, value) {
 }
 
 async function renderSiteliderDashboard() {
-    let weekInput = document.getElementById('sl-week-select');
-    if(!weekInput || !weekInput.value) {
-        let d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + 4 - (d.getDay() || 7));
-        let yearStart = new Date(d.getFullYear(), 0, 1);
-        let weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
-        if(weekInput) weekInput.value = d.getFullYear() + '-W' + String(weekNo).padStart(2, '0');
-    }
-    
-    let weekVal = weekInput ? weekInput.value : ''; 
-    if(!weekVal) return;
-    
-    let parts = weekVal.split('-W'); let year = parseInt(parts[0]); let week = parseInt(parts[1]);
-    let simple = new Date(year, 0, 1 + (week - 1) * 7); let dow = simple.getDay(); let ISOweekStart = simple;
-    if (dow <= 4) ISOweekStart.setDate(simple.getDate() - simple.getDay() + 1); else ISOweekStart.setDate(simple.getDate() + 8 - simple.getDay());
-
-    let weekDates = []; let offsets = [0, 1, 2, 3, 4, 5, 6]; 
-    offsets.forEach(off => { let d = new Date(ISOweekStart.getTime()); d.setDate(d.getDate() + off); weekDates.push(d); });
-    let friday = weekDates[4]; let refMonthStr = friday.getFullYear() + '-' + String(friday.getMonth() + 1).padStart(2, '0');
-    
-    let monthPresData = {};
-    if(refMonthStr === currentPresMes) { monthPresData = livePresenca; } else {
-        let presSnap = await dbFirebase.ref('shopee_presenca_live/' + refMonthStr).once('value'); monthPresData = presSnap.val() || {};
-    }
-
-    let daysInMonth = new Date(friday.getFullYear(), friday.getMonth() + 1, 0).getDate();
-    let absMes = { sch: 0, abs: 0 }; let absSem = { sch: 0, abs: 0 }; let absDia = { sch: 0, abs: 0 };
-    let diaChartAbs = []; let chartLabelsAbs = [];
-    for(let d=1; d<=daysInMonth; d++) { diaChartAbs[d] = { sch: 0, abs: 0 }; chartLabelsAbs.push(d.toString()); }
-
-    let weekDayNumbers = weekDates.filter(d => d.getMonth() === friday.getMonth()).map(d => d.getDate());
-    let lastDayOfWeekNum = weekDayNumbers[weekDayNumbers.length - 1]; 
-
-    for(let op in monthPresData) {
-        for(let d=1; d<=daysInMonth; d++) {
-            let st = monthPresData[op][d];
-            if(st === 'P' || st === 'F' || st === 'AT') {
-                absMes.sch++; diaChartAbs[d].sch++;
-                let isAbs = (st === 'F' || st === 'AT');
-                if(isAbs) { absMes.abs++; diaChartAbs[d].abs++; }
-                if(weekDayNumbers.includes(d)) { absSem.sch++; if(isAbs) absSem.abs++; }
-                if(d === lastDayOfWeekNum) { absDia.sch++; if(isAbs) absDia.abs++; }
-            }
-        }
-    }
-
-    let percMes = absMes.sch > 0 ? (absMes.abs / absMes.sch * 100).toFixed(1) : "0.0";
-    let percSem = absSem.sch > 0 ? (absSem.abs / absSem.sch * 100).toFixed(1) : "0.0";
-    let percDia = absDia.sch > 0 ? (absDia.abs / absDia.sch * 100).toFixed(1) : "0.0";
-
-    if(document.getElementById('sl-abs-mes')) {
-        document.getElementById('sl-abs-mes').innerText = percMes + "%";
-        document.getElementById('sl-abs-sem').innerText = percSem + "%";
-        document.getElementById('sl-abs-dia').innerText = percDia + "%";
-    }
-
-    let dataAbsChart = [];
-    for(let d=1; d<=daysInMonth; d++) { let val = diaChartAbs[d].sch > 0 ? (diaChartAbs[d].abs / diaChartAbs[d].sch * 100) : 0; dataAbsChart.push(val.toFixed(1)); }
-
-    let weekData = historyDataCache[weekVal];
-    let isWeekActiveTab = false;
-    if(liveEscalaSemana && liveEscalaSemana['segunda'] && liveEscalaSemana['segunda'].dataDia) {
-         let [dd, mm] = liveEscalaSemana['segunda'].dataDia.split('/');
-         if(dd && mm) {
-             let wStart = weekDates[0];
-             if(parseInt(dd) === wStart.getDate() && parseInt(mm) === (wStart.getMonth() + 1)) { isWeekActiveTab = true; }
-         }
-    }
-
-    if (!weekData && isWeekActiveTab) { weekData = liveEscalaSemana; } else if (!weekData) { weekData = {}; }
-
-    let sumPhdSemana = 0; let countPhdSemana = 0; let lastPhdDia = 0;
-    let chartLabelsPhd = []; let dataPhdChart = [];
-    let lastDayName = "SEM DADOS"; let lastDayDate = "--/--";
-
-    escDiasConf.forEach(dConf => {
-        let p = weekData[dConf.id] ? parseFloat(weekData[dConf.id].phd) : 0;
-        if(!isNaN(p) && p > 0) { 
-            sumPhdSemana += p; countPhdSemana++; lastPhdDia = p; 
-            lastDayName = dConf.nome.replace('ESCALA ', ''); 
-            lastDayDate = weekData[dConf.id].dataDia || "--/--"; 
-            chartLabelsPhd.push(dConf.nome.replace('ESCALA ', '')); dataPhdChart.push(p); 
-        } 
-        else if(weekData[dConf.id]) { chartLabelsPhd.push(dConf.nome.replace('ESCALA ', '')); dataPhdChart.push(0); }
-    });
-
-    let avgPhdSemana = countPhdSemana > 0 ? Math.round(sumPhdSemana / countPhdSemana) : 0;
-    
-    colorizePHD('sl-phd-dia', lastPhdDia);
-    colorizePHD('sl-phd-sem', avgPhdSemana);
-
-    let avgMesPHD = 0;
     try {
-        let sumMesPHD = 0; let countMesPHD = 0;
-        for(let wKey in historyDataCache) {
-            let wObj = historyDataCache[wKey]; let belongsToMonth = false;
-            for(let dia in wObj) {
-                if(wObj[dia] && wObj[dia].dataDia) { let [dd, mm] = wObj[dia].dataDia.split('/'); if(mm === refMonthStr.split('-')[1]) belongsToMonth = true; }
-            }
-            if(belongsToMonth) {
-                for(let dia in wObj) { let p = parseFloat(wObj[dia].phd) || 0; if(p > 0) { sumMesPHD += p; countMesPHD++; } }
-            }
+        let weekInput = document.getElementById('sl-week-select');
+        if(!weekInput) return; // Se a aba não existir, cancela a execução com segurança.
+
+        if(!weekInput.value) {
+            let d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + 4 - (d.getDay() || 7));
+            let yearStart = new Date(d.getFullYear(), 0, 1);
+            let weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+            weekInput.value = d.getFullYear() + '-W' + String(weekNo).padStart(2, '0');
         }
-        if(isWeekActiveTab && refMonthStr === currentPresMes) { sumMesPHD += sumPhdSemana; countMesPHD += countPhdSemana; }
-        avgMesPHD = countMesPHD > 0 ? Math.round(sumMesPHD / countMesPHD) : 0; 
-    } catch(e) { console.error("Erro PHD Mensal", e); }
-    
-    colorizePHD('sl-phd-mes', avgMesPHD);
-
-    let percDiaPHD = globalMetaPHD > 0 ? ((lastPhdDia / globalMetaPHD) * 100).toFixed(1) : "0.0";
-    let percSemPHD = globalMetaPHD > 0 ? ((avgPhdSemana / globalMetaPHD) * 100).toFixed(1) : "0.0";
-    let percMesPHD = globalMetaPHD > 0 ? ((avgMesPHD / globalMetaPHD) * 100).toFixed(1) : "0.0";
-
-    if(document.getElementById('sl-phd-dia-lbl')){
-        document.getElementById('sl-phd-dia-lbl').innerText = `ÚLTIMO REGISTRO (${percDiaPHD}% DA META)`;
-        document.getElementById('sl-phd-sem-lbl').innerText = `MÉDIA DA SEMANA (${percSemPHD}% DA META)`;
-        document.getElementById('sl-phd-mes-lbl').innerText = `MÉDIA DO MÊS (${percMesPHD}% DA META)`;
-    }
-
-    // ==================================================
-    // LABELS DE TEMPO - ANÁLISE DE GAP
-    // ==================================================
-    let elMetaDisplay = document.getElementById('sa-meta-display');
-    if (elMetaDisplay) elMetaDisplay.innerText = globalMetaPHD;
-
-    let elDiaData = document.getElementById('sa-dia-data');
-    if (elDiaData) elDiaData.innerText = `REF: ${lastDayName} (${lastDayDate})`;
-    let elSemData = document.getElementById('sa-sem-data');
-    if (elSemData) elSemData.innerText = `REF: SEMANA ${week} DE ${year}`;
-    let elMesData = document.getElementById('sa-mes-data');
-    const monthNames = ["JANEIRO", "FEVEREIRO", "MARÇO", "ABRIL", "MAIO", "JUNHO", "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "REVISAR", "DEZEMBRO"];
-    if (elMesData) elMesData.innerText = `REF: ${monthNames[parseInt(refMonthStr.split('-')[1]) - 1] || 'MÊS'} DE ${refMonthStr.split('-')[0]}`;
-
-    function updateGapCard(prefix, realized) {
-        let elReal = document.getElementById(`sa-${prefix}-real`); let elMeta = document.getElementById(`sa-${prefix}-meta`); let elGap = document.getElementById(`sa-${prefix}-gap`); let elStatus = document.getElementById(`sa-${prefix}-status`); let elPerc = document.getElementById(`sa-${prefix}-perc`);
-        if(!elReal) return;
-        elReal.innerText = realized; elMeta.innerText = globalMetaPHD;
-        let gap = realized - globalMetaPHD; let perc = globalMetaPHD > 0 ? ((realized / globalMetaPHD) * 100).toFixed(1) : 0;
-        elPerc.innerText = `${perc}%`;
-        if(realized === 0) {
-            elGap.innerText = "-"; elGap.style.color = "var(--text-muted)";
-            elStatus.innerText = "AGUARDANDO DADOS..."; elStatus.style.background = "rgba(255,255,255,0.05)"; elStatus.style.color = "var(--text-muted)";
-        } else if (gap >= 0) {
-            elGap.innerText = `+${gap}`; elGap.style.color = "var(--success)";
-            elStatus.innerText = "META ATINGIDA / SUPERADA"; elStatus.style.background = "rgba(16, 185, 129, 0.1)"; elStatus.style.color = "var(--success)";
-        } else {
-            elGap.innerText = gap; elGap.style.color = "var(--danger)";
-            elStatus.innerText = "ABAIXO DA META"; elStatus.style.background = "rgba(239, 68, 68, 0.1)"; elStatus.style.color = "var(--danger)";
-        }
-    }
-    updateGapCard('dia', lastPhdDia); updateGapCard('sem', avgPhdSemana); updateGapCard('mes', avgMesPHD);
-
-    // =========================================================================
-    // FIX COMPLETO: CORREÇÃO DO ACÚMULO DO RANK DE BIPAGEM AM (DATAS EXATAS)
-    // =========================================================================
-    let targetInputDate = document.getElementById('p-data')?.value || ''; // Chave Diária Exata
-    let latestDayVolMap = {};
-    if (targetInputDate && prodHistoryCache[targetInputDate]) {
-        latestDayVolMap = prodHistoryCache[targetInputDate];
-    }
-
-    let semTotals = {};
-    weekDates.forEach(d => {
-        let dStr = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-        if (prodHistoryCache[dStr]) {
-            for(let op in prodHistoryCache[dStr]) {
-                semTotals[op] = (semTotals[op] || 0) + prodHistoryCache[dStr][op];
-            }
-        }
-    });
-
-    let mesTotals = {};
-    for(let dStr in prodHistoryCache) {
-        if (dStr.startsWith(refMonthStr)) { 
-            for(let op in prodHistoryCache[dStr]) {
-                mesTotals[op] = (mesTotals[op] || 0) + prodHistoryCache[dStr][op];
-            } 
-        }
-    }
-
-    function getTop4(obj) {
-        return Object.keys(obj).map(k => ({name: k, vol: obj[k]})).sort((a,b) => b.vol - a.vol).slice(0, 4);
-    }
-
-    let topDia = getTop4(latestDayVolMap);
-    let topSem = getTop4(semTotals);
-    let topMes = getTop4(mesTotals);
-
-    function renderTopList(elementId, arr) {
-        let el = document.getElementById(elementId);
-        if(!el) return;
-        if(arr.length === 0) { el.innerHTML = '<div style="color:var(--text-muted); font-size:0.85rem; text-align:center; padding: 20px 0;">Sem dados importados nesta data...</div>'; return; }
         
-        let html = '';
-        arr.forEach((item, idx) => {
-            let icon = ''; let color = '';
-            if(idx===0) { icon = '🥇'; color = 'var(--gold)'; }
-            else if(idx===1) { icon = '🥈'; color = 'var(--silver)'; }
-            else if(idx===2) { icon = '🥉'; color = 'var(--bronze)'; }
-            else { icon = '4º'; color = '#fff'; }
-            
-            html += `<div style="display:flex; justify-content:space-between; align-items:center; background: rgba(0,0,0,0.2); padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.03);">
-                        <div style="font-size: 0.85rem; font-weight: 700; color: ${color}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 65%;">
-                            <span style="margin-right: 5px; font-size:1rem;">${icon}</span> ${item.name}
-                        </div>
-                        <div style="font-size: 0.95rem; color: var(--success); font-weight: 800;">${item.vol.toLocaleString('pt-BR')}</div>
-                     </div>`;
+        let weekVal = weekInput.value; 
+        if(!weekVal) return;
+        
+        let parts = weekVal.split('-W'); let year = parseInt(parts[0]); let week = parseInt(parts[1]);
+        let simple = new Date(year, 0, 1 + (week - 1) * 7); let dow = simple.getDay(); let ISOweekStart = simple;
+        if (dow <= 4) ISOweekStart.setDate(simple.getDate() - simple.getDay() + 1); else ISOweekStart.setDate(simple.getDate() + 8 - simple.getDay());
+
+        let weekDates = []; let offsets = [0, 1, 2, 3, 4, 5, 6]; 
+        offsets.forEach(off => { let d = new Date(ISOweekStart.getTime()); d.setDate(d.getDate() + off); weekDates.push(d); });
+        let friday = weekDates[4]; let refMonthStr = friday.getFullYear() + '-' + String(friday.getMonth() + 1).padStart(2, '0');
+        
+        let monthPresData = {};
+        if(refMonthStr === currentPresMes) { monthPresData = livePresenca; } else {
+            let presSnap = await dbFirebase.ref('shopee_presenca_live/' + refMonthStr).once('value'); monthPresData = presSnap.val() || {};
+        }
+
+        let daysInMonth = new Date(friday.getFullYear(), friday.getMonth() + 1, 0).getDate();
+        let absMes = { sch: 0, abs: 0 }; let absSem = { sch: 0, abs: 0 }; let absDia = { sch: 0, abs: 0 };
+        let diaChartAbs = []; let chartLabelsAbs = [];
+        for(let d=1; d<=daysInMonth; d++) { diaChartAbs[d] = { sch: 0, abs: 0 }; chartLabelsAbs.push(d.toString()); }
+
+        let weekDayNumbers = weekDates.filter(d => d.getMonth() === friday.getMonth()).map(d => d.getDate());
+        let lastDayOfWeekNum = weekDayNumbers[weekDayNumbers.length - 1]; 
+
+        for(let op in monthPresData) {
+            for(let d=1; d<=daysInMonth; d++) {
+                let st = monthPresData[op][d];
+                if(st === 'P' || st === 'F' || st === 'AT') {
+                    absMes.sch++; diaChartAbs[d].sch++;
+                    let isAbs = (st === 'F' || st === 'AT');
+                    if(isAbs) { absMes.abs++; diaChartAbs[d].abs++; }
+                    if(weekDayNumbers.includes(d)) { absSem.sch++; if(isAbs) absSem.abs++; }
+                    if(d === lastDayOfWeekNum) { absDia.sch++; if(isAbs) absDia.abs++; }
+                }
+            }
+        }
+
+        let percMes = absMes.sch > 0 ? (absMes.abs / absMes.sch * 100).toFixed(1) : "0.0";
+        let percSem = absSem.sch > 0 ? (absSem.abs / absSem.sch * 100).toFixed(1) : "0.0";
+        let percDia = absDia.sch > 0 ? (absDia.abs / absDia.sch * 100).toFixed(1) : "0.0";
+
+        if(document.getElementById('sl-abs-mes')) {
+            document.getElementById('sl-abs-mes').innerText = percMes + "%";
+            document.getElementById('sl-abs-sem').innerText = percSem + "%";
+            document.getElementById('sl-abs-dia').innerText = percDia + "%";
+        }
+
+        let dataAbsChart = [];
+        for(let d=1; d<=daysInMonth; d++) { let val = diaChartAbs[d].sch > 0 ? (diaChartAbs[d].abs / diaChartAbs[d].sch * 100) : 0; dataAbsChart.push(val.toFixed(1)); }
+
+        let weekData = historyDataCache[weekVal];
+        let isWeekActiveTab = false;
+        if(liveEscalaSemana && liveEscalaSemana['segunda'] && liveEscalaSemana['segunda'].dataDia) {
+             let [dd, mm] = liveEscalaSemana['segunda'].dataDia.split('/');
+             if(dd && mm) {
+                 let wStart = weekDates[0];
+                 if(parseInt(dd) === wStart.getDate() && parseInt(mm) === (wStart.getMonth() + 1)) { isWeekActiveTab = true; }
+             }
+        }
+
+        if (!weekData && isWeekActiveTab) { weekData = liveEscalaSemana; } else if (!weekData) { weekData = {}; }
+
+        let sumPhdSemana = 0; let countPhdSemana = 0; let lastPhdDia = 0;
+        let chartLabelsPhd = []; let dataPhdChart = [];
+        let lastDayName = "SEM DADOS"; let lastDayDate = "--/--";
+
+        escDiasConf.forEach(dConf => {
+            let p = weekData[dConf.id] ? parseFloat(weekData[dConf.id].phd) : 0;
+            if(!isNaN(p) && p > 0) { 
+                sumPhdSemana += p; countPhdSemana++; lastPhdDia = p; 
+                lastDayName = dConf.nome.replace('ESCALA ', ''); 
+                lastDayDate = weekData[dConf.id].dataDia || "--/--"; 
+                chartLabelsPhd.push(dConf.nome.replace('ESCALA ', '')); dataPhdChart.push(p); 
+            } 
+            else if(weekData[dConf.id]) { chartLabelsPhd.push(dConf.nome.replace('ESCALA ', '')); dataPhdChart.push(0); }
         });
-        el.innerHTML = html;
+
+        let avgPhdSemana = countPhdSemana > 0 ? Math.round(sumPhdSemana / countPhdSemana) : 0;
+        
+        colorizePHD('sl-phd-dia', lastPhdDia);
+        colorizePHD('sl-phd-sem', avgPhdSemana);
+
+        let avgMesPHD = 0;
+        try {
+            let sumMesPHD = 0; let countMesPHD = 0;
+            for(let wKey in historyDataCache) {
+                let wObj = historyDataCache[wKey]; let belongsToMonth = false;
+                for(let dia in wObj) {
+                    if(wObj[dia] && wObj[dia].dataDia) { let [dd, mm] = wObj[dia].dataDia.split('/'); if(mm === refMonthStr.split('-')[1]) belongsToMonth = true; }
+                }
+                if(belongsToMonth) {
+                    for(let dia in wObj) { let p = parseFloat(wObj[dia].phd) || 0; if(p > 0) { sumMesPHD += p; countMesPHD++; } }
+                }
+            }
+            if(isWeekActiveTab && refMonthStr === currentPresMes) { sumMesPHD += sumPhdSemana; countMesPHD += countPhdSemana; }
+            avgMesPHD = countMesPHD > 0 ? Math.round(sumMesPHD / countMesPHD) : 0; 
+        } catch(e) { console.error("Erro PHD Mensal", e); }
+        
+        colorizePHD('sl-phd-mes', avgMesPHD);
+
+        let percDiaPHD = globalMetaPHD > 0 ? ((lastPhdDia / globalMetaPHD) * 100).toFixed(1) : "0.0";
+        let percSemPHD = globalMetaPHD > 0 ? ((avgPhdSemana / globalMetaPHD) * 100).toFixed(1) : "0.0";
+        let percMesPHD = globalMetaPHD > 0 ? ((avgMesPHD / globalMetaPHD) * 100).toFixed(1) : "0.0";
+
+        if(document.getElementById('sl-phd-dia-lbl')){
+            document.getElementById('sl-phd-dia-lbl').innerText = `ÚLTIMO REGISTRO (${percDiaPHD}% DA META)`;
+            document.getElementById('sl-phd-sem-lbl').innerText = `MÉDIA DA SEMANA (${percSemPHD}% DA META)`;
+            document.getElementById('sl-phd-mes-lbl').innerText = `MÉDIA DO MÊS (${percMesPHD}% DA META)`;
+        }
+
+        // ==================================================
+        // LABELS DE TEMPO E ANÁLISE DE GAP (BLINDADO)
+        // ==================================================
+        let elMetaDisplay = document.getElementById('sa-meta-display');
+        if (elMetaDisplay) elMetaDisplay.innerText = globalMetaPHD;
+
+        let elDiaData = document.getElementById('sa-dia-data');
+        if (elDiaData) elDiaData.innerText = `REF: ${lastDayName} (${lastDayDate})`;
+        let elSemData = document.getElementById('sa-sem-data');
+        if (elSemData) elSemData.innerText = `REF: SEMANA ${week} DE ${year}`;
+        let elMesData = document.getElementById('sa-mes-data');
+        const monthNames = ["JANEIRO", "FEVEREIRO", "MARÇO", "ABRIL", "MAIO", "JUNHO", "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"];
+        if (elMesData) elMesData.innerText = `REF: ${monthNames[parseInt(refMonthStr.split('-')[1]) - 1] || 'MÊS'} DE ${refMonthStr.split('-')[0]}`;
+
+        function updateGapCard(prefix, realized) {
+            let elReal = document.getElementById(`sa-${prefix}-real`); 
+            let elMeta = document.getElementById(`sa-${prefix}-meta`); 
+            let elGap = document.getElementById(`sa-${prefix}-gap`); 
+            let elStatus = document.getElementById(`sa-${prefix}-status`); 
+            let elPerc = document.getElementById(`sa-${prefix}-perc`);
+            
+            if(!elReal) return;
+            elReal.innerText = realized; elMeta.innerText = globalMetaPHD;
+            let gap = realized - globalMetaPHD; let perc = globalMetaPHD > 0 ? ((realized / globalMetaPHD) * 100).toFixed(1) : 0;
+            elPerc.innerText = `${perc}%`;
+            
+            if(realized === 0) {
+                elGap.innerText = "-"; elGap.style.color = "var(--text-muted)";
+                elStatus.innerText = "AGUARDANDO DADOS..."; elStatus.style.background = "rgba(255,255,255,0.05)"; elStatus.style.color = "var(--text-muted)";
+            } else if (gap >= 0) {
+                elGap.innerText = `+${gap}`; elGap.style.color = "var(--success)";
+                elStatus.innerText = "META ATINGIDA / SUPERADA"; elStatus.style.background = "rgba(16, 185, 129, 0.1)"; elStatus.style.color = "var(--success)";
+            } else {
+                elGap.innerText = gap; elGap.style.color = "var(--danger)";
+                elStatus.innerText = "ABAIXO DA META"; elStatus.style.background = "rgba(239, 68, 68, 0.1)"; elStatus.style.color = "var(--danger)";
+            }
+        }
+        updateGapCard('dia', lastPhdDia); updateGapCard('sem', avgPhdSemana); updateGapCard('mes', avgMesPHD);
+
+        // =========================================================================
+        // RANK DE BIPAGEM AM (FILTRO EXATO DE DATAS)
+        // =========================================================================
+        let targetInputDate = document.getElementById('p-data')?.value || ''; 
+        let latestDayVolMap = {};
+        if (targetInputDate && prodHistoryCache[targetInputDate]) {
+            latestDayVolMap = prodHistoryCache[targetInputDate];
+        }
+
+        let semTotals = {};
+        let weekDatesStrArray = weekDates.map(d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'));
+        weekDatesStrArray.forEach(dStr => {
+            if (prodHistoryCache[dStr]) {
+                for(let op in prodHistoryCache[dStr]) {
+                    semTotals[op] = (semTotals[op] || 0) + prodHistoryCache[dStr][op];
+                }
+            }
+        });
+
+        let mesTotals = {};
+        for(let dStr in prodHistoryCache) {
+            if (dStr.startsWith(refMonthStr)) { 
+                for(let op in prodHistoryCache[dStr]) {
+                    mesTotals[op] = (mesTotals[op] || 0) + prodHistoryCache[dStr][op];
+                } 
+            }
+        }
+
+        function getTop4(obj) {
+            return Object.keys(obj).map(k => ({name: k, vol: obj[k]})).sort((a,b) => b.vol - a.vol).slice(0, 4);
+        }
+
+        let topDia = getTop4(latestDayVolMap);
+        let topSem = getTop4(semTotals);
+        let topMes = getTop4(mesTotals);
+
+        function renderTopList(elementId, arr) {
+            let el = document.getElementById(elementId);
+            if(!el) return;
+            if(arr.length === 0) { el.innerHTML = '<div style="color:var(--text-muted); font-size:0.85rem; text-align:center; padding: 20px 0;">Sem dados importados no período.</div>'; return; }
+            
+            let html = '';
+            arr.forEach((item, idx) => {
+                let icon = ''; let color = '';
+                if(idx===0) { icon = '🥇'; color = 'var(--gold)'; }
+                else if(idx===1) { icon = '🥈'; color = 'var(--silver)'; }
+                else if(idx===2) { icon = '🥉'; color = 'var(--bronze)'; }
+                else { icon = '4º'; color = '#fff'; }
+                
+                html += `<div style="display:flex; justify-content:space-between; align-items:center; background: rgba(0,0,0,0.2); padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.03);">
+                            <div style="font-size: 0.85rem; font-weight: 700; color: ${color}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 65%;">
+                                <span style="margin-right: 5px; font-size:1rem;">${icon}</span> ${item.name}
+                            </div>
+                            <div style="font-size: 0.95rem; color: var(--success); font-weight: 800;">${item.vol.toLocaleString('pt-BR')}</div>
+                         </div>`;
+            });
+            el.innerHTML = html;
+        }
+
+        renderTopList('sa-top-dia-list', topDia);
+        renderTopList('sa-top-sem-list', topSem);
+        renderTopList('sa-top-mes-list', topMes);
+
+        // Gráficos do Canvas
+        const canvasPHD = document.getElementById('slChartPHD');
+        if(canvasPHD) {
+            const ctxPHD = canvasPHD.getContext('2d');
+            if(window.slChartPHDInstance) window.slChartPHDInstance.destroy();
+            window.slChartPHDInstance = new Chart(ctxPHD, {
+                type: 'bar',
+                data: { 
+                    labels: chartLabelsPhd.length > 0 ? chartLabelsPhd : ['Nenhum dado'], 
+                    datasets: [
+                        { type: 'line', label: `Meta (${globalMetaPHD})`, data: chartLabelsPhd.map(() => globalMetaPHD), borderColor: '#fbbf24', borderWidth: 2, borderDash: [5, 5], fill: false, pointRadius: 0 },
+                        { type: 'bar', label: 'PHD Atingido (Semana)', data: dataPhdChart.length > 0 ? dataPhdChart : [0], backgroundColor: 'rgba(59, 130, 246, 0.8)', borderRadius: 4 }
+                    ] 
+                },
+                options: { responsive: true, maintainAspectRatio: false, scales: { y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } }, x: { ticks: { color: '#94a3b8' }, grid: { display: false } } }, plugins: { legend: { labels: { color: '#fff', font: { family: 'Outfit' } } } } }
+            });
+        }
+
+        const canvasABS = document.getElementById('slChartABS');
+        if(canvasABS) {
+            const ctxABS = canvasABS.getContext('2d');
+            if(window.slChartABSInstance) window.slChartABSInstance.destroy();
+            window.slChartABSInstance = new Chart(ctxABS, {
+                type: 'line',
+                data: { labels: chartLabelsAbs, datasets: [{ label: 'Taxa de Absenteísmo % (Mês Referência: ' + refMonthStr + ')', data: dataAbsChart, borderColor: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.1)', borderWidth: 3, tension: 0.3, fill: true }] },
+                options: { responsive: true, maintainAspectRatio: false, scales: { y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } }, x: { ticks: { color: '#94a3b8', maxTicksLimit: 15 }, grid: { display: false } } }, plugins: { legend: { labels: { color: '#fff', font: { family: 'Outfit' } } } } }
+            });
+        }
+    } catch(err) {
+        console.error("Sitelider error ignorado para proteger o sistema:", err);
     }
-
-    renderTopList('sa-top-dia-list', topDia);
-    renderTopList('sa-top-sem-list', topSem);
-    renderTopList('sa-top-mes-list', topMes);
-
-    // Renderização dos Gráficos do Canvas
-    const ctxPHD = document.getElementById('slChartPHD').getContext('2d');
-    if(window.slChartPHDInstance) window.slChartPHDInstance.destroy();
-    window.slChartPHDInstance = new Chart(ctxPHD, {
-        type: 'bar',
-        data: { 
-            labels: chartLabelsPhd.length > 0 ? chartLabelsPhd : ['Nenhum dado'], 
-            datasets: [
-                { type: 'line', label: `Meta (${globalMetaPHD})`, data: chartLabelsPhd.map(() => globalMetaPHD), borderColor: '#fbbf24', borderWidth: 2, borderDash: [5, 5], fill: false, pointRadius: 0 },
-                { type: 'bar', label: 'PHD Atingido (Semana)', data: dataPhdChart.length > 0 ? dataPhdChart : [0], backgroundColor: 'rgba(59, 130, 246, 0.8)', borderRadius: 4 }
-            ] 
-        },
-        options: { responsive: true, maintainAspectRatio: false, scales: { y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } }, x: { ticks: { color: '#94a3b8' }, grid: { display: false } } }, plugins: { legend: { labels: { color: '#fff', font: { family: 'Outfit' } } } } }
-    });
-
-    const ctxABS = document.getElementById('slChartABS').getContext('2d');
-    if(window.slChartABSInstance) window.slChartABSInstance.destroy();
-    window.slChartABSInstance = new Chart(ctxABS, {
-        type: 'line',
-        data: { labels: chartLabelsAbs, datasets: [{ label: 'Taxa de Absenteísmo % (Mês Referência: ' + refMonthStr + ')', data: dataAbsChart, borderColor: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.1)', borderWidth: 3, tension: 0.3, fill: true }] },
-        options: { responsive: true, maintainAspectRatio: false, scales: { y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } }, x: { ticks: { color: '#94a3b8', maxTicksLimit: 15 }, grid: { display: false } } }, plugins: { legend: { labels: { color: '#fff', font: { family: 'Outfit' } } } } }
-    });
 }
 
 // =========================================================
-// ESCUTADORES DA NUVEM MULTI-PC
+// ESCUTADORES DA NUVEM MULTI-PC (BLINDADOS)
 // =========================================================
 dbFirebase.ref('shopee_prod_history').on('value', snap => {
     prodHistoryCache = snap.val() || {};
-    if(!document.getElementById('view-sitelider-analise').classList.contains('hidden')) renderSiteliderDashboard();
+    let el = document.getElementById('view-sitelider-analise');
+    if(el && !el.classList.contains('hidden')) renderSiteliderDashboard();
 });
 
 dbFirebase.ref('shopee_meta_phd').on('value', snap => {
     if (snap.exists()) {
         globalMetaPHD = snap.val();
         let el = document.getElementById('meta-phd-input'); if (el) el.value = globalMetaPHD;
-        if(!document.getElementById('view-sitelider').classList.contains('hidden') || !document.getElementById('view-sitelider-analise').classList.contains('hidden')) renderSiteliderDashboard();
+        let v1 = document.getElementById('view-sitelider'); let v2 = document.getElementById('view-sitelider-analise');
+        if((v1 && !v1.classList.contains('hidden')) || (v2 && !v2.classList.contains('hidden'))) renderSiteliderDashboard();
     }
 });
 
 dbFirebase.ref('shopee_colaboradores').on('value', snap => {
     if(snap.exists()) { operadoresList = Object.values(snap.val()).sort(); } 
-    if(!document.getElementById('view-escala').classList.contains('hidden')) renderEscalaSemana(); 
-    if(!document.getElementById('view-escala-dc').classList.contains('hidden')) renderEscalaDcSemana(); 
-    if(!document.getElementById('view-presenca').classList.contains('hidden')) renderPresencaGrid(); 
+    let elEsc = document.getElementById('view-escala'); if(elEsc && !elEsc.classList.contains('hidden')) renderEscalaSemana(); 
+    let elDc = document.getElementById('view-escala-dc'); if(elDc && !elDc.classList.contains('hidden')) renderEscalaDcSemana(); 
+    let elPres = document.getElementById('view-presenca'); if(elPres && !elPres.classList.contains('hidden')) renderPresencaGrid(); 
 });
 
 dbFirebase.ref('shopee_daily_live').on('value', (snapshot) => { 
     let data = snapshot.val(); dailyData = data ? (Array.isArray(data) ? data : Object.values(data)) : []; 
-    if(!document.getElementById('view-dia').classList.contains('hidden')) renderDaily(); 
+    let el = document.getElementById('view-dia'); if(el && !el.classList.contains('hidden')) renderDaily(); 
 });
 
-dbFirebase.ref('shopee_prod_live').on('value', (snapshot) => { globalProdData = snapshot.val() || {}; if(!document.getElementById('view-rankprod').classList.contains('hidden')) renderRankProd(); });
+dbFirebase.ref('shopee_prod_live').on('value', (snapshot) => { 
+    globalProdData = snapshot.val() || {}; 
+    let el = document.getElementById('view-rankprod'); if(el && !el.classList.contains('hidden')) renderRankProd(); 
+});
 
 dbFirebase.ref('shopee_ctrl_live').on('value', snap => {
     ctrlData = snap.val() || initCtrl();
-    if(!document.getElementById('view-ctrl').classList.contains('hidden')) renderControl();
-    if(!document.getElementById('view-bi').classList.contains('hidden')) renderBIChart();
+    let elCtrl = document.getElementById('view-ctrl'); if(elCtrl && !elCtrl.classList.contains('hidden')) renderControl();
+    let elBi = document.getElementById('view-bi'); if(elBi && !elBi.classList.contains('hidden')) renderBIChart();
 });
 
 dbFirebase.ref('shopee_prod_state').on('value', snap => {
@@ -413,34 +446,44 @@ dbFirebase.ref('shopee_prod_state').on('value', snap => {
         setV('p-data', state.data); setV('p-hora-ini', state.horaIni); setV('p-hora-fim', state.horaFim);
         setT('p-backlog', state.backlog); setT('p-xpt', state.xpt); setT('p-vol-rot', state.volRot);
         if(state.stations) {
-            for(let j=1; j<=10; j++) { let sel = document.getElementById(`station-select-${j}`); if(sel && state.stations[j-1]) { if(Array.from(sel.options).some(o => o.value === state.stations[j-1])) sel.value = state.stations[j-1]; } }
+            for(let j=1; j<=10; j++) { 
+                let sel = document.getElementById(`station-select-${j}`); 
+                if(sel && state.stations[j-1]) { 
+                    if(Array.from(sel.options).some(o => o.value === state.stations[j-1])) sel.value = state.stations[j-1]; 
+                } 
+            }
         }
         calculateProdTotals(false);
     }
 });
 
-dbFirebase.ref('shopee_gold_db').on('value', snap => { monthlyDataCache = snap.val() || {}; if(!document.getElementById('view-mes').classList.contains('hidden')) renderMonthly(); });
+dbFirebase.ref('shopee_gold_db').on('value', snap => { 
+    monthlyDataCache = snap.val() || {}; 
+    let el = document.getElementById('view-mes'); if(el && !el.classList.contains('hidden')) renderMonthly(); 
+});
 
 dbFirebase.ref('shopee_escala_history').on('value', snap => {
     historyDataCache = snap.val() || {};
-    if(!document.getElementById('view-hist-escala').classList.contains('hidden')) renderHistEscala('lugares');
-    if(!document.getElementById('view-sitelider').classList.contains('hidden') || !document.getElementById('view-sitelider-analise').classList.contains('hidden')) renderSiteliderDashboard();
+    let elH = document.getElementById('view-hist-escala'); if(elH && !elH.classList.contains('hidden')) renderHistEscala('lugares');
+    let v1 = document.getElementById('view-sitelider'); let v2 = document.getElementById('view-sitelider-analise');
+    if((v1 && !v1.classList.contains('hidden')) || (v2 && !v2.classList.contains('hidden'))) renderSiteliderDashboard();
 });
 
 dbFirebase.ref('shopee_escala_dc_history').on('value', snap => {
     historyDcDataCache = snap.val() || {};
-    if(!document.getElementById('view-hist-escala-dc').classList.contains('hidden')) renderHistEscala('dc');
+    let el = document.getElementById('view-hist-escala-dc'); if(el && !el.classList.contains('hidden')) renderHistEscala('dc');
 });
 
 dbFirebase.ref('shopee_escala_semana_live').on('value', (snapshot) => { 
     let data = snapshot.val(); if (data) liveEscalaSemana = data; else initEmptyEscalaSemana(); 
-    if(!document.getElementById('view-escala').classList.contains('hidden')) renderEscalaSemana(); 
-    if(!document.getElementById('view-sitelider').classList.contains('hidden') || !document.getElementById('view-sitelider-analise').classList.contains('hidden')) renderSiteliderDashboard(); 
+    let el = document.getElementById('view-escala'); if(el && !el.classList.contains('hidden')) renderEscalaSemana(); 
+    let v1 = document.getElementById('view-sitelider'); let v2 = document.getElementById('view-sitelider-analise');
+    if((v1 && !v1.classList.contains('hidden')) || (v2 && !v2.classList.contains('hidden'))) renderSiteliderDashboard(); 
 });
 
 dbFirebase.ref('shopee_escala_dc_live').on('value', (snapshot) => { 
     let data = snapshot.val(); if (data) liveEscalaDcSemana = data; else initEmptyEscalaDcSemana(); 
-    if(!document.getElementById('view-escala-dc').classList.contains('hidden')) renderEscalaDcSemana(); 
+    let el = document.getElementById('view-escala-dc'); if(el && !el.classList.contains('hidden')) renderEscalaDcSemana(); 
 });
 
 const dateObj = new Date();
@@ -448,19 +491,21 @@ currentPresMes = dateObj.getFullYear() + '-' + String(dateObj.getMonth() + 1).pa
 
 presencaListener = dbFirebase.ref('shopee_presenca_live/' + currentPresMes).on('value', snap => {
     livePresenca = snap.val() || {};
-    if(!document.getElementById('view-presenca').classList.contains('hidden')) renderPresencaGrid(); 
-    if(!document.getElementById('view-escala').classList.contains('hidden')) { if(currentUser && currentUser.r === 'admin') { escDiasConf.forEach(d => updateDropdownsAvailability(d.id)); updateSidebar(); } }
-    if(!document.getElementById('view-escala-dc').classList.contains('hidden')) { if(currentUser && currentUser.r === 'admin') { escDiasConf.forEach(d => updateDropdownsAvailabilityDc(d.id)); updateSidebarDc(); } }
-    if(!document.getElementById('view-sitelider').classList.contains('hidden') || !document.getElementById('view-sitelider-analise').classList.contains('hidden')) renderSiteliderDashboard(); 
+    let elP = document.getElementById('view-presenca'); if(elP && !elP.classList.contains('hidden')) renderPresencaGrid(); 
+    let elEsc = document.getElementById('view-escala'); if(elEsc && !elEsc.classList.contains('hidden')) { if(currentUser && currentUser.r === 'admin') { escDiasConf.forEach(d => updateDropdownsAvailability(d.id)); updateSidebar(); } }
+    let elDc = document.getElementById('view-escala-dc'); if(elDc && !elDc.classList.contains('hidden')) { if(currentUser && currentUser.r === 'admin') { escDiasConf.forEach(d => updateDropdownsAvailabilityDc(d.id)); updateSidebarDc(); } }
+    let v1 = document.getElementById('view-sitelider'); let v2 = document.getElementById('view-sitelider-analise');
+    if((v1 && !v1.classList.contains('hidden')) || (v2 && !v2.classList.contains('hidden'))) renderSiteliderDashboard(); 
 });
 
+// AQUI É ONDE FIZEMOS A BLINDAGEM DE ERROS DO SAVE DA PRODUTIVIDADE H/H
 function saveProdState() {
     if (!currentUser || currentUser.r !== 'admin') return;
     try {
         let dateVal = document.getElementById('p-data')?.value || '';
         let state = { data: dateVal, horaIni: document.getElementById('p-hora-ini')?.value || '', horaFim: document.getElementById('p-hora-fim')?.value || '', backlog: document.getElementById('p-backlog')?.textContent || '0', xpt: document.getElementById('p-xpt')?.textContent || '0', volRot: document.getElementById('p-vol-rot')?.textContent || '0', stations: [] };
         for(let j=1; j<=10; j++) { let sel = document.getElementById(`station-select-${j}`); state.stations.push(sel ? sel.value : ""); }
-        dbFirebase.ref('shopee_prod_state').set(state);
+        dbFirebase.ref('shopee_prod_state').set(state).catch(e => console.error(e));
 
         if (dateVal && Object.keys(globalProdData).length > 0) {
             let dailyTotals = {};
@@ -469,9 +514,11 @@ function saveProdState() {
                 for(let h in globalProdData[name]) sum += globalProdData[name][h];
                 if (sum > 0) dailyTotals[name] = sum;
             }
-            dbFirebase.ref('shopee_prod_history/' + dateVal).set(dailyTotals);
+            dbFirebase.ref('shopee_prod_history/' + dateVal).set(dailyTotals).catch(e => console.error(e));
         }
-    } catch(e) { console.error("Erro no saveProdState:", e); }
+    } catch(e) {
+        console.error("Erro silencioso no saveProdState:", e);
+    }
 }
 
 function saveDailyToCloud() { if(currentUser && currentUser.r === 'admin') { dbFirebase.ref('shopee_daily_live').set(dailyData).catch(e => console.error(e)); } }
@@ -484,7 +531,8 @@ function checkSession() {
         document.getElementById('login-screen').style.display = 'none'; document.getElementById('app-shell').style.display = 'flex';
         document.getElementById('display-user').innerText = found.u.toUpperCase();
         if(found.r === 'admin') { document.body.classList.add('is-admin'); }
-        initProdGrid(); document.getElementById('pres-month-select').value = currentPresMes; switchTab('escala'); 
+        let pm = document.getElementById('pres-month-select'); if(pm) pm.value = currentPresMes; 
+        switchTab('escala'); 
     }
 }
 
@@ -496,13 +544,13 @@ function login() {
         document.getElementById('login-screen').style.display = 'none'; document.getElementById('app-shell').style.display = 'flex';
         document.getElementById('display-user').innerText = u.toUpperCase();
         if(found.r === 'admin') { document.body.classList.add('is-admin'); }
-        initProdGrid(); document.getElementById('pres-month-select').value = currentPresMes; switchTab('escala');
+        let pm = document.getElementById('pres-month-select'); if(pm) pm.value = currentPresMes; 
+        switchTab('escala');
     } else { document.getElementById('login-err').style.display = 'block'; }
 }
 
 function logout() { localStorage.removeItem('spxUser'); location.reload(); }
-window.onload = checkSession; document.getElementById('pass').addEventListener('keypress', e=>{if(e.key==='Enter')login()});
-function showToast(msg) { const t = document.getElementById('toast'); t.innerText = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 3000); }
+function showToast(msg) { const t = document.getElementById('toast'); if(!t) return; t.innerText = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 3000); }
 function fmtTime(s) { const m = Math.floor(s/60); const sec = Math.round(s%60); return `${m}m ${sec}s`; }
 function secToHHMMSS(s) { if(!s) return "00:00:00"; const h = Math.floor(s/3600).toString().padStart(2,'0'); const m = Math.floor((s%3600)/60).toString().padStart(2,'0'); const sec = Math.floor(s%60).toString().padStart(2,'0'); return `${h}:${m}:${sec}`; }
 function excelDate(serial) { if(!serial) return "-"; const date = new Date((serial - 25569) * 86400 * 1000); return date.toLocaleDateString('pt-BR'); }
@@ -510,45 +558,66 @@ function fmtExcelTime(dec) { if(!dec) return "-"; let s = Math.round(dec * 86400
 function readExcelFile(file, parseDates = false) { return new Promise(resolve => { const reader = new FileReader(); reader.onload = e => { const workbook = XLSX.read(new Uint8Array(e.target.result), { type: 'array', cellDates: parseDates }); const data = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], {header:1}); resolve(data); }; reader.readAsArrayBuffer(file); }); }
 
 let selectedShiftTemp = '';
-function openShiftModal() { document.getElementById('shift-modal-overlay').classList.remove('hidden'); }
-function closeShiftModal() { document.getElementById('shift-modal-overlay').classList.add('hidden'); }
-function confirmShift(shift) { selectedShiftTemp = shift; document.getElementById('shift-display').innerText = "| TURNO: " + shift; closeShiftModal(); document.getElementById('file-prod').click(); }
+function openShiftModal() { let el = document.getElementById('shift-modal-overlay'); if(el) el.classList.remove('hidden'); }
+function closeShiftModal() { let el = document.getElementById('shift-modal-overlay'); if(el) el.classList.add('hidden'); }
+function confirmShift(shift) { selectedShiftTemp = shift; let el = document.getElementById('shift-display'); if(el) el.innerText = "| TURNO: " + shift; closeShiftModal(); document.getElementById('file-prod').click(); }
 
 // =========================================================
-// AUTO-FILL ESTAÇÕES (MESA DA ESCALA) - INDEPENDENTE E BLINDADO
+// AUTO-FILL ESTAÇÕES (MESA DA ESCALA) - ISOLADO E BLINDADO
 // =========================================================
 window.autoFillStations = function() {
     try {
-        let dateVal = document.getElementById('p-data').value;
-        if (!dateVal) { showToast("Preencha a Data primeiro!"); return; }
-        let [y, m, d] = dateVal.split('-'); let dateObj = new Date(y, m - 1, d);
+        let dateInput = document.getElementById('p-data');
+        let dateVal = dateInput ? dateInput.value : '';
+        if (!dateVal) {
+            showToast("Preencha a Data primeiro!");
+            return;
+        }
+
+        let [y, m, d] = dateVal.split('-');
+        let dateObj = new Date(y, m - 1, d);
         let daysMap = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
         let dayStr = daysMap[dateObj.getDay()];
 
         let escDia = liveEscalaSemana[dayStr];
         if (escDia && escDia.grid) {
-            let bipadorRow = escDia.grid[1]; let etiquetadorRow = escDia.grid[2]; 
+            let bipadorRow = escDia.grid[1]; 
+            let etiquetadorRow = escDia.grid[2]; 
+
             let changed = false;
             for (let i = 0; i < 10; i++) {
                 let name = "";
                 if (bipadorRow && bipadorRow[i]) name = bipadorRow[i];
                 else if (etiquetadorRow && etiquetadorRow[i]) name = etiquetadorRow[i];
+
                 if (name) {
                     let select = document.getElementById(`station-select-${i+1}`);
                     if (select) {
-                        if (!Array.from(select.options).some(opt => opt.value === name)) { select.innerHTML += `<option value="${name}">${name}</option>`; }
-                        select.value = name; changed = true;
+                        let exists = Array.from(select.options).some(opt => opt.value === name);
+                        if (!exists) { select.innerHTML += `<option value="${name}">${name}</option>`; }
+                        select.value = name;
+                        changed = true;
                     }
                 }
             }
-            if(changed) { refreshProdGridData(); saveProdState(); showToast("Estações alocadas pela Escala!"); }
-            else { showToast("Nenhum Bipador alocado na escala deste dia."); }
-        } else { showToast("A escala de processamento deste dia está vazia."); }
-    } catch(e) { console.error("Erro no autoFill:", e); showToast("Erro ao sincronizar escala."); }
+            if(changed) {
+                refreshProdGridData();
+                saveProdState();
+                showToast("Nomes puxados da Escala com Sucesso!");
+            } else {
+                showToast("Nenhum Bipador/Etiquetador nesta data.");
+            }
+        } else {
+            showToast("A Escala deste dia está vazia.");
+        }
+    } catch(e) {
+        console.error("Erro no autoFill:", e);
+        showToast("Erro ao ler escala.");
+    }
 };
 
 // =========================================================
-// PRODUTIVIDADE H/H (MOTOR EXCEL RESTAURADO)
+// PRODUTIVIDADE H/H (LEITURA DO EXCEL)
 // =========================================================
 async function importProdData(input) {
     if(input.files.length === 0) return;
@@ -589,7 +658,7 @@ async function importProdData(input) {
         }
         updateDropdowns(); 
         saveProdToCloud(); 
-        showToast("Excel Processado!");
+        showToast("Produtividade Processada!");
     } catch(e) { console.error("Erro na importação:", e); showToast("Erro."); }
 }
 
@@ -597,7 +666,15 @@ function updateDropdowns() {
     let names = Object.keys(globalProdData).sort();
     for(let j = 1; j <= 10; j++) {
         let select = document.getElementById(`station-select-${j}`); 
-        if(select) { let currentVal = select.value; select.innerHTML = `<option value="">Estação ${j}</option>`; names.forEach(n => { select.innerHTML += `<option value="${n}">${n}</option>`; }); if(names.includes(currentVal)) select.value = currentVal; }
+        if(select) { 
+            let currentVal = select.value; 
+            // Adicionado limite visual e de tamanho direto no script para evitar a quebra da tabela
+            select.style.maxWidth = "80px";
+            select.style.textOverflow = "ellipsis";
+            select.innerHTML = `<option value="">Estação ${j}</option>`; 
+            names.forEach(n => { select.innerHTML += `<option value="${n}">${n}</option>`; }); 
+            if(names.includes(currentVal)) select.value = currentVal; 
+        }
     }
     refreshProdGridData();
 }
@@ -647,9 +724,51 @@ function calculateProdTotals(triggerSave = false) {
     if(triggerSave) { saveProdToCloud(); renderRankProd(); saveProdState(); }
 }
 
+function initProdGrid() {
+    const tbody = document.getElementById('prod-body-grid'); let html = '';
+    for (let i = 0; i < 24; i++) {
+        let h = (i === 0) ? 23 : i - 1; let hour = h.toString().padStart(2, '0') + ':00';
+        html += `<tr><td style="border-left: 2px solid #000; font-weight: bold; background:#f0f8ff;" class="editable-cell" contenteditable="true" id="p-hour-${i}" onblur="refreshProdGridData(); saveProdState();">${hour}</td>`;
+        for (let j = 1; j <= 10; j++) { html += `<td id="p-cell-${i}-${j}" class="editable-cell" contenteditable="true" onblur="calculateProdTotals(true)"></td>`; }
+        html += `<td id="p-row-total-${i}" style="font-weight: bold; background: #e2e8f0; color: #0f172a;"></td>`;
+        if (i === 0) { html += `<td rowspan="24" class="spx-percent-giant"><span class="spx-percent-text" id="p-giant-percent">0%</span></td>`; }
+        html += `</tr>`;
+    }
+    html += `<tr class="spx-navy-prod"><td style="border-left: 2px solid #000; padding: 4px;">Total</td>`;
+    for (let j = 1; j <= 10; j++) html += `<td style="color:#fff;" id="p-col-total-${j}">0</td>`;
+    html += `<td style="color:#fff; font-weight: 900;" id="p-grand-total">0</td><td style="background:#fff; border:2px solid #000; border-top:none;"></td></tr>`;
+    if(tbody) tbody.innerHTML = html;
+}
+
+// INICIALIZADOR SEGURO: Força a criação das 24 horas imediatamente para evitar o sumiço do body
+initProdGrid();
+if(document.getElementById('pass')) { document.getElementById('pass').addEventListener('keypress', e => { if(e.key==='Enter') login(); }); }
+
 // =========================================================
-// RANKING DIÁRIO (MOTOR PRINCIPAL SEPARADO E PROTEGIDO)
+// RANKING DIÁRIO (MOTOR PRINCIPAL BLINDADO)
 // =========================================================
+async function handleSingleFile(input) {
+    if(input.files.length === 0) return; dailyData = []; ctrlData = initCtrl();
+    try { 
+        const data = await readExcelFile(input.files[0], false); 
+        processData([data], true); 
+        let el = document.getElementById('st-single'); if(el) el.innerText = "Carregado com sucesso!"; 
+        showToast("Importação Concluída"); 
+    } catch (e) { console.error(e); showToast("Erro."); }
+}
+
+async function handleMassFiles(input) {
+    if(input.files.length === 0) return; dailyData = []; 
+    try { 
+        const files = Array.from(input.files); 
+        const promises = files.map(f => readExcelFile(f, false)); 
+        const results = await Promise.all(promises); 
+        processData(results, false); 
+        let el = document.getElementById('st-mass'); if(el) el.innerText = `${files.length} Arquivos`; 
+        showToast("Importação em Massa Concluída"); 
+    } catch (e) { console.error(e); showToast("Erro."); }
+}
+
 function processData(allFilesData, isSingleImport) {
     try {
         const map = {};
@@ -659,19 +778,19 @@ function processData(allFilesData, isSingleImport) {
                 let tempName = rawName.replace(/\[.*?\]/g, '').replace(/^(AT|OPS?)\s*-?\s*\d*\s*-?\s*/gi, '').replace(/^\d+\s*-?\s*/, '').trim().toUpperCase(); tempName = tempName.replace(/[.\#$\[\]\/]/g, '');
                 let parts = tempName.split(/\s+/).filter(Boolean); let cleanName = "";
                 if(parts.length > 1) { cleanName = parts[0] + " " + parts[1].charAt(0); } else if(parts.length === 1) { cleanName = parts[0]; }
-                if (!cleanName) continue;
+                if (!cleanName) continue; let nome = cleanName;
                 
-                let volRank = parseFloat(String(r[3]).replace(/[^\d,-]/g,'').replace(',','.')) || 0; 
-                let volCtrl = parseFloat(String(r[2]).replace(/[^\d,-]/g,'').replace(',','.')) || 0; 
-                let volValid = parseFloat(String(r[4]).replace(/[^\d,-]/g,'').replace(',','.')) || 0; 
-                let valF = parseFloat(String(r[5]).replace(/[^\d,-]/g,'').replace(',','.')) || 0; 
-                let valG = parseFloat(String(r[6]).replace(/[^\d,-]/g,'').replace(',','.')) || 0; 
-                let rec = parseFloat(String(r[11]).replace(',','.')) || 0;
+                let volRank = parseFloat(String(r[3]||'').replace(/[^\d,-]/g,'').replace(',','.')) || 0; 
+                let volCtrl = parseFloat(String(r[2]||'').replace(/[^\d,-]/g,'').replace(',','.')) || 0; 
+                let volValid = parseFloat(String(r[4]||'').replace(/[^\d,-]/g,'').replace(',','.')) || 0; 
+                let valF = parseFloat(String(r[5]||'').replace(/[^\d,-]/g,'').replace(',','.')) || 0; 
+                let valG = parseFloat(String(r[6]||'').replace(/[^\d,-]/g,'').replace(',','.')) || 0; 
+                let rec = parseFloat(String(r[11]||'').replace(',','.')) || 0;
                 let tStart = r[7]; let tEnd = r[8]; let time = 0; 
                 if(typeof tStart==='number' && typeof tEnd==='number') { let diff = tEnd - tStart; if(diff < 0) diff += 1; time = Math.round(diff * 86400); }
                 
-                if(!map[cleanName]) map[cleanName] = { nome: cleanName, rotas:0, vol:0, reconf:0, time:0, doblecheck: 0 };
-                map[cleanName].rotas += 1; map[cleanName].vol += volRank; map[cleanName].time += time; map[cleanName].reconf += rec;
+                if(!map[nome]) map[nome] = { nome, rotas:0, vol:0, reconf:0, time:0, doblecheck: 0 };
+                map[nome].rotas += 1; map[nome].vol += volRank; map[nome].time += time; map[nome].reconf += rec;
                 
                 if (isSingleImport) {
                     let status = String(r[12] || "").trim().toUpperCase(); 
@@ -684,12 +803,23 @@ function processData(allFilesData, isSingleImport) {
                 }
             }
         });
-        dailyData = Object.values(map); 
-        saveDailyToCloud(); 
-        renderDaily(); 
+        dailyData = Object.values(map); saveDailyToCloud(); renderDaily(); 
         if (isSingleImport && currentUser && currentUser.r === 'admin') dbFirebase.ref('shopee_ctrl_live').set(ctrlData);
-    } catch(e) { console.error("Erro no processamento do Rank Diário:", e); showToast("Erro ao ler colunas do CSV."); }
+    } catch(err) { console.error("Falha no Processamento Diario:", err); showToast("Erro Crítico no Arquivo."); }
 }
+
+function clearData() { 
+    dailyData=[]; ctrlData=initCtrl(); saveDailyToCloud(); 
+    if(currentUser && currentUser.r === 'admin') dbFirebase.ref('shopee_ctrl_live').set(ctrlData);
+    let st1 = document.getElementById('st-single'); if(st1) st1.innerText="Selecionar CSV (Diário)"; 
+    let st2 = document.getElementById('st-mass'); if(st2) st2.innerText="Múltiplos arquivos .CSV"; 
+    renderDaily(); renderControl(); showToast("Tela Limpa"); 
+}
+
+let currentDcName = "";
+window.openDoblecheck = function(nome) { currentDcName = nome; let el = document.getElementById('dc-modal-driver-name'); if(el) el.innerText = "Motorista: " + nome; let m = document.getElementById('dc-modal-overlay'); if(m) m.classList.remove('hidden'); };
+window.closeDcModal = function() { let m = document.getElementById('dc-modal-overlay'); if(m) m.classList.add('hidden'); };
+window.applyDc = function(val) { let d = dailyData.find(x => x.nome === currentDcName); if(d) { d.doblecheck = val; saveDailyToCloud(); } closeDcModal(); };
 
 function renderDaily() {
     const grid = document.getElementById('grid-diario'); if(!grid) return; grid.innerHTML = '';
@@ -739,11 +869,6 @@ function renderMonthly() {
 
 async function resetMonthly() { if(confirm("Deseja apagar permanentemente o histórico MENSAL DA NUVEM?")) { await dbFirebase.ref('shopee_gold_db').remove(); showToast("Banco Apagado!"); } }
 
-let currentDcName = "";
-window.openDoblecheck = function(nome) { currentDcName = nome; document.getElementById('dc-modal-driver-name').innerText = "Motorista: " + nome; document.getElementById('dc-modal-overlay').classList.remove('hidden'); };
-window.closeDcModal = function() { document.getElementById('dc-modal-overlay').classList.add('hidden'); };
-window.applyDc = function(val) { let d = dailyData.find(x => x.nome === currentDcName); if(d) { d.doblecheck = val; saveDailyToCloud(); } closeDcModal(); };
-
 // =========================================================
 // OUTRAS CONFIGURAÇÕES DO RANKPROD & BI CHART
 // =========================================================
@@ -756,6 +881,22 @@ function renderRankProd() {
     });
 }
 
+async function renderBIChart() {
+    const canvas = document.getElementById('biChartCanvas');
+    if(!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let hours = Object.keys(ctrlData.hourly).sort();
+    let labels = hours.length > 0 ? hours : ['Sem Dados'];
+    let volumes = hours.length > 0 ? hours.map(h => ctrlData.hourly[h].v) : [0];
+    let rotas = hours.length > 0 ? hours.map(h => ctrlData.hourly[h].r) : [0];
+    if(window.biChartInstance) window.biChartInstance.destroy();
+    window.biChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: { labels: labels, datasets: [ { label: 'Volume (Pacotes)', data: volumes, backgroundColor: 'rgba(99, 102, 241, 0.8)', borderRadius: 6, yAxisID: 'y' }, { label: 'Rotas Processadas', data: rotas, type: 'line', borderColor: '#fbbf24', backgroundColor: '#fbbf24', borderWidth: 3, tension: 0.4, yAxisID: 'y1' } ] },
+        options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, scales: { y: { type: 'linear', display: true, position: 'left', ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } }, y1: { type: 'linear', display: true, position: 'right', ticks: { color: '#fbbf24' }, grid: { drawOnChartArea: false } }, x: { ticks: { color: '#94a3b8' }, grid: { display: false } } }, plugins: { legend: { labels: { color: '#fff', font: { family: 'Outfit', size: 12 } } }, tooltip: { backgroundColor: 'rgba(0,0,0,0.8)', titleFont: { family: 'Outfit' }, bodyFont: { family: 'Outfit' } } } }
+    });
+}
+
 function initEmptyEscalaSemana() {
     liveEscalaSemana = {};
     escDiasConf.forEach(d => { liveEscalaSemana[d.id] = { hc: '16', pct: '0', cap: '16980', dw: '0', phd: '0', capphd: '630', dataDia: '(inserir data)', visible: false, grid: {} }; });
@@ -764,6 +905,27 @@ function initEmptyEscalaSemana() {
 // =========================================================
 // HISTÓRICO DE ESCALAS (FIM DO ARQUIVO)
 // =========================================================
+function updateDatesFromWeek(inputId, tipo) {
+    if (!currentUser || currentUser.r !== 'admin') return;
+    let inputEl = document.getElementById(inputId); if(!inputEl) return;
+    const weekVal = inputEl.value; if (!weekVal) return;
+    const parts = weekVal.split('-W'); if (parts.length !== 2) return;
+    const year = parseInt(parts[0]); const week = parseInt(parts[1]);
+    const monday = getDateOfISOWeek(week, year);
+
+    const offsets = { 'segunda': 0, 'terca': 1, 'quarta': 2, 'quinta': 3, 'sexta': 4, 'sabado': 5, 'domingo': 6 };
+    let objAlvo = tipo === 'lugares' ? liveEscalaSemana : liveEscalaDcSemana;
+
+    for (let diaId in offsets) {
+        if (!objAlvo[diaId]) objAlvo[diaId] = { hc: '16', pct: '0', cap: '16980', dw: '0', phd: '0', capphd: '630', dataDia: '', visible: false, grid: {} };
+        let d = new Date(monday.getTime()); d.setDate(d.getDate() + offsets[diaId]);
+        let dayStr = String(d.getDate()).padStart(2, '0'); let monthStr = String(d.getMonth() + 1).padStart(2, '0');
+        objAlvo[diaId].dataDia = `${dayStr}/${monthStr}`;
+    }
+    let refDb = tipo === 'lugares' ? 'shopee_escala_semana_live' : 'shopee_escala_dc_live';
+    dbFirebase.ref(refDb).set(objAlvo).then(() => { showToast("Datas preenchidas!"); });
+}
+
 function renderHistEscala(tipo) {
     let containerId = tipo === 'lugares' ? 'hist-escala-list' : 'hist-escala-dc-list';
     let cacheSource = tipo === 'lugares' ? historyDataCache : historyDcDataCache;
@@ -799,7 +961,16 @@ function renderHistEscala(tipo) {
         container.appendChild(div);
     });
 }
-
-// Outras pequenas funções acessórias mantidas para integridade
+function clearEscalaHistory(tipo) {
+    let desc = tipo === 'lugares' ? 'PROCESSAMENTO' : 'DOBLECHECK';
+    let refNode = tipo === 'lugares' ? 'shopee_escala_history' : 'shopee_escala_dc_history';
+    if(confirm(`ATENÇÃO: Deseja apagar permanentemente TODO o histórico de escalas ${desc}? Esta ação não pode ser desfeita.`)) {
+        dbFirebase.ref(refNode).remove().then(() => { renderHistEscala(tipo); showToast("Histórico apagado!"); }).catch(e => console.error(e));
+    }
+}
+function getDateOfISOWeek(w, y) { let simple = new Date(y, 0, 1 + (w - 1) * 7); let dow = simple.getDay(); let ISOweekStart = simple; if (dow <= 4) ISOweekStart.setDate(simple.getDate() - simple.getDay() + 1); else ISOweekStart.setDate(simple.getDate() + 8 - simple.getDay()); return ISOweekStart; }
+function formatShortName(fullName) { if (!fullName) return ""; let p = fullName.split(/\s+/).filter(Boolean); if (p.length > 1) { return p[0] + " " + p[1]; } return p[0]; }
+function getAbsenteesForDay(diaId, isDc = false) { let absentees = []; let objAlvo = isDc ? liveEscalaDcSemana : liveEscalaSemana; let escDia = objAlvo[diaId]; if(!escDia || !escDia.dataDia) return absentees; let match = escDia.dataDia.match(/(\d{1,2})/); if(match) { let day = parseInt(match[1]); for(let op in livePresenca) { if(livePresenca[op] && (livePresenca[op][day] === 'F' || livePresenca[op][day] === 'FG' || livePresenca[op][day] === 'AT')) { absentees.push(op); } } } return absentees; }
+function addNewCollaborator(inputId) { const input = document.getElementById(inputId); if(!input) return; const name = input.value.trim().toUpperCase(); if(!name) return showToast("Digite o nome completo."); if(operadoresList.includes(name)) return showToast("Este colaborador já existe."); dbFirebase.ref('shopee_colaboradores/' + name).set(name).then(() => { input.value = ""; showToast("Colaborador cadastrado!"); }).catch(e => console.error(e)); }
+function removeCollaborator(name) { if(confirm(`Deseja realmente desligar o colaborador ${name}?`)) { dbFirebase.ref('shopee_colaboradores/' + name).remove().then(() => { showToast("Colaborador removido!"); }).catch(e => console.error(e)); } }
 function loadPresencaData() { renderPresencaGrid(); }
-window.onload = checkSession;
