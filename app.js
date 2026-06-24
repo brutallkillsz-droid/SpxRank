@@ -22,6 +22,7 @@ let dailyData = [];
 let ctrlData = initCtrl();
 let globalProdData = {}; 
 
+// CONFIGURAÇÃO DOS DIAS ATUALIZADA (SEGUNDA A DOMINGO)
 const escDiasConf = [
     { id: 'segunda', nome: 'ESCALA SEGUNDA', bg: '#5c6e85', cor: '#fff' },
     { id: 'terca', nome: 'ESCALA TERÇA', bg: '#b4a7d6', cor: '#000' },
@@ -56,8 +57,7 @@ let historyDataCache = {};
 let historyDcDataCache = {};
 let monthlyDataCache = {};
 
-let globalMetaPHD = 530; 
-let prodHistoryCache = {}; 
+let globalMetaPHD = 530; // Base padrão
 
 function initCtrl() { return { date: '', totalVol: 0, totalRotas: 0, minTime: null, maxTime: null, finRot: 0, finVol: 0, missRot: 0, missVol: 0, missingRot: 0, missingVol: 0, hourly: {}, sumDurHI: 0, countDurHI: 0 }; }
 
@@ -97,7 +97,7 @@ function switchTab(id) {
 }
 
 // =========================================================
-// CÉREBRO MATEMÁTICO E META PHD
+// CÉREBRO MATEMÁTICO: CÁLCULO DE PHD E SALVAMENTO DE META
 // =========================================================
 window.calcPHDAndSave = function(diaId) {
     saveEscalaSemanaToCloud();
@@ -111,7 +111,7 @@ window.saveMetaPHD = function() {
 };
 
 // =========================================================
-// DASHBOARD SITELIDER & ANÁLISE DE GAP E MELHORES DA PROD
+// DASHBOARD SITELIDER
 // =========================================================
 function colorizePHD(elementId, value) {
     let el = document.getElementById(elementId);
@@ -175,11 +175,9 @@ async function renderSiteliderDashboard() {
     let percSem = absSem.sch > 0 ? (absSem.abs / absSem.sch * 100).toFixed(1) : "0.0";
     let percDia = absDia.sch > 0 ? (absDia.abs / absDia.sch * 100).toFixed(1) : "0.0";
 
-    if(document.getElementById('sl-abs-mes')) {
-        document.getElementById('sl-abs-mes').innerText = percMes + "%";
-        document.getElementById('sl-abs-sem').innerText = percSem + "%";
-        document.getElementById('sl-abs-dia').innerText = percDia + "%";
-    }
+    document.getElementById('sl-abs-mes').innerText = percMes + "%";
+    document.getElementById('sl-abs-sem').innerText = percSem + "%";
+    document.getElementById('sl-abs-dia').innerText = percDia + "%";
 
     let dataAbsChart = [];
     for(let d=1; d<=daysInMonth; d++) { let val = diaChartAbs[d].sch > 0 ? (diaChartAbs[d].abs / diaChartAbs[d].sch * 100) : 0; dataAbsChart.push(val.toFixed(1)); }
@@ -198,17 +196,26 @@ async function renderSiteliderDashboard() {
 
     let sumPhdSemana = 0; let countPhdSemana = 0; let lastPhdDia = 0;
     let chartLabelsPhd = []; let dataPhdChart = [];
-    let lastDayName = "SEM DADOS"; let lastDayDate = "--/--";
+    
+    // Variáveis para rastrear a Data Diária do último preenchimento
+    let lastDayName = "SEM DADOS";
+    let lastDayDate = "--/--";
 
     escDiasConf.forEach(dConf => {
         let p = weekData[dConf.id] ? parseFloat(weekData[dConf.id].phd) : 0;
         if(!isNaN(p) && p > 0) { 
-            sumPhdSemana += p; countPhdSemana++; lastPhdDia = p; 
-            lastDayName = dConf.nome.replace('ESCALA ', ''); 
-            lastDayDate = weekData[dConf.id].dataDia || "--/--"; 
-            chartLabelsPhd.push(dConf.nome.replace('ESCALA ', '')); dataPhdChart.push(p); 
+            sumPhdSemana += p; 
+            countPhdSemana++; 
+            lastPhdDia = p; 
+            lastDayName = dConf.nome.replace('ESCALA ', ''); // Pega o nome "SEGUNDA"
+            lastDayDate = weekData[dConf.id].dataDia || "--/--"; // Pega a data "23/06"
+            chartLabelsPhd.push(dConf.nome.replace('ESCALA ', '')); 
+            dataPhdChart.push(p); 
         } 
-        else if(weekData[dConf.id]) { chartLabelsPhd.push(dConf.nome.replace('ESCALA ', '')); dataPhdChart.push(0); }
+        else if(weekData[dConf.id]) { 
+            chartLabelsPhd.push(dConf.nome.replace('ESCALA ', '')); 
+            dataPhdChart.push(0); 
+        }
     });
 
     let avgPhdSemana = countPhdSemana > 0 ? Math.round(sumPhdSemana / countPhdSemana) : 0;
@@ -238,103 +245,74 @@ async function renderSiteliderDashboard() {
     let percSemPHD = globalMetaPHD > 0 ? ((avgPhdSemana / globalMetaPHD) * 100).toFixed(1) : "0.0";
     let percMesPHD = globalMetaPHD > 0 ? ((avgMesPHD / globalMetaPHD) * 100).toFixed(1) : "0.0";
 
-    if(document.getElementById('sl-phd-dia-lbl')){
-        document.getElementById('sl-phd-dia-lbl').innerText = `ÚLTIMO REGISTRO (${percDiaPHD}% DA META)`;
-        document.getElementById('sl-phd-sem-lbl').innerText = `MÉDIA DA SEMANA (${percSemPHD}% DA META)`;
-        document.getElementById('sl-phd-mes-lbl').innerText = `MÉDIA DO MÊS (${percMesPHD}% DA META)`;
-    }
+    document.getElementById('sl-phd-dia-lbl').innerText = `ÚLTIMO REGISTRO (${percDiaPHD}% DA META)`;
+    document.getElementById('sl-phd-sem-lbl').innerText = `MÉDIA DA SEMANA (${percSemPHD}% DA META)`;
+    document.getElementById('sl-phd-mes-lbl').innerText = `MÉDIA DO MÊS (${percMesPHD}% DA META)`;
 
-    // ==================================================
-    // ANÁLISE DE GAP 
-    // ==================================================
+    // =========================================================================
+    // INJEÇÃO DOS TEXTOS COM DATAS NA ANÁLISE DE GAP (META PHD)
+    // =========================================================================
     let elMetaDisplay = document.getElementById('sa-meta-display');
     if (elMetaDisplay) elMetaDisplay.innerText = globalMetaPHD;
 
+    // Atualiza o subtítulo Diário
     let elDiaData = document.getElementById('sa-dia-data');
     if (elDiaData) elDiaData.innerText = `REF: ${lastDayName} (${lastDayDate})`;
+
+    // Atualiza o subtítulo Semanal
     let elSemData = document.getElementById('sa-sem-data');
     if (elSemData) elSemData.innerText = `REF: SEMANA ${week} DE ${year}`;
-    let elMesData = document.getElementById('sa-mes-data');
-    const monthNames = ["JANEIRO", "FEVEREIRO", "MARÇO", "ABRIL", "MAIO", "JUNHO", "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"];
-    if (elMesData) elMesData.innerText = `REF: ${monthNames[parseInt(refMonthStr.split('-')[1]) - 1]} DE ${refMonthStr.split('-')[0]}`;
 
+    // Atualiza o subtítulo Mensal
+    const monthNames = ["JANEIRO", "FEVEREIRO", "MARÇO", "ABRIL", "MAIO", "JUNHO", "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"];
+    let mIndex = parseInt(refMonthStr.split('-')[1]) - 1;
+    let elMesData = document.getElementById('sa-mes-data');
+    if (elMesData) elMesData.innerText = `REF: ${monthNames[mIndex]} DE ${refMonthStr.split('-')[0]}`;
+
+    // Atualiza os Valores do Gap
     function updateGapCard(prefix, realized) {
-        let elReal = document.getElementById(`sa-${prefix}-real`); let elMeta = document.getElementById(`sa-${prefix}-meta`); let elGap = document.getElementById(`sa-${prefix}-gap`); let elStatus = document.getElementById(`sa-${prefix}-status`); let elPerc = document.getElementById(`sa-${prefix}-perc`);
+        let elReal = document.getElementById(`sa-${prefix}-real`);
+        let elMeta = document.getElementById(`sa-${prefix}-meta`);
+        let elGap = document.getElementById(`sa-${prefix}-gap`);
+        let elStatus = document.getElementById(`sa-${prefix}-status`);
+        let elPerc = document.getElementById(`sa-${prefix}-perc`);
+
         if(!elReal) return;
-        elReal.innerText = realized; elMeta.innerText = globalMetaPHD;
-        let gap = realized - globalMetaPHD; let perc = globalMetaPHD > 0 ? ((realized / globalMetaPHD) * 100).toFixed(1) : 0;
+
+        elReal.innerText = realized;
+        elMeta.innerText = globalMetaPHD;
+
+        let gap = realized - globalMetaPHD;
+        let perc = globalMetaPHD > 0 ? ((realized / globalMetaPHD) * 100).toFixed(1) : 0;
+
         elPerc.innerText = `${perc}%`;
+
         if(realized === 0) {
-            elGap.innerText = "-"; elGap.style.color = "var(--text-muted)";
-            elStatus.innerText = "AGUARDANDO DADOS..."; elStatus.style.background = "rgba(255,255,255,0.05)"; elStatus.style.color = "var(--text-muted)";
+            elGap.innerText = "-";
+            elGap.style.color = "var(--text-muted)";
+            elStatus.innerText = "AGUARDANDO DADOS...";
+            elStatus.style.background = "rgba(255,255,255,0.05)";
+            elStatus.style.color = "var(--text-muted)";
         } else if (gap >= 0) {
-            elGap.innerText = `+${gap}`; elGap.style.color = "var(--success)";
-            elStatus.innerText = "META ATINGIDA / SUPERADA"; elStatus.style.background = "rgba(16, 185, 129, 0.1)"; elStatus.style.color = "var(--success)";
+            elGap.innerText = `+${gap}`;
+            elGap.style.color = "var(--success)";
+            elStatus.innerText = "META ATINGIDA / SUPERADA";
+            elStatus.style.background = "rgba(16, 185, 129, 0.1)";
+            elStatus.style.color = "var(--success)";
         } else {
             elGap.innerText = gap; // já possui o sinal negativo
             elGap.style.color = "var(--danger)";
-            elStatus.innerText = "ABAIXO DA META"; elStatus.style.background = "rgba(239, 68, 68, 0.1)"; elStatus.style.color = "var(--danger)";
-        }
-    }
-    updateGapCard('dia', lastPhdDia); updateGapCard('sem', avgPhdSemana); updateGapCard('mes', avgMesPHD);
-
-    // ==================================================
-    // RANK DE BIPAGEM TOP 4 (AM)
-    // ==================================================
-    let semTotals = {}; let mesTotals = {}; let latestDayWithData = null; let latestDayVolMap = {};
-
-    weekDates.forEach(d => {
-        let dStr = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-        if (prodHistoryCache[dStr]) {
-            latestDayWithData = dStr; latestDayVolMap = prodHistoryCache[dStr];
-            for(let op in prodHistoryCache[dStr]) { semTotals[op] = (semTotals[op] || 0) + prodHistoryCache[dStr][op]; }
-        }
-    });
-
-    for(let dStr in prodHistoryCache) {
-        if (dStr.startsWith(refMonthStr)) { 
-            for(let op in prodHistoryCache[dStr]) { mesTotals[op] = (mesTotals[op] || 0) + prodHistoryCache[dStr][op]; } 
+            elStatus.innerText = "ABAIXO DA META";
+            elStatus.style.background = "rgba(239, 68, 68, 0.1)";
+            elStatus.style.color = "var(--danger)";
         }
     }
 
-    // Filtra, ordena os operadores pelo volume e pega os Top 4
-    function getTop4(obj) {
-        return Object.keys(obj).map(k => ({name: k, vol: obj[k]})).sort((a,b) => b.vol - a.vol).slice(0, 4);
-    }
+    updateGapCard('dia', lastPhdDia);
+    updateGapCard('sem', avgPhdSemana);
+    updateGapCard('mes', avgMesPHD);
 
-    let topDia = getTop4(latestDayVolMap);
-    let topSem = getTop4(semTotals);
-    let topMes = getTop4(mesTotals);
 
-    // Renderiza as listas dinamicamente nos Cards
-    function renderTopList(elementId, arr) {
-        let el = document.getElementById(elementId);
-        if(!el) return;
-        if(arr.length === 0) { el.innerHTML = '<div style="color:var(--text-muted); font-size:0.85rem; text-align:center; padding: 20px 0;">Aguardando dados...</div>'; return; }
-        
-        let html = '';
-        arr.forEach((item, idx) => {
-            let icon = ''; let color = '';
-            if(idx===0) { icon = '🥇'; color = 'var(--gold)'; }
-            else if(idx===1) { icon = '🥈'; color = 'var(--silver)'; }
-            else if(idx===2) { icon = '🥉'; color = 'var(--bronze)'; }
-            else { icon = '4º'; color = '#fff'; }
-            
-            html += `<div style="display:flex; justify-content:space-between; align-items:center; background: rgba(0,0,0,0.2); padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.03);">
-                        <div style="font-size: 0.85rem; font-weight: 700; color: ${color}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 65%;">
-                            <span style="margin-right: 5px; font-size:1rem;">${icon}</span> ${item.name}
-                        </div>
-                        <div style="font-size: 0.95rem; color: var(--success); font-weight: 800;">${item.vol.toLocaleString('pt-BR')}</div>
-                     </div>`;
-        });
-        el.innerHTML = html;
-    }
-
-    renderTopList('sa-top-dia-list', topDia);
-    renderTopList('sa-top-sem-list', topSem);
-    renderTopList('sa-top-mes-list', topMes);
-
-    // Geração de Gráficos
     const ctxPHD = document.getElementById('slChartPHD').getContext('2d');
     if(window.slChartPHDInstance) window.slChartPHDInstance.destroy();
     window.slChartPHDInstance = new Chart(ctxPHD, {
@@ -342,8 +320,23 @@ async function renderSiteliderDashboard() {
         data: { 
             labels: chartLabelsPhd.length > 0 ? chartLabelsPhd : ['Nenhum dado'], 
             datasets: [
-                { type: 'line', label: `Meta (${globalMetaPHD})`, data: chartLabelsPhd.map(() => globalMetaPHD), borderColor: '#fbbf24', borderWidth: 2, borderDash: [5, 5], fill: false, pointRadius: 0 },
-                { type: 'bar', label: 'PHD Atingido (Semana)', data: dataPhdChart.length > 0 ? dataPhdChart : [0], backgroundColor: 'rgba(59, 130, 246, 0.8)', borderRadius: 4 }
+                {
+                    type: 'line',
+                    label: `Meta (${globalMetaPHD})`,
+                    data: chartLabelsPhd.map(() => globalMetaPHD),
+                    borderColor: '#fbbf24',
+                    borderWidth: 2,
+                    borderDash: [5, 5],
+                    fill: false,
+                    pointRadius: 0
+                },
+                { 
+                    type: 'bar',
+                    label: 'PHD Atingido (Semana)', 
+                    data: dataPhdChart.length > 0 ? dataPhdChart : [0], 
+                    backgroundColor: 'rgba(59, 130, 246, 0.8)', 
+                    borderRadius: 4 
+                }
             ] 
         },
         options: { responsive: true, maintainAspectRatio: false, scales: { y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } }, x: { ticks: { color: '#94a3b8' }, grid: { display: false } } }, plugins: { legend: { labels: { color: '#fff', font: { family: 'Outfit' } } } } }
@@ -361,15 +354,12 @@ async function renderSiteliderDashboard() {
 // =========================================================
 // ESCUTADORES DA NUVEM MULTI-PC
 // =========================================================
-dbFirebase.ref('shopee_prod_history').on('value', snap => {
-    prodHistoryCache = snap.val() || {};
-    if(!document.getElementById('view-sitelider-analise').classList.contains('hidden')) renderSiteliderDashboard();
-});
 
 dbFirebase.ref('shopee_meta_phd').on('value', snap => {
     if (snap.exists()) {
         globalMetaPHD = snap.val();
-        let el = document.getElementById('meta-phd-input'); if (el) el.value = globalMetaPHD;
+        let el = document.getElementById('meta-phd-input');
+        if (el) el.value = globalMetaPHD;
         if(!document.getElementById('view-sitelider').classList.contains('hidden') || !document.getElementById('view-sitelider-analise').classList.contains('hidden')) renderSiteliderDashboard();
     }
 });
@@ -446,20 +436,9 @@ presencaListener = dbFirebase.ref('shopee_presenca_live/' + currentPresMes).on('
 
 function saveProdState() {
     if (!currentUser || currentUser.r !== 'admin') return;
-    let dateVal = document.getElementById('p-data')?.value || '';
-    let state = { data: dateVal, horaIni: document.getElementById('p-hora-ini')?.value || '', horaFim: document.getElementById('p-hora-fim')?.value || '', backlog: document.getElementById('p-backlog')?.textContent || '0', xpt: document.getElementById('p-xpt')?.textContent || '0', volRot: document.getElementById('p-vol-rot')?.textContent || '0', stations: [] };
+    let state = { data: document.getElementById('p-data')?.value || '', horaIni: document.getElementById('p-hora-ini')?.value || '', horaFim: document.getElementById('p-hora-fim')?.value || '', backlog: document.getElementById('p-backlog')?.textContent || '0', xpt: document.getElementById('p-xpt')?.textContent || '0', volRot: document.getElementById('p-vol-rot')?.textContent || '0', stations: [] };
     for(let j=1; j<=10; j++) { let sel = document.getElementById(`station-select-${j}`); state.stations.push(sel ? sel.value : ""); }
     dbFirebase.ref('shopee_prod_state').set(state);
-
-    if (dateVal && Object.keys(globalProdData).length > 0) {
-        let dailyTotals = {};
-        for(let name in globalProdData) {
-            let sum = 0;
-            for(let h in globalProdData[name]) sum += globalProdData[name][h];
-            if (sum > 0) dailyTotals[name] = sum;
-        }
-        dbFirebase.ref('shopee_prod_history/' + dateVal).set(dailyTotals);
-    }
 }
 
 function saveDailyToCloud() { if(currentUser && currentUser.r === 'admin') { dbFirebase.ref('shopee_daily_live').set(dailyData).catch(e => console.error(e)); } }
@@ -501,47 +480,6 @@ let selectedShiftTemp = '';
 function openShiftModal() { document.getElementById('shift-modal-overlay').classList.remove('hidden'); }
 function closeShiftModal() { document.getElementById('shift-modal-overlay').classList.add('hidden'); }
 function confirmShift(shift) { selectedShiftTemp = shift; document.getElementById('shift-display').innerText = "| TURNO: " + shift; closeShiftModal(); document.getElementById('file-prod').click(); }
-
-// =========================================================
-// PUXAR NOMES DA ESCALA PARA A PRODUTIVIDADE (AUTO-FILL)
-// =========================================================
-window.autoFillStations = function() {
-    let dateVal = document.getElementById('p-data').value;
-    if (!dateVal) return;
-    
-    let [y, m, d] = dateVal.split('-');
-    let dateObj = new Date(y, m - 1, d);
-    let daysMap = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
-    let dayStr = daysMap[dateObj.getDay()];
-
-    let escDia = liveEscalaSemana[dayStr];
-    if (escDia && escDia.grid) {
-        let bipadorRow = escDia.grid[1]; 
-        let etiquetadorRow = escDia.grid[2]; 
-
-        let changed = false;
-        for (let i = 0; i < 10; i++) {
-            let name = "";
-            if (bipadorRow && bipadorRow[i]) name = bipadorRow[i];
-            else if (etiquetadorRow && etiquetadorRow[i]) name = etiquetadorRow[i];
-
-            if (name) {
-                let select = document.getElementById(`station-select-${i+1}`);
-                if (select) {
-                    let exists = Array.from(select.options).some(opt => opt.value === name);
-                    if (!exists) { select.innerHTML += `<option value="${name}">${name}</option>`; }
-                    select.value = name;
-                    changed = true;
-                }
-            }
-        }
-        if(changed) {
-            refreshProdGridData();
-            saveProdState();
-            showToast("Nomes puxados da Escala com Sucesso!");
-        }
-    }
-};
 
 // =========================================================
 // DIÁRIO E CONTROLE 
@@ -699,10 +637,7 @@ async function importProdData(input) {
                 globalProdData[cleanName][mappedHour] = (globalProdData[cleanName][mappedHour] || 0) + val;
             }
         }
-        updateDropdowns(); 
-        saveProdToCloud(); 
-        autoFillStations(); 
-        showToast("Produtividade Processada!");
+        updateDropdowns(); saveProdToCloud(); showToast("Produtividade Processada!");
     } catch(e) { console.error("Erro na importação:", e); showToast("Erro."); }
 }
 
@@ -775,7 +710,7 @@ async function renderBIChart() {
 }
 
 // =========================================================
-// ESCALA DE LÓGICAS (PROCESSAMENTO E DC)
+// ESCALA (LUGARES E DOBLECHECK)
 // =========================================================
 function updateDatesFromWeek(inputId, tipo) {
     if (!currentUser || currentUser.r !== 'admin') return;
@@ -849,10 +784,10 @@ function removeCollaborator(name) {
 }
 
 // ==========================================
-// LÓGICA: ESCALA DE PROCESSAMENTO
+// LÓGICA: ESCALA DE LUGARES
 // ==========================================
 function clearEscalaSemana() {
-    if(confirm("Tem certeza que deseja limpar TODA a escala de Processamento?")) {
+    if(confirm("Tem certeza que deseja limpar TODA a escala de Lugares?")) {
         let oldData = {...liveEscalaSemana}; liveEscalaSemana = {};
         escDiasConf.forEach(d => { let prevData = oldData[d.id] ? oldData[d.id].dataDia : '(inserir data)'; let prevVis = oldData[d.id] && oldData[d.id].visible !== undefined ? oldData[d.id].visible : false; liveEscalaSemana[d.id] = { hc: '16', pct: '0', cap: '16980', dw: '0', phd: '0', capphd: '630', dataDia: prevData, visible: prevVis, grid: {} }; });
         dbFirebase.ref('shopee_escala_semana_live').set(liveEscalaSemana).then(() => { showToast("Escala limpa com sucesso!"); }).catch(e => console.error(e));
@@ -1320,7 +1255,7 @@ async function archiveEscalaDc() {
 }
 
 function clearEscalaHistory(tipo) {
-    let desc = tipo === 'lugares' ? 'PROCESSAMENTO' : 'DOBLECHECK';
+    let desc = tipo === 'lugares' ? 'LUGARES' : 'DOBLECHECK';
     let refNode = tipo === 'lugares' ? 'shopee_escala_history' : 'shopee_escala_dc_history';
     if(confirm(`ATENÇÃO: Deseja apagar permanentemente TODO o histórico de escalas ${desc}? Esta ação não pode ser desfeita.`)) {
         dbFirebase.ref(refNode).remove().then(() => { renderHistEscala(tipo); showToast("Histórico apagado!"); }).catch(e => console.error(e));
