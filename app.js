@@ -297,7 +297,6 @@ async function renderSiteliderDashboard() {
         }
     }
 
-    // Filtra, ordena os operadores pelo volume e pega os Top 4
     function getTop4(obj) {
         return Object.keys(obj).map(k => ({name: k, vol: obj[k]})).sort((a,b) => b.vol - a.vol).slice(0, 4);
     }
@@ -306,7 +305,6 @@ async function renderSiteliderDashboard() {
     let topSem = getTop4(semTotals);
     let topMes = getTop4(mesTotals);
 
-    // Renderiza as listas dinamicamente nos Cards
     function renderTopList(elementId, arr) {
         let el = document.getElementById(elementId);
         if(!el) return;
@@ -444,21 +442,26 @@ presencaListener = dbFirebase.ref('shopee_presenca_live/' + currentPresMes).on('
     if(!document.getElementById('view-sitelider').classList.contains('hidden') || !document.getElementById('view-sitelider-analise').classList.contains('hidden')) renderSiteliderDashboard(); 
 });
 
+// AQUI É ONDE FIZEMOS A BLINDAGEM DE ERROS
 function saveProdState() {
     if (!currentUser || currentUser.r !== 'admin') return;
-    let dateVal = document.getElementById('p-data')?.value || '';
-    let state = { data: dateVal, horaIni: document.getElementById('p-hora-ini')?.value || '', horaFim: document.getElementById('p-hora-fim')?.value || '', backlog: document.getElementById('p-backlog')?.textContent || '0', xpt: document.getElementById('p-xpt')?.textContent || '0', volRot: document.getElementById('p-vol-rot')?.textContent || '0', stations: [] };
-    for(let j=1; j<=10; j++) { let sel = document.getElementById(`station-select-${j}`); state.stations.push(sel ? sel.value : ""); }
-    dbFirebase.ref('shopee_prod_state').set(state);
+    try {
+        let dateVal = document.getElementById('p-data')?.value || '';
+        let state = { data: dateVal, horaIni: document.getElementById('p-hora-ini')?.value || '', horaFim: document.getElementById('p-hora-fim')?.value || '', backlog: document.getElementById('p-backlog')?.textContent || '0', xpt: document.getElementById('p-xpt')?.textContent || '0', volRot: document.getElementById('p-vol-rot')?.textContent || '0', stations: [] };
+        for(let j=1; j<=10; j++) { let sel = document.getElementById(`station-select-${j}`); state.stations.push(sel ? sel.value : ""); }
+        dbFirebase.ref('shopee_prod_state').set(state).catch(e => console.error(e));
 
-    if (dateVal && Object.keys(globalProdData).length > 0) {
-        let dailyTotals = {};
-        for(let name in globalProdData) {
-            let sum = 0;
-            for(let h in globalProdData[name]) sum += globalProdData[name][h];
-            if (sum > 0) dailyTotals[name] = sum;
+        if (dateVal && Object.keys(globalProdData).length > 0) {
+            let dailyTotals = {};
+            for(let name in globalProdData) {
+                let sum = 0;
+                for(let h in globalProdData[name]) sum += globalProdData[name][h];
+                if (sum > 0) dailyTotals[name] = sum;
+            }
+            dbFirebase.ref('shopee_prod_history/' + dateVal).set(dailyTotals).catch(e => console.error(e));
         }
-        dbFirebase.ref('shopee_prod_history/' + dateVal).set(dailyTotals);
+    } catch(e) {
+        console.error("Erro silencioso no saveProdState:", e);
     }
 }
 
@@ -503,171 +506,67 @@ function closeShiftModal() { document.getElementById('shift-modal-overlay').clas
 function confirmShift(shift) { selectedShiftTemp = shift; document.getElementById('shift-display').innerText = "| TURNO: " + shift; closeShiftModal(); document.getElementById('file-prod').click(); }
 
 // =========================================================
-// PUXAR NOMES DA ESCALA PARA A PRODUTIVIDADE (AUTO-FILL)
+// PUXAR NOMES DA ESCALA (AGORA ISOLADO E BLINDADO)
 // =========================================================
 window.autoFillStations = function() {
-    let dateVal = document.getElementById('p-data').value;
-    if (!dateVal) return;
-    
-    let [y, m, d] = dateVal.split('-');
-    let dateObj = new Date(y, m - 1, d);
-    let daysMap = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
-    let dayStr = daysMap[dateObj.getDay()];
+    try {
+        let dateVal = document.getElementById('p-data').value;
+        if (!dateVal) {
+            showToast("Preencha a Data primeiro!");
+            return;
+        }
 
-    let escDia = liveEscalaSemana[dayStr];
-    if (escDia && escDia.grid) {
-        let bipadorRow = escDia.grid[1]; 
-        let etiquetadorRow = escDia.grid[2]; 
+        let [y, m, d] = dateVal.split('-');
+        let dateObj = new Date(y, m - 1, d);
+        let daysMap = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
+        let dayStr = daysMap[dateObj.getDay()];
 
-        let changed = false;
-        for (let i = 0; i < 10; i++) {
-            let name = "";
-            if (bipadorRow && bipadorRow[i]) name = bipadorRow[i];
-            else if (etiquetadorRow && etiquetadorRow[i]) name = etiquetadorRow[i];
+        let escDia = liveEscalaSemana[dayStr];
+        if (escDia && escDia.grid) {
+            let bipadorRow = escDia.grid[1]; 
+            let etiquetadorRow = escDia.grid[2]; 
 
-            if (name) {
-                let select = document.getElementById(`station-select-${i+1}`);
-                if (select) {
-                    let exists = Array.from(select.options).some(opt => opt.value === name);
-                    if (!exists) { select.innerHTML += `<option value="${name}">${name}</option>`; }
-                    select.value = name;
-                    changed = true;
+            let changed = false;
+            for (let i = 0; i < 10; i++) {
+                let name = "";
+                if (bipadorRow && bipadorRow[i]) name = bipadorRow[i];
+                else if (etiquetadorRow && etiquetadorRow[i]) name = etiquetadorRow[i];
+
+                if (name) {
+                    let select = document.getElementById(`station-select-${i+1}`);
+                    if (select) {
+                        let exists = Array.from(select.options).some(opt => opt.value === name);
+                        if (!exists) { select.innerHTML += `<option value="${name}">${name}</option>`; }
+                        select.value = name;
+                        changed = true;
+                    }
                 }
             }
+            if(changed) {
+                refreshProdGridData();
+                saveProdState();
+                showToast("Nomes puxados da Escala!");
+            } else {
+                showToast("Nenhum Bipador/Etiquetador nesta data.");
+            }
+        } else {
+            showToast("A Escala deste dia está vazia.");
         }
-        if(changed) {
-            refreshProdGridData();
-            saveProdState();
-            showToast("Nomes puxados da Escala com Sucesso!");
-        }
+    } catch(e) {
+        console.error("Erro no autoFill:", e);
+        showToast("Erro ao ler escala.");
     }
 };
 
 // =========================================================
-// DIÁRIO E CONTROLE 
+// A IMPORTAÇÃO DO EXCEL VOLTOU A SER EXATAMENTE O QUE ERA
 // =========================================================
-async function handleSingleFile(input) {
-    if(input.files.length === 0) return; dailyData = []; ctrlData = initCtrl();
-    try { const data = await readExcelFile(input.files[0], false); processData([data], true); document.getElementById('st-single').innerText = "Carregado com sucesso!"; showToast("Importação Concluída"); } catch (e) { console.error(e); showToast("Erro."); }
-}
-
-async function handleMassFiles(input) {
-    if(input.files.length === 0) return; dailyData = []; 
-    try { const files = Array.from(input.files); const promises = files.map(f => readExcelFile(f, false)); const results = await Promise.all(promises); processData(results, false); document.getElementById('st-mass').innerText = `${files.length} Arquivos`; showToast("Importação em Massa Concluída"); } catch (e) { console.error(e); showToast("Erro."); }
-}
-
-function processData(allFilesData, isSingleImport) {
-    const map = {};
-    allFilesData.forEach(rows => {
-        for(let i=1; i<rows.length; i++) {
-            const r = rows[i]; let rawName = String(r[9] || ""); if(!rawName.trim()) continue;
-            let tempName = rawName.replace(/\[.*?\]/g, '').replace(/^(AT|OPS?)\s*-?\s*\d*\s*-?\s*/gi, '').replace(/^\d+\s*-?\s*/, '').trim().toUpperCase(); tempName = tempName.replace(/[.\#$\[\]\/]/g, '');
-            let parts = tempName.split(/\s+/).filter(Boolean); let cleanName = "";
-            if(parts.length > 1) { cleanName = parts[0] + " " + parts[1].charAt(0); } else if(parts.length === 1) { cleanName = parts[0]; }
-            if (!cleanName) continue; let nome = cleanName;
-            let volRank = parseFloat(String(r[3]).replace(/[^\d,-]/g,'').replace(',','.')) || 0; let volCtrl = parseFloat(String(r[2]).replace(/[^\d,-]/g,'').replace(',','.')) || 0; let volValid = parseFloat(String(r[4]).replace(/[^\d,-]/g,'').replace(',','.')) || 0; let valF = parseFloat(String(r[5]).replace(/[^\d,-]/g,'').replace(',','.')) || 0; let valG = parseFloat(String(r[6]).replace(/[^\d,-]/g,'').replace(',','.')) || 0; let rec = parseFloat(String(r[11]).replace(',','.')) || 0;
-            let tStart = r[7]; let tEnd = r[8]; let time = 0; if(typeof tStart==='number' && typeof tEnd==='number') { let diff = tEnd - tStart; if(diff < 0) diff += 1; time = Math.round(diff * 86400); }
-            if(!map[nome]) map[nome] = { nome, rotas:0, vol:0, reconf:0, time:0, doblecheck: 0 };
-            map[nome].rotas += 1; map[nome].vol += volRank; map[nome].time += time; map[nome].reconf += rec;
-            if (isSingleImport) {
-                let status = String(r[12] || "").trim().toUpperCase(); 
-                if(!ctrlData.date && tStart) ctrlData.date = excelDate(tStart); ctrlData.totalVol += volCtrl; ctrlData.totalRotas++;
-                if(tStart) { if(ctrlData.minTime===null || tStart<ctrlData.minTime) ctrlData.minTime = tStart; }
-                if(tEnd) { if(ctrlData.maxTime===null || tEnd>ctrlData.maxTime) ctrlData.maxTime = tEnd; }
-                if(time > 0) { ctrlData.sumDurHI += time; ctrlData.countDurHI++; }
-                if(status === 'VALIDATED') { ctrlData.finRot++; ctrlData.finVol += volValid; if(valF > 0) { ctrlData.missRot++; ctrlData.missVol += valF; } if(valG > 0) { ctrlData.missingRot++; ctrlData.missingVol += valG; } }
-                if(typeof tStart === 'number') { let sDay = Math.round(tStart * 86400) % 86400; let h = Math.floor(sDay / 3600); let hStr = `${String(h).padStart(2,'0')}:00 - ${String(h+1).padStart(2,'0')}:00`; if(!ctrlData.hourly[hStr]) ctrlData.hourly[hStr] = {r:0, v:0}; ctrlData.hourly[hStr].r++; ctrlData.hourly[hStr].v += volCtrl; }
-            }
-        }
-    });
-    dailyData = Object.values(map); saveDailyToCloud(); renderDaily(); 
-    if (isSingleImport && currentUser && currentUser.r === 'admin') dbFirebase.ref('shopee_ctrl_live').set(ctrlData);
-}
-
-function clearData() { 
-    dailyData=[]; ctrlData=initCtrl(); saveDailyToCloud(); 
-    if(currentUser && currentUser.r === 'admin') dbFirebase.ref('shopee_ctrl_live').set(ctrlData);
-    document.getElementById('st-single').innerText="Selecionar CSV (Diário)"; document.getElementById('st-mass').innerText="Múltiplos arquivos .CSV"; 
-    renderDaily(); renderControl(); showToast("Tela Limpa"); 
-}
-
-let currentDcName = "";
-window.openDoblecheck = function(nome) { currentDcName = nome; document.getElementById('dc-modal-driver-name').innerText = "Motorista: " + nome; document.getElementById('dc-modal-overlay').classList.remove('hidden'); };
-window.closeDcModal = function() { document.getElementById('dc-modal-overlay').classList.add('hidden'); };
-window.applyDc = function(val) { let d = dailyData.find(x => x.nome === currentDcName); if(d) { d.doblecheck = val; saveDailyToCloud(); } closeDcModal(); };
-
-function renderDaily() {
-    const grid = document.getElementById('grid-diario'); if(!grid) return; grid.innerHTML = '';
-    let safeData = Array.isArray(dailyData) ? dailyData : Object.values(dailyData || {});
-    let sorted = safeData.map(d => { const avg = d.rotas>0 ? d.time/d.rotas : 0; let dc = d.doblecheck || 0; let totalErrosTela = d.reconf + dc; let errosAcuracidade = d.reconf + (dc * 5); let acur = d.vol > 0 ? ((d.vol - errosAcuracidade) / d.vol) * 100 : 100; if(acur < 0) acur = 0; return {...d, avg, acur, totalErrosTela}; }).sort((a,b) => (b.rotas-a.rotas) || (b.vol-a.vol));
-    sorted.forEach((d, i) => {
-        const pos = i+1; let css = ''; let icon = ''; if(pos===1) { css='rank-1'; icon='🥇'; } else if(pos===2) { css='rank-2'; icon='🥈'; } else if(pos===3) { css='rank-3'; icon='🥉'; }
-        const div = document.createElement('div'); div.className = `stat-card ${css}`;
-        let dcBtn = currentUser && currentUser.r === 'admin' ? `<button class="btn-ghost" style="padding: 6px; font-size: 0.65rem; width: 100%; border-color: var(--primary); color: var(--primary);" onclick="openDoblecheck('${d.nome}')"><i class="fas fa-edit"></i> DOBLECHECK ${d.doblecheck > 0 ? '('+d.doblecheck+')' : ''}</button>` : ``;
-        div.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;"><div class="sc-name">${icon} ${d.nome}</div><div class="sc-rank r-txt">#${pos}</div></div><div class="sc-hero"><div class="sc-val">${d.rotas}</div><div class="sc-lbl">ROTAS CONCLUÍDAS</div></div><div class="sc-grid"><div class="si"><div class="si-l">Volume</div><div class="si-v">${d.vol}</div></div><div class="si"><div class="si-l">Acuracidade</div><div class="si-v" style="color:${d.acur>=99?'var(--success)':'var(--danger)'}">${d.acur.toFixed(2)}%</div></div><div class="si"><div class="si-l">Erros Totais</div><div class="si-v" style="color:${d.totalErrosTela>0?'var(--danger)':'#eee'}">${d.totalErrosTela}</div></div><div class="si" style="display:flex; align-items:flex-end;">${dcBtn}</div></div><div style="text-align:center; padding-top:15px; margin-top:15px; border-top: 1px solid rgba(255,255,255,0.05);"><div class="si-l">Tempo Médio: <span style="color:#fff; font-size: 0.85rem;">${fmtTime(d.avg)}</span></div></div>`;
-        grid.appendChild(div);
-    });
-}
-
-function renderControl() {
-    const d = ctrlData; const el = (id)=>document.getElementById(id);
-    el('c-data').innerText = d.date || "-"; el('c-vol').innerText = d.totalVol; el('c-rotas').innerText = d.totalRotas; el('c-ini').innerText = fmtExcelTime(d.minTime); el('c-fim').innerText = fmtExcelTime(d.maxTime);
-    let durSec = 0; if(d.minTime && d.maxTime) durSec = Math.round((d.maxTime - d.minTime)*86400); el('c-dur').innerText = secToHHMMSS(durSec);
-    let avgHI = d.countDurHI>0 ? d.sumDurHI/d.countDurHI : 0; el('c-avg-time').innerText = secToHHMMSS(avgHI);
-    
-    let total = d.totalVol; let finPerc = total>0 ? (d.finVol/total)*100 : 0; let pendPerc = total>0 ? (100 - finPerc) : 0;
-    let pendRot = d.totalRotas - d.finRot; let pendVol = d.totalVol - d.finVol;
-    el('c-fin-rot').innerText = d.finRot; el('c-fin-vol').innerText = d.finVol; el('c-fin-perc').innerText = finPerc.toFixed(2).replace('.',',') + "%";
-    el('c-pen-rot').innerText = pendRot; el('c-pen-vol').innerText = pendVol; el('c-pen-perc').innerText = pendPerc.toFixed(2).replace('.',',') + "%";
-    el('c-mis-rot').innerText = d.missRot; el('c-mis-vol').innerText = d.missVol; let misPerc = total>0 ? (d.missRot/total)*100 : 0; el('c-mis-perc').innerText = misPerc.toFixed(2).replace('.',',') + "%";
-    el('c-missing-rot').innerText = d.missingRot; el('c-missing-vol').innerText = d.missingVol; let missingPerc = total>0 ? (d.missingRot/total)*100 : 0; el('c-missing-perc').innerText = missingPerc.toFixed(2).replace('.',',') + "%";
-    const tbody = document.getElementById('c-hourly-body'); tbody.innerHTML = '';
-    Object.keys(d.hourly).sort().forEach(h => { tbody.innerHTML += `<tr><td>${h}</td><td style="text-align:center">${d.hourly[h].r}</td><td style="text-align:center">${d.hourly[h].v}</td></tr>`; });
-}
-
-async function saveToMonthly() {
-    if(dailyData.length===0) return showToast("Sem dados para arquivar."); showToast("Salvando na Nuvem...");
-    try { let db = {...monthlyDataCache}; dailyData.forEach(d => { const k = d.nome; if(!db[k]) db[k] = {nome:k, rotas:0, vol:0, reconf:0, time:0, doblecheck:0}; db[k].rotas += d.rotas; db[k].vol += d.vol; db[k].reconf += d.reconf; db[k].doblecheck = (db[k].doblecheck || 0) + (d.doblecheck || 0); db[k].time += d.time; }); await dbFirebase.ref('shopee_gold_db').set(db); showToast("Arquivado na Nuvem!"); } catch(e) { console.error(e); showToast("Erro."); }
-}
-
-function renderMonthly() {
-    const container = document.getElementById('monthly-list'); if(!container) return;
-    let list = Object.values(monthlyDataCache).map(d => { let dc = d.doblecheck || 0; let totalErrosTela = d.reconf + dc; let errosAcuracidade = d.reconf + (dc * 5); let acur = d.vol > 0 ? ((d.vol - errosAcuracidade) / d.vol) * 100 : 100; if(acur < 0) acur = 0; let avg = d.rotas > 0 ? d.time / d.rotas : 0; return {...d, acur, avg, totalErrosTela}; }).sort((a,b) => (b.rotas-a.rotas) || (b.vol-a.vol));
-    container.innerHTML = '';
-    if(list.length===0) { container.innerHTML = '<div style="text-align:center;color:#666;padding:40px">Histórico Vazio</div>'; return; }
-    list.forEach((d, i) => {
-        const pos = i+1; let css = ''; let icon = ''; if(pos===1) { css='mr-1'; icon='🥇'; } else if(pos===2) { css='rank-2'; icon='🥈'; } else if(pos===3) { css='rank-3'; icon='🥉'; }
-        const div = document.createElement('div'); div.className = `stat-card m-row ${css}`; div.style.padding = "15px 30px";
-        div.innerHTML = `<div class="m-idx">#${pos}</div><div style="font-weight:700;display:flex;gap:10px;align-items:center; color:#fff;">${icon} ${d.nome}</div><div class="m-stat"><div class="ms-l">Rotas</div><div class="ms-v">${d.rotas}</div></div><div class="m-stat"><div class="ms-l">Vol Total</div><div class="ms-v">${d.vol}</div></div><div class="m-stat"><div class="ms-l">Erros Totais</div><div class="ms-v" style="color:${d.totalErrosTela>0?'var(--danger)':'inherit'}">${d.totalErrosTela}</div></div><div class="m-stat"><div class="ms-l">Acuracidade Global</div><div class="ms-v" style="color:${d.acur>=99?'var(--success)':'var(--danger)'}">${d.acur.toFixed(2)}%</div></div><div class="m-stat"><div class="ms-l">T. Médio Global</div><div class="ms-v">${fmtTime(d.avg)}</div></div>`;
-        container.appendChild(div);
-    });
-}
-
-async function resetMonthly() { if(confirm("Deseja apagar permanentemente o histórico MENSAL DA NUVEM?")) { await dbFirebase.ref('shopee_gold_db').remove(); showToast("Banco Apagado!"); } }
-
-// =========================================================
-// PRODUTIVIDADE E DASHBOARD BI
-// =========================================================
-function initProdGrid() {
-    const tbody = document.getElementById('prod-body-grid'); let html = '';
-    for (let i = 0; i < 24; i++) {
-        let h = (i === 0) ? 23 : i - 1; let hour = h.toString().padStart(2, '0') + ':00';
-        html += `<tr><td style="border-left: 2px solid #000; font-weight: bold; background:#f0f8ff;" class="editable-cell" contenteditable="true" id="p-hour-${i}" onblur="refreshProdGridData(); saveProdState();">${hour}</td>`;
-        for (let j = 1; j <= 10; j++) { html += `<td id="p-cell-${i}-${j}" class="editable-cell" contenteditable="true" onblur="calculateProdTotals(true)"></td>`; }
-        html += `<td id="p-row-total-${i}" style="font-weight: bold; background: #e2e8f0; color: #0f172a;"></td>`;
-        if (i === 0) { html += `<td rowspan="24" class="spx-percent-giant"><span class="spx-percent-text" id="p-giant-percent">0%</span></td>`; }
-        html += `</tr>`;
-    }
-    html += `<tr class="spx-navy-prod"><td style="border-left: 2px solid #000; padding: 4px;">Total</td>`;
-    for (let j = 1; j <= 10; j++) html += `<td style="color:#fff;" id="p-col-total-${j}">0</td>`;
-    html += `<td style="color:#fff; font-weight: 900;" id="p-grand-total">0</td><td style="background:#fff; border:2px solid #000; border-top:none;"></td></tr>`;
-    if(tbody) tbody.innerHTML = html;
-}
-
 async function importProdData(input) {
     if(input.files.length === 0) return;
     try {
-        const data = await readExcelFile(input.files[0], true); if (!data || data.length === 0) { showToast("Arquivo vazio."); return; }
+        const data = await readExcelFile(input.files[0], true); 
+        if (!data || data.length === 0) { showToast("Arquivo vazio."); return; }
+        
         globalProdData = {}; let headers = data[0] || []; let colHoursMap = {};
         let allowedHours = [];
         if (selectedShiftTemp === 'AM') { allowedHours = ['23:00', '00:00', '01:00', '02:00', '03:00', '04:00']; } 
@@ -701,7 +600,6 @@ async function importProdData(input) {
         }
         updateDropdowns(); 
         saveProdToCloud(); 
-        autoFillStations(); 
         showToast("Produtividade Processada!");
     } catch(e) { console.error("Erro na importação:", e); showToast("Erro."); }
 }
