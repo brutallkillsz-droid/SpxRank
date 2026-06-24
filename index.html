@@ -5,22 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Painel Liderança | HUB LMG-48</title>
     
-    <!-- Bibliotecas Externas -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
 
-    <!-- Framework FIREBASE -->
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
 
-    <!-- CSS -->
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <!-- POPUPS E TOASTS GLOBAIS -->
     <div id="toast" class="toast">Notificação</div>
 
     <div id="pres-popup" class="hidden">
@@ -31,7 +27,6 @@
         <button class="pres-btn empty-btn" onclick="setPresenca('')" title="Limpar Dia"><i class="fas fa-eraser"></i></button>
     </div>
 
-    <!-- MODAL DOBLECHECK (RANKING DIÁRIO) -->
     <div id="dc-modal-overlay" class="hidden">
         <div class="dc-modal-content">
             <div class="dc-modal-title">DOBLECHECK</div>
@@ -51,7 +46,6 @@
         </div>
     </div>
 
-    <!-- MODAL SELEÇÃO DE TURNO (PRODUTIVIDADE) -->
     <div id="shift-modal-overlay" class="hidden">
         <div class="dc-modal-content">
             <div class="dc-modal-title">TURNO DE IMPORTAÇÃO</div>
@@ -68,7 +62,6 @@
         </div>
     </div>
 
-    <!-- TELA DE LOGIN -->
     <div id="login-screen">
         <div class="login-card">
             <div class="brand-title">LOGISTICS ELITE</div>
@@ -79,10 +72,8 @@
         </div>
     </div>
 
-    <!-- CONTAINER PRINCIPAL DO APLICATIVO -->
     <div id="app-shell">
         
-        <!-- SIDEBAR DE NAVEGAÇÃO -->
         <aside class="sidebar">
             <div class="nav-logo">
                 <i class="fas fa-rocket"></i> PAINEL LIDERANÇA
@@ -142,7 +133,6 @@
             </div>
         </aside>
 
-        <!-- ÁREA DE CONTEÚDO PRINCIPAL (MAIN) -->
         <main class="main-content">
             
             <section id="view-sitelider" class="hidden">
@@ -156,7 +146,7 @@
                         <input type="number" id="meta-phd-input" class="btn-ghost" style="width: 80px; background: rgba(255,255,255,0.05); color: #fbbf24; border-color: #fbbf24; font-weight: 800; text-align: center; font-size: 1rem; padding: 5px;" value="530" onblur="saveMetaPHD()">
 
                         <label style="color: var(--text-muted); font-size: 0.8rem; font-weight: 700; margin-left: 10px;">SEMANA REFERÊNCIA:</label>
-                        <input type="week" id="sl-week-select" class="btn-ghost" style="background: rgba(255,255,255,0.05); color: #fff; border-color: var(--primary);" onchange="renderSiteliderDashboard()" onclick="try{this.showPicker()}catch(e){}">
+                        <input type="week" id="sl-week-select" class="btn-ghost" style="background: rgba(255,255,255,0.05); color: #fff; border-color: var(--primary);" onchange="renderSiteliderDashboard()">
                         <button class="btn-ghost" onclick="renderSiteliderDashboard()"><i class="fas fa-sync"></i></button>
                     </div>
                 </div>
@@ -168,21 +158,21 @@
                             <div class="sc-name">PHD Diário</div>
                             <div class="sc-rank"><i class="fas fa-bolt" style="color:var(--primary);"></i></div>
                         </div>
-                        <div class="sc-hero"><div class="sc-val" id="sl-phd-dia">0</div><div class="sc-lbl" id="sl-phd-dia-lbl">ÚLTIMO REGISTRADO NA SEMANA</div></div>
+                        <div class="sc-hero"><div class="sc-val" id="sl-phd-dia">0</div><div class="sc-lbl" id="sl-phd-dia-lbl">ÚLTIMO REGISTRADO</div></div>
                     </div>
                     <div class="stat-card sl-phd">
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
                             <div class="sc-name">PHD Semanal</div>
                             <div class="sc-rank"><i class="fas fa-calendar-week" style="color:var(--primary);"></i></div>
                         </div>
-                        <div class="sc-hero"><div class="sc-val" id="sl-phd-sem">0</div><div class="sc-lbl" id="sl-phd-sem-lbl">MÉDIA DA SEMANA SELECIONADA</div></div>
+                        <div class="sc-hero"><div class="sc-val" id="sl-phd-sem">0</div><div class="sc-lbl" id="sl-phd-sem-lbl">MÉDIA DA SEMANA</div></div>
                     </div>
                     <div class="stat-card sl-phd">
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
                             <div class="sc-name">PHD Mensal</div>
                             <div class="sc-rank"><i class="fas fa-chart-area" style="color:var(--primary);"></i></div>
                         </div>
-                        <div class="sc-hero"><div class="sc-val" id="sl-phd-mes">0</div><div class="sc-lbl" id="sl-phd-mes-lbl">MÉDIA DO MÊS DE REFERÊNCIA</div></div>
+                        <div class="sc-hero"><div class="sc-val" id="sl-phd-mes">0</div><div class="sc-lbl" id="sl-phd-mes-lbl">MÉDIA DO MÊS</div></div>
                     </div>
                 </div>
 
@@ -193,21 +183,21 @@
                             <div class="sc-name">ABS Diário</div>
                             <div class="sc-rank"><i class="fas fa-user-clock" style="color:var(--danger);"></i></div>
                         </div>
-                        <div class="sc-hero"><div class="sc-val" id="sl-abs-dia">0%</div><div class="sc-lbl">TAXA DE FALTAS/AT DA SEXTA</div></div>
+                        <div class="sc-hero"><div class="sc-val" id="sl-abs-dia">0%</div><div class="sc-lbl">TAXA DE ABS DIÁRIO</div></div>
                     </div>
                     <div class="stat-card sl-abs">
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
                             <div class="sc-name">ABS Semanal</div>
                             <div class="sc-rank"><i class="fas fa-users-slash" style="color:var(--danger);"></i></div>
                         </div>
-                        <div class="sc-hero"><div class="sc-val" id="sl-abs-sem">0%</div><div class="sc-lbl">TAXA DA SEMANA SELECIONADA</div></div>
+                        <div class="sc-hero"><div class="sc-val" id="sl-abs-sem">0%</div><div class="sc-lbl">TAXA DA SEMANA</div></div>
                     </div>
                     <div class="stat-card sl-abs">
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
                             <div class="sc-name">ABS Mensal</div>
                             <div class="sc-rank"><i class="fas fa-chart-pie" style="color:var(--danger);"></i></div>
                         </div>
-                        <div class="sc-hero"><div class="sc-val" id="sl-abs-mes">0%</div><div class="sc-lbl">TAXA DO MÊS DE REFERÊNCIA</div></div>
+                        <div class="sc-hero"><div class="sc-val" id="sl-abs-mes">0%</div><div class="sc-lbl">TAXA DO MÊS</div></div>
                     </div>
                 </div>
 
@@ -221,7 +211,6 @@
                 </div>
             </section>
 
-            <!-- NOVA ABA: ANÁLISE DE GAP (META PHD) COM RANK DE BIPAGEM TOP 4 -->
             <section id="view-sitelider-analise" class="hidden">
                 <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
                     <div>
@@ -235,7 +224,6 @@
                 </div>
 
                 <div class="bento-grid" style="grid-template-columns: repeat(3, 1fr);">
-                    <!-- Diário -->
                     <div class="stat-card" style="border-top: 4px solid var(--primary);">
                         <h3 style="color: #fff; margin-bottom: 5px; font-size: 1.1rem;"><i class="fas fa-calendar-day" style="color:var(--primary); margin-right: 8px;"></i> Fechamento Diário</h3>
                         <div id="sa-dia-data" style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; margin-bottom: 20px; text-transform: uppercase;">REF: -</div>
@@ -259,7 +247,6 @@
                         <div style="text-align: center; margin-top: 25px; padding: 12px; border-radius: 12px; font-weight: 800; letter-spacing: 1px;" id="sa-dia-status">-</div>
                     </div>
 
-                    <!-- Semanal -->
                     <div class="stat-card" style="border-top: 4px solid var(--accent);">
                         <h3 style="color: #fff; margin-bottom: 5px; font-size: 1.1rem;"><i class="fas fa-calendar-week" style="color:var(--accent); margin-right: 8px;"></i> Fechamento Semanal</h3>
                         <div id="sa-sem-data" style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; margin-bottom: 20px; text-transform: uppercase;">REF: -</div>
@@ -283,7 +270,6 @@
                         <div style="text-align: center; margin-top: 25px; padding: 12px; border-radius: 12px; font-weight: 800; letter-spacing: 1px;" id="sa-sem-status">-</div>
                     </div>
 
-                    <!-- Mensal -->
                     <div class="stat-card" style="border-top: 4px solid var(--success);">
                         <h3 style="color: #fff; margin-bottom: 5px; font-size: 1.1rem;"><i class="fas fa-calendar-alt" style="color:var(--success); margin-right: 8px;"></i> Fechamento Mensal</h3>
                         <div id="sa-mes-data" style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; margin-bottom: 20px; text-transform: uppercase;">REF: -</div>
@@ -308,22 +294,18 @@
                     </div>
                 </div>
 
-                <!-- RANKING DE BIPAGEM TOP 4 -->
                 <h3 style="color: #fff; margin-top: 40px; margin-bottom: 20px; font-size: 1.2rem; font-weight: 800; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px;">
                     <i class="fas fa-medal" style="color: var(--gold); margin-right: 8px;"></i> Destaques de Produtividade (Bipagem)
                 </h3>
                 <div class="bento-grid" style="grid-template-columns: repeat(3, 1fr);">
-                    <!-- Diário -->
                     <div class="stat-card rank-2">
                         <h4 style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; margin-bottom: 10px;">Rank de Bipagem Diário (AM)</h4>
                         <div id="sa-top-dia-list" style="display:flex; flex-direction: column; gap: 8px; margin-top: 10px;"></div>
                     </div>
-                    <!-- Semanal -->
                     <div class="stat-card rank-1">
                         <h4 style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; margin-bottom: 10px;">Rank de Bipagem Semanal (AM)</h4>
                         <div id="sa-top-sem-list" style="display:flex; flex-direction: column; gap: 8px; margin-top: 10px;"></div>
                     </div>
-                    <!-- Mensal -->
                     <div class="stat-card rank-3">
                         <h4 style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; margin-bottom: 10px;">Rank de Bipagem Mensal (AM)</h4>
                         <div id="sa-top-mes-list" style="display:flex; flex-direction: column; gap: 8px; margin-top: 10px;"></div>
@@ -480,7 +462,6 @@
                 <div id="monthly-list" class="m-list"></div>
             </section>
 
-            <!-- ABA: ESCALA DE LUGARES -->
             <section id="view-escala" class="hidden esc-layout">
                 <div class="esc-main-content" style="padding: 0;">
                     <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
@@ -489,7 +470,7 @@
                             <button class="btn-ghost" style="border-color: #3b82f6; color: #3b82f6;" onclick="replicateMonday()" title="Copia a escala de Segunda para todos os dias"><i class="fas fa-copy"></i> Replicar Segunda</button>
                             <button class="btn-ghost" style="border-color: var(--accent); color: var(--accent);" onclick="autoDistributeAllLugares()">Sortear Semana Toda</button>
                             <button class="btn-ghost" style="border-color: var(--danger); color: var(--danger);" onclick="clearEscalaSemana()"><i class="fas fa-trash"></i> Limpar Semana</button>
-                            <input type="week" id="hist-date-input" class="btn-ghost" style="background: rgba(255,255,255,0.05); color: #fff; border-color: var(--glass-border);" onchange="updateDatesFromWeek('hist-date-input', 'lugares')" onclick="try{this.showPicker()}catch(e){}">
+                            <input type="week" id="hist-date-input" class="btn-ghost" style="background: rgba(255,255,255,0.05); color: #fff; border-color: var(--glass-border);" onchange="updateDatesFromWeek('hist-date-input', 'lugares')">
                             <button class="btn-primary" style="width:auto; padding: 10px 30px;" onclick="archiveEscalaSemanal()">Salvar Histórico Semanal</button>
                         </div>
                     </div>
@@ -525,7 +506,7 @@
                         <div class="admin-only flex-container" style="display:flex; gap: 10px;">
                             <button class="btn-ghost" style="border-color: var(--accent); color: var(--accent);" onclick="autoDistributeAllDc()">Sortear Semana Toda</button>
                             <button class="btn-ghost" style="border-color: var(--danger); color: var(--danger);" onclick="clearEscalaDc()"><i class="fas fa-trash"></i> Limpar Semana</button>
-                            <input type="week" id="hist-date-input-dc" class="btn-ghost" style="background: rgba(255,255,255,0.05); color: #fff; border-color: var(--glass-border);" onchange="updateDatesFromWeek('hist-date-input-dc', 'dc')" onclick="try{this.showPicker()}catch(e){}">
+                            <input type="week" id="hist-date-input-dc" class="btn-ghost" style="background: rgba(255,255,255,0.05); color: #fff; border-color: var(--glass-border);" onchange="updateDatesFromWeek('hist-date-input-dc', 'dc')">
                             <button class="btn-primary" style="width:auto; padding: 10px 30px;" onclick="archiveEscalaDc()">Salvar Histórico Semanal</button>
                         </div>
                     </div>
@@ -578,7 +559,7 @@
                     </div>
                     <div class="admin-only flex-container" style="display:flex; align-items: center; gap: 10px;">
                         <label style="color: var(--text-muted); font-size: 0.8rem; font-weight: 700;">MÊS REFERÊNCIA:</label>
-                        <input type="month" id="pres-month-select" class="btn-ghost" style="background: rgba(255,255,255,0.05); color: #fff; border-color: var(--primary);" onchange="changePresencaMonth()" onclick="try{this.showPicker()}catch(e){}">
+                        <input type="month" id="pres-month-select" class="btn-ghost" style="background: rgba(255,255,255,0.05); color: #fff; border-color: var(--primary);" onchange="changePresencaMonth()">
                     </div>
                 </div>
 
@@ -597,7 +578,6 @@
         </main>
     </div>
 
-    <!-- Vinculação do motor JavaScript externo -->
     <script src="app.js"></script>
 </body>
 </html>
