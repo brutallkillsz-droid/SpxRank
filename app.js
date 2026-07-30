@@ -59,13 +59,10 @@ let monthlyDataCache = {};
 let globalMetaPHD = 530; 
 let prodHistoryCache = {}; 
 
-let isEscalaSemanaRendered = false;
-let isEscalaDcSemanaRendered = false;
-
 function initCtrl() { return { date: '', totalVol: 0, totalRotas: 0, minTime: null, maxTime: null, finRot: 0, finVol: 0, missRot: 0, missVol: 0, missingRot: 0, missingVol: 0, hourly: {}, sumDurHI: 0, countDurHI: 0 }; }
 
 // =========================================================
-// SIDEBAR MENU & NAVEGAÇÃO 
+// SIDEBAR MENU & NAVEGAÇÃO BLINDADA
 // =========================================================
 function toggleMenu(menuId, headerEl) {
     let el = document.getElementById(menuId);
@@ -104,12 +101,11 @@ function switchTab(id) {
 }
 
 // =========================================================
-// SALVAMENTO CÉLULA A CÉLULA (FIM DO ZERAMENTO E DO LAG)
+// CÉREBRO MATEMÁTICO E SALVAMENTO CÉLULA A CÉLULA
 // =========================================================
 window.updateScaleField = function(diaId, field, element) {
     if (!currentUser || currentUser.r !== 'admin') return;
     let valueText = element.innerText.trim();
-    
     if(!liveEscalaSemana[diaId]) liveEscalaSemana[diaId] = { hc: '16', pct: '0', cap: '16980', dw: '0', phd: '0', capphd: '630', dataDia: '', visible: true, grid: {} };
     
     liveEscalaSemana[diaId][field] = valueText;
@@ -175,7 +171,7 @@ window.saveMetaPHD = function() {
 };
 
 // =========================================================
-// RENDERIZAÇÃO INTELIGENTE DAS ESCALAS (SEM TRAVAMENTOS)
+// RENDERIZAÇÃO INTELIGENTE DAS ESCALAS (FIM DO TRAVAMENTO)
 // =========================================================
 function syncEscalaSemanaUI() {
     const isAdm = currentUser && currentUser.r === 'admin';
@@ -190,6 +186,12 @@ function syncEscalaSemanaUI() {
         let dwEl = document.getElementById(`esc-dw-${id}`); if(dwEl && document.activeElement !== dwEl) dwEl.innerText = escDia.dw || '0';
         let phdEl = document.getElementById(`esc-phd-${id}`); if(phdEl) phdEl.innerText = escDia.phd || '0';
         let capphdEl = document.getElementById(`esc-capphd-${id}`); if(capphdEl && document.activeElement !== capphdEl) capphdEl.innerText = escDia.capphd || '0';
+
+        let eyeBtn = document.getElementById(`btn-eye-sem-${id}`);
+        if(eyeBtn) {
+            eyeBtn.className = escDia.visible ? 'esc-day-btn' : 'esc-day-btn eye-off';
+            eyeBtn.innerHTML = `<i class="fas ${escDia.visible ? 'fa-eye' : 'fa-eye-slash'}"></i> ${escDia.visible ? 'Visível' : 'Oculto'}`;
+        }
 
         escRows.forEach((cargo, rIdx) => {
             escCols.forEach((col, cIdx) => {
@@ -209,15 +211,20 @@ function syncEscalaSemanaUI() {
 }
 
 function renderEscalaSemana() {
-    if(isEscalaSemanaRendered) {
+    const container = document.getElementById('escala-semanal-container'); if(!container) return;
+    const isAdm = currentUser && currentUser.r === 'admin'; 
+    const editAttr = isAdm ? 'contenteditable="true"' : ''; 
+    const editClass = isAdm ? 'editable-cell' : '';
+    
+    // Verifica se a tabela já foi desenhada para este usuário. Se sim, apenas atualiza os dados!
+    let currentRole = isAdm ? 'admin' : 'user';
+    if (container.children.length > 0 && container.getAttribute('data-role') === currentRole) {
         syncEscalaSemanaUI();
         return;
     }
 
-    const container = document.getElementById('escala-semanal-container'); if(!container) return; container.innerHTML = '';
-    const isAdm = currentUser && currentUser.r === 'admin'; 
-    const editAttr = isAdm ? 'contenteditable="true"' : ''; 
-    const editClass = isAdm ? 'editable-cell' : '';
+    container.innerHTML = '';
+    container.setAttribute('data-role', currentRole);
     let renderedAny = false;
 
     escDiasConf.forEach((diaConf, index) => {
@@ -229,11 +236,10 @@ function renderEscalaSemana() {
         let btnCopiar = (isAdm && index > 0) ? `<button class="esc-day-btn" style="border-color: #3b82f6; color: #3b82f6;" onclick="copyFromPreviousDay('${diaConf.id}')"><i class="fas fa-copy"></i> Copiar Anter.</button>` : '';
         let btnSortear = isAdm ? `<button class="esc-day-btn" onclick="autoDistributeOperators('${diaConf.id}')"><i class="fas fa-random"></i> Sortear</button>` : '';
         let eyeClass = escDia.visible ? 'esc-day-btn' : 'esc-day-btn eye-off'; 
-        let btnEye = isAdm ? `<button class="${eyeClass}" onclick="toggleDayVisibility('${diaConf.id}')"><i class="fas fa-eye"></i> ${escDia.visible ? 'Visível' : 'Oculto'}</button>` : '';
-        let headerControls = isAdm ? `<div style="display:flex; gap:8px; align-items:center;">${btnCopiar}${btnSortear}${btnEye}</div>` : '';
+        let btnEye = isAdm ? `<button id="btn-eye-sem-${diaConf.id}" class="${eyeClass}" onclick="toggleDayVisibility('${diaConf.id}')"><i class="fas ${escDia.visible ? 'fa-eye' : 'fa-eye-slash'}"></i> ${escDia.visible ? 'Visível' : 'Oculto'}</button>` : '';
 
         let html = `<div class="esc-block"><table class="esc-table" style="border-bottom:none; margin-bottom: 5px;">
-                <tr><td colspan="7" style="background-color: ${diaConf.bg} !important; color: ${diaConf.cor} !important; padding: 0;"><div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 15px;"><span style="font-size: 14px; font-weight: 800;">${diaConf.nome}</span>${headerControls}</div></td></tr>
+                <tr><td colspan="7" style="background-color: ${diaConf.bg} !important; color: ${diaConf.cor} !important; padding: 0;"><div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 15px;"><span style="font-size: 14px; font-weight: 800;">${diaConf.nome}</span><div style="display:flex; gap:8px;">${btnCopiar}${btnSortear}${btnEye}</div></div></td></tr>
                 <tr>
                     <td class="esc-gray-light ${editClass}" ${editAttr} id="esc-datadia-${diaConf.id}" onblur="updateScaleField('${diaConf.id}', 'dataDia', this)" style="text-align: left; padding-left: 10px; font-weight: bold; font-size: 11px; color: #002f6c; width:20%;">${escDia.dataDia || '(inserir data)'}</td>
                     <td class="esc-gray-light" style="width:10%">Quantidade HC</td><td class="${editClass}" ${editAttr} id="esc-hc-${diaConf.id}" onblur="updateScaleField('${diaConf.id}', 'hc', this)" style="width:10%">${escDia.hc}</td>
@@ -259,7 +265,7 @@ function renderEscalaSemana() {
                 let colspanAttr = (isMergedRow && isMesaGroupCol) ? 'colspan="2"' : '';
                 
                 if (isAdm) {
-                    let selectHtml = `<select class="esc-select" id="esc-cell-${diaConf.id}-${rIdx}-${cIdx}" onchange="handleEscalaSelect('${diaConf.id}', '${rIdx}', '${cIdx}', this)"><option value="">--</option>`;
+                    let selectHtml = `<select class="esc-select" id="esc-cell-${diaConf.id}-${rIdx}-${cIdx}" onchange="handleEscalaSelect('${diaConf.id}', ${rIdx}, ${cIdx}, this)"><option value="">--</option>`;
                     operadoresList.forEach(op => { 
                         let short = formatShortName(op); let selected = (cellVal === op) ? 'selected' : ''; 
                         selectHtml += `<option value="${op}" ${selected}>${short}</option>`;
@@ -274,7 +280,6 @@ function renderEscalaSemana() {
 
     if (!isAdm && !renderedAny) container.innerHTML = '<div style="text-align:center; padding: 50px; color: var(--text-muted); font-size: 1.2rem; font-weight: bold;">A Escala ainda não foi publicada.</div>';
     if(isAdm) { escDiasConf.forEach(d => updateDropdownsAvailability(d.id)); updateSidebar(); }
-    isEscalaSemanaRendered = true;
 }
 
 function syncEscalaDcUI() {
@@ -284,6 +289,12 @@ function syncEscalaDcUI() {
         let escDia = liveEscalaDcSemana[id] || {};
         let dtEl = document.getElementById(`esc-dc-datadia-${id}`); if(dtEl && document.activeElement !== dtEl) dtEl.innerText = escDia.dataDia || '(inserir data)';
         
+        let eyeBtn = document.getElementById(`btn-eye-dc-${id}`);
+        if(eyeBtn) {
+            eyeBtn.className = escDia.visible ? 'esc-day-btn' : 'esc-day-btn eye-off';
+            eyeBtn.innerHTML = `<i class="fas ${escDia.visible ? 'fa-eye' : 'fa-eye-slash'}"></i> ${escDia.visible ? 'Visível' : 'Oculto'}`;
+        }
+
         dcLayout.forEach(sec => {
             let slots = sec.rows * sec.cols;
             for(let i=0; i<slots; i++) {
@@ -304,13 +315,18 @@ function syncEscalaDcUI() {
 }
 
 function renderEscalaDcSemana() {
-    if(isEscalaDcSemanaRendered) {
+    const container = document.getElementById('escala-dc-container'); if(!container) return; 
+    const isAdm = currentUser && currentUser.r === 'admin'; 
+    let currentRole = isAdm ? 'admin' : 'user';
+
+    // Evita redesenhar a tabela do zero se já existir, apenas atualiza
+    if (container.children.length > 0 && container.getAttribute('data-role') === currentRole) {
         syncEscalaDcUI();
         return;
     }
 
-    const container = document.getElementById('escala-dc-container'); if(!container) return; container.innerHTML = '';
-    const isAdm = currentUser && currentUser.r === 'admin'; 
+    container.innerHTML = '';
+    container.setAttribute('data-role', currentRole);
     let renderedAny = false;
 
     escDiasConf.forEach((diaConf, index) => {
@@ -320,7 +336,7 @@ function renderEscalaDcSemana() {
         
         let btnSortear = isAdm ? `<button class="esc-day-btn" onclick="autoDistributeDc('${diaConf.id}')"><i class="fas fa-random"></i> Sortear</button>` : '';
         let eyeClass = escDia.visible ? 'esc-day-btn' : 'esc-day-btn eye-off'; 
-        let btnEye = isAdm ? `<button class="${eyeClass}" onclick="toggleDayVisibilityDc('${diaConf.id}')"><i class="fas fa-eye"></i> ${escDia.visible ? 'Visível' : 'Oculto'}</button>` : '';
+        let btnEye = isAdm ? `<button id="btn-eye-dc-${diaConf.id}" class="${eyeClass}" onclick="toggleDayVisibilityDc('${diaConf.id}')"><i class="fas ${escDia.visible ? 'fa-eye' : 'fa-eye-slash'}"></i> ${escDia.visible ? 'Visível' : 'Oculto'}</button>` : '';
         let headerControls = isAdm ? `<div style="display:flex; gap:8px; align-items:center;">${btnSortear}${btnEye}</div>` : '';
 
         let html = `<div class="esc-block"><table class="esc-table" style="border-bottom:none; margin-bottom: 5px;">
@@ -356,133 +372,6 @@ function renderEscalaDcSemana() {
 
     if (!isAdm && !renderedAny) container.innerHTML = '<div style="text-align:center; padding: 50px; color: var(--text-muted); font-size: 1.2rem; font-weight: bold;">A Escala Doblecheck ainda não foi publicada.</div>';
     if(isAdm) { escDiasConf.forEach(d => updateDropdownsAvailabilityDc(d.id)); updateSidebarDc(); }
-    isEscalaDcSemanaRendered = true;
-}
-
-// =========================================================
-// SALVAMENTO DE HISTÓRICO COM CONTAGEM DE DIAS TRABALHADOS
-// =========================================================
-async function archiveEscalaSemanal() {
-    let dataInput = document.getElementById('hist-date-input').value; if(!dataInput) { showToast("Selecione a semana de referência no topo."); return; }
-    showToast("Salvando Semana no Histórico...");
-    
-    let resumoDias = {};
-    escDiasConf.forEach(diaConf => {
-        let escDia = liveEscalaSemana[diaConf.id];
-        if(escDia && escDia.grid) {
-            escRows.forEach((cargo, rIdx) => {
-                escCols.forEach((col, cIdx) => {
-                    let op = escDia.grid[rIdx] ? escDia.grid[rIdx][cIdx] : null;
-                    if(op) {
-                        if(!resumoDias[op]) resumoDias[op] = { Total: 0 };
-                        let roleName = `${cargo} - ${col.replace(' VOLUMOSO','')}`;
-                        resumoDias[op][roleName] = (resumoDias[op][roleName] || 0) + 1;
-                        resumoDias[op].Total += 1;
-                    }
-                });
-            });
-        }
-    });
-    liveEscalaSemana.resumoDias = resumoDias;
-
-    try { await dbFirebase.ref('shopee_escala_history/' + dataInput).set(liveEscalaSemana); showToast("Semana Salva com Sucesso!"); } catch(e) { console.error(e); showToast("Erro."); }
-}
-
-async function archiveEscalaDc() {
-    let dataInput = document.getElementById('hist-date-input-dc').value; if(!dataInput) { showToast("Selecione a semana de referência no topo."); return; }
-    showToast("Salvando Semana DC...");
-
-    let resumoDias = {};
-    escDiasConf.forEach(diaConf => {
-        let escDia = liveEscalaDcSemana[diaConf.id];
-        if(escDia && escDia.grid) {
-            dcLayout.forEach(sec => {
-                let slots = sec.rows * sec.cols;
-                for(let i=0; i<slots; i++) {
-                    let op = escDia.grid[`${sec.id}_${i}`];
-                    if(op) {
-                        if(!resumoDias[op]) resumoDias[op] = { Total: 0 };
-                        let roleName = sec.title;
-                        resumoDias[op][roleName] = (resumoDias[op][roleName] || 0) + 1;
-                        resumoDias[op].Total += 1;
-                    }
-                }
-            });
-        }
-    });
-    liveEscalaDcSemana.resumoDias = resumoDias;
-
-    try { await dbFirebase.ref('shopee_escala_dc_history/' + dataInput).set(liveEscalaDcSemana); showToast("Semana Salva com Sucesso!"); } catch(e) { console.error(e); showToast("Erro."); }
-}
-
-function renderHistEscala(tipo) {
-    let containerId = tipo === 'lugares' ? 'hist-escala-list' : 'hist-escala-dc-list';
-    let cacheSource = tipo === 'lugares' ? historyDataCache : historyDcDataCache;
-    const container = document.getElementById(containerId); if(!container) return;
-    
-    let keys = Object.keys(cacheSource).sort((a,b) => b.localeCompare(a)); 
-    if(keys.length === 0) { container.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:40px">Nenhum histórico encontrado.</div>'; return; }
-    container.innerHTML = '';
-    
-    keys.forEach((dateKey, index) => {
-        const semanaData = cacheSource[dateKey];
-        let displayWeek = dateKey; if(dateKey.includes('-W')) { let pts = dateKey.split('-W'); displayWeek = "Semana " + pts[1] + " de " + pts[0]; }
-
-        let tableHtml = `<div class="hidden" id="hist-det-${tipo}-${index}" style="margin-top: 15px; border-top: 1px solid var(--glass-border); padding-top: 15px; overflow-x: auto;"><table class="hist-table"><tr><th>COLABORADOR</th>`;
-        
-        escDiasConf.forEach(diaConf => { let dData = semanaData[diaConf.id]?.dataDia || diaConf.nome.replace('ESCALA ', ''); tableHtml += `<th>${diaConf.nome.replace('ESCALA ', '')}<br><span style="font-size:9px; color:var(--text-muted)">${dData}</span></th>`; });
-        tableHtml += `</tr>`;
-
-        let workedOps = new Set();
-        escDiasConf.forEach(d => { let grid = semanaData[d.id]?.grid; if(grid) { Object.values(grid).forEach(op => { if(typeof op === 'string' && op) workedOps.add(op); else if (typeof op === 'object') { Object.values(op).forEach(v => { if(v) workedOps.add(v); }); } }); } });
-        let sortedOps = Array.from(workedOps).sort();
-
-        if(sortedOps.length === 0) {
-            tableHtml += `<tr><td colspan="7" style="color:var(--text-muted); font-size:10px;">Nenhum operador alocado.</td></tr>`;
-        } else {
-            sortedOps.forEach(op => {
-                tableHtml += `<tr><td style="text-align:left; font-size:10px; font-weight:bold;">${op}</td>`;
-                escDiasConf.forEach(d => {
-                    let grid = semanaData[d.id]?.grid; let roleStr = "-";
-                    if(grid) {
-                        if(tipo === 'lugares') {
-                            for(let r=0; r<escRows.length; r++) { if(grid[r]) { for(let c=0; c<escCols.length; c++) { if(grid[r][c] === op) { roleStr = `<span style="color:var(--primary); font-weight:800;">${escRows[r]}</span><br><span style="font-size:9px; color:var(--text-muted)">${escCols[c]}</span>`; } } } }
-                        } else {
-                            dcLayout.forEach(sec => { let slots = sec.rows * sec.cols; for(let i=0; i<slots; i++) { if(grid[`${sec.id}_${i}`] === op) { roleStr = `<span style="color:var(--primary); font-weight:800;">${sec.title}</span><br><span style="font-size:9px; color:var(--text-muted)">Vaga ${i+1}</span>`; } } });
-                        }
-                    }
-                    tableHtml += `<td style="font-size:10px;">${roleStr}</td>`;
-                });
-                tableHtml += `</tr>`;
-            });
-        }
-        
-        let resumoHtml = '';
-        if(semanaData.resumoDias) {
-            resumoHtml = `<div style="background: rgba(0,0,0,0.1); padding: 15px; border-radius: 8px; margin-top: 15px;">
-                          <h4 style="color:var(--primary); font-size: 0.9rem; margin-bottom: 10px;">Resumo de Atuação na Semana</h4>
-                          <table class="hist-table">
-                          <tr><th style="width: 30%;">Operador</th><th style="width: 15%;">Total Dias</th><th>Detalhamento</th></tr>`;
-            Object.keys(semanaData.resumoDias).sort().forEach(op => {
-                let data = semanaData.resumoDias[op];
-                let details = Object.keys(data).filter(k => k !== 'Total').map(k => `<span style="color:var(--accent)">${k}:</span> <b>${data[k]}x</b>`).join(' | ');
-                resumoHtml += `<tr><td style="text-align:left; font-weight:bold;">${op}</td><td>${data.Total}</td><td style="text-align:left; font-size:10px;">${details}</td></tr>`;
-            });
-            resumoHtml += `</table></div>`;
-        }
-
-        tableHtml += `</table> ${resumoHtml} </div>`;
-
-        const div = document.createElement('div'); div.className = `stat-card`; div.style.padding = "20px"; div.style.marginBottom = "15px";
-        let kpis = '';
-        if(tipo === 'lugares') {
-            let resumo = semanaData['segunda'] || {hc:'0', pct:'0', dw:'0'};
-            kpis = `<div style="display:grid; grid-template-columns: repeat(3, 1fr); gap: 15px;"><div class="si"><div class="si-l">Headcount (Segunda)</div><div class="si-v" style="font-size: 1.2rem;">${resumo.hc}</div></div><div class="si"><div class="si-l">Pct Proc. (Segunda)</div><div class="si-v" style="color:var(--success); font-size: 1.2rem;">${resumo.pct}</div></div><div class="si"><div class="si-l">Nec. DW (Segunda)</div><div class="si-v" style="color:var(--danger); font-size: 1.2rem;">${resumo.dw}</div></div></div>`;
-        }
-
-        div.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px; border-bottom: 1px solid var(--glass-border); padding-bottom: 15px;"><div style="font-weight: 800; font-size: 1.2rem; color: var(--primary);"><i class="fas fa-calendar-week" style="margin-right: 8px;"></i> ${displayWeek}</div><button class="btn-ghost" style="padding: 6px 12px; font-size: 0.75rem;" onclick="document.getElementById('hist-det-${tipo}-${index}').classList.toggle('hidden')"><i class="fas fa-search"></i> Ver Relatório</button></div>${kpis}${tableHtml}`;
-        container.appendChild(div);
-    });
 }
 
 // =========================================================
@@ -610,6 +499,9 @@ async function renderSiteliderDashboard() {
             document.getElementById('sl-phd-mes-lbl').innerText = `MÉDIA DO MÊS (${percMesPHD}% DA META)`;
         }
 
+        // ==================================================
+        // LABELS DE TEMPO E ANÁLISE DE GAP (BLINDADO)
+        // ==================================================
         let elMetaDisplay = document.getElementById('sa-meta-display');
         if (elMetaDisplay) elMetaDisplay.innerText = globalMetaPHD;
 
@@ -649,22 +541,25 @@ async function renderSiteliderDashboard() {
         // =========================================================================
         // RANK DE BIPAGEM AM (FILTRO EXATO DE DATAS)
         // =========================================================================
-        let targetInputDate = document.getElementById('p-data')?.value || ''; 
-        let latestDayVolMap = {};
-        if (targetInputDate && prodHistoryCache[targetInputDate]) {
-            latestDayVolMap = prodHistoryCache[targetInputDate];
-        }
-
+        
         let semTotals = {};
         let weekDatesStrArray = weekDates.map(d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'));
+        
+        let latestDayWithDataStr = null;
+        let latestDayVolMap = {};
+
+        // Rastreia a semana e puxa a última data que tem dados como o "Diário", além de somar a Semana.
         weekDatesStrArray.forEach(dStr => {
             if (prodHistoryCache[dStr]) {
+                latestDayWithDataStr = dStr;
+                latestDayVolMap = prodHistoryCache[dStr];
                 for(let op in prodHistoryCache[dStr]) {
                     semTotals[op] = (semTotals[op] || 0) + prodHistoryCache[dStr][op];
                 }
             }
         });
 
+        // Soma Mensal (Puxa do mês exato de referência)
         let mesTotals = {};
         for(let dStr in prodHistoryCache) {
             if (dStr.startsWith(refMonthStr)) { 
@@ -839,19 +734,385 @@ presencaListener = dbFirebase.ref('shopee_presenca_live/' + currentPresMes).on('
 });
 
 // =========================================================
-// AUTO-FILL ESTAÇÕES (MESA DA ESCALA) - ISOLADO E BLINDADO
+// RENDERIZADOR E CHECK DE AUTENTICAÇÃO
 // =========================================================
+function checkSession() {
+    const saved = localStorage.getItem('spxUser');
+    if(saved) {
+        const found = JSON.parse(saved); currentUser = found;
+        document.getElementById('login-screen').style.display = 'none'; document.getElementById('app-shell').style.display = 'flex';
+        document.getElementById('display-user').innerText = found.u.toUpperCase();
+        if(found.r === 'admin') { document.body.classList.add('is-admin'); }
+        initProdGrid(); let pm = document.getElementById('pres-month-select'); if(pm) pm.value = currentPresMes; 
+        switchTab('escala'); 
+    }
+}
+
+function login() {
+    const u = document.getElementById('user').value; const p = document.getElementById('pass').value;
+    const found = USERS.find(x => x.u === u && x.p === p);
+    if(found) {
+        currentUser = found; localStorage.setItem('spxUser', JSON.stringify(found));
+        document.getElementById('login-screen').style.display = 'none'; document.getElementById('app-shell').style.display = 'flex';
+        document.getElementById('display-user').innerText = u.toUpperCase();
+        if(found.r === 'admin') { document.body.classList.add('is-admin'); }
+        initProdGrid(); let pm = document.getElementById('pres-month-select'); if(pm) pm.value = currentPresMes; 
+        switchTab('escala');
+    } else { document.getElementById('login-err').style.display = 'block'; }
+}
+
+function logout() { localStorage.removeItem('spxUser'); location.reload(); }
+window.onload = function() { checkSession(); let pw = document.getElementById('pass'); if(pw) pw.addEventListener('keypress', e => { if(e.key==='Enter') login(); }); };
+
+function showToast(msg) { const t = document.getElementById('toast'); if(!t) return; t.innerText = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 3000); }
+function fmtTime(s) { const m = Math.floor(s/60); const sec = Math.round(s%60); return `${m}m ${sec}s`; }
+function secToHHMMSS(s) { if(!s) return "00:00:00"; const h = Math.floor(s/3600).toString().padStart(2,'0'); const m = Math.floor((s%3600)/60).toString().padStart(2,'0'); const sec = Math.floor(s%60).toString().padStart(2,'0'); return `${h}:${m}:${sec}`; }
+function excelDate(serial) { if(!serial) return "-"; const date = new Date((serial - 25569) * 86400 * 1000); return date.toLocaleDateString('pt-BR'); }
+function fmtExcelTime(dec) { if(!dec) return "-"; let s = Math.round(dec * 86400); return secToHHMMSS(s).substring(0,5); }
+function readExcelFile(file, parseDates = false) { return new Promise(resolve => { const reader = new FileReader(); reader.onload = e => { const workbook = XLSX.read(new Uint8Array(e.target.result), { type: 'array', cellDates: parseDates }); const data = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], {header:1}); resolve(data); }; reader.readAsArrayBuffer(file); }); }
+
+// =========================================================
+// ESCALA DE PROCESSAMENTO: FUNÇÕES SECUNDÁRIAS E LIMPEZA
+// =========================================================
+function updateDatesFromWeek(inputId, tipo) {
+    if (!currentUser || currentUser.r !== 'admin') return;
+    let inputEl = document.getElementById(inputId); if(!inputEl) return;
+    const weekVal = inputEl.value; if (!weekVal) return;
+    const parts = weekVal.split('-W'); if (parts.length !== 2) return;
+    const year = parseInt(parts[0]); const week = parseInt(parts[1]);
+    const monday = getDateOfISOWeek(week, year);
+
+    const offsets = { 'segunda': 0, 'terca': 1, 'quarta': 2, 'quinta': 3, 'sexta': 4, 'sabado': 5, 'domingo': 6 };
+    let objAlvo = tipo === 'lugares' ? liveEscalaSemana : liveEscalaDcSemana;
+
+    for (let diaId in offsets) {
+        if (!objAlvo[diaId]) objAlvo[diaId] = { hc: '16', pct: '0', cap: '16980', dw: '0', phd: '0', capphd: '630', dataDia: '', visible: false, grid: {} };
+        let d = new Date(monday.getTime()); d.setDate(d.getDate() + offsets[diaId]);
+        let dayStr = String(d.getDate()).padStart(2, '0'); let monthStr = String(d.getMonth() + 1).padStart(2, '0');
+        objAlvo[diaId].dataDia = `${dayStr}/${monthStr}`;
+    }
+    let refDb = tipo === 'lugares' ? 'shopee_escala_semana_live' : 'shopee_escala_dc_live';
+    dbFirebase.ref(refDb).set(objAlvo).then(() => { showToast("Datas preenchidas!"); });
+}
+
+function updateDropdownsAvailability(diaId) {
+    if (!currentUser || currentUser.r !== 'admin') return;
+    let selectedValues = []; let absentees = getAbsenteesForDay(diaId, false);
+    escRows.forEach((cargo, rIdx) => { escCols.forEach((col, cIdx) => { let el = document.getElementById(`esc-cell-${diaId}-${rIdx}-${cIdx}`); if (el && el.value) selectedValues.push(el.value); }); });
+    escRows.forEach((cargo, rIdx) => { escCols.forEach((col, cIdx) => {
+            let el = document.getElementById(`esc-cell-${diaId}-${rIdx}-${cIdx}`);
+            if (el) { 
+                Array.from(el.options).forEach(opt => { 
+                    if (opt.value === "") return; 
+                    let isUsedElsewhere = (selectedValues.includes(opt.value) && opt.value !== el.value);
+                    let isAbsent = absentees.includes(opt.value);
+                    if (isUsedElsewhere || isAbsent) { 
+                        opt.disabled = true; opt.hidden = true; opt.style.display = 'none';      
+                        if(isAbsent) opt.text = formatShortName(opt.value) + " (OFF)"; else opt.text = formatShortName(opt.value);
+                    } else { 
+                        opt.disabled = false; opt.hidden = false; opt.style.display = ''; opt.text = formatShortName(opt.value);
+                    } 
+                }); 
+            }
+        });
+    });
+}
+
+function updateDropdownsAvailabilityDc(diaId) {
+    if (!currentUser || currentUser.r !== 'admin') return;
+    let selectedValues = []; let absentees = getAbsenteesForDay(diaId, true);
+    let prevAllocated = []; let currentIdx = escDiasConf.findIndex(d => d.id === diaId);
+    if (currentIdx > 0) { let prevDiaId = escDiasConf[currentIdx - 1].id; let prevGrid = liveEscalaDcSemana[prevDiaId]?.grid; if (prevGrid) Object.values(prevGrid).forEach(op => { if(op) prevAllocated.push(op); }); }
+
+    dcLayout.forEach(sec => { let slots = sec.rows * sec.cols; for(let i=0; i<slots; i++) { let el = document.getElementById(`esc-dc-cell-${diaId}-${sec.id}_${i}`); if (el && el.value) selectedValues.push(el.value); } });
+    
+    dcLayout.forEach(sec => {
+        let slots = sec.rows * sec.cols;
+        for(let i=0; i<slots; i++) {
+            let el = document.getElementById(`esc-dc-cell-${diaId}-${sec.id}_${i}`);
+            if (el) { 
+                Array.from(el.options).forEach(opt => { 
+                    if (opt.value === "") return; 
+                    let isUsedElsewhere = (selectedValues.includes(opt.value) && opt.value !== el.value);
+                    let isAbsent = absentees.includes(opt.value);
+                    let usedYesterday = prevAllocated.includes(opt.value);
+                    if (isUsedElsewhere || isAbsent || usedYesterday) { 
+                        opt.disabled = true; opt.hidden = true; opt.style.display = 'none';      
+                        let rText = isAbsent ? " (OFF)" : (usedYesterday ? " (ONTEM)" : "");
+                        opt.text = formatShortName(opt.value) + rText;
+                    } else { opt.disabled = false; opt.hidden = false; opt.style.display = ''; opt.text = formatShortName(opt.value); } 
+                }); 
+            }
+        }
+    });
+}
+
+function updateSidebar() {
+    if (!currentUser || currentUser.r !== 'admin') return;
+    let container = document.getElementById('sidebar-names-list'); if (!container) return;
+    let selectedValues = []; let absentees = getAbsenteesForDay(currentSidebarDay, false);
+    escRows.forEach((cargo, rIdx) => { escCols.forEach((col, cIdx) => { let el = document.getElementById(`esc-cell-${currentSidebarDay}-${rIdx}-${cIdx}`); if (el && el.value) selectedValues.push(el.value); }); });
+
+    let html = ''; let availableCount = 0;
+    operadoresList.forEach(op => { 
+        if (!selectedValues.includes(op) && !absentees.includes(op)) { 
+            html += `<div class="sidebar-name-item"><div style="display:flex; align-items:center; gap:8px;"><i class="fas fa-user"></i> ${op}</div><i class="fas fa-times" style="color:var(--danger); cursor:pointer; font-size:1rem; padding:0 5px;" onclick="removeCollaborator('${op}')" title="Desligar Colaborador"></i></div>`; 
+            availableCount++; 
+        } 
+    });
+    if(availableCount === 0) { html = `<div style="text-align:center; color: var(--success); font-weight: bold; margin-top: 20px; font-size: 1rem;"><i class="fas fa-check-circle"></i> Todos Alocados!</div>`; }
+    container.innerHTML = html; let countEl = document.getElementById('sidebar-count'); if(countEl) countEl.innerText = `(${availableCount})`; 
+    let sideSelect = document.getElementById('sidebar-day-select'); if(sideSelect) sideSelect.value = currentSidebarDay;
+}
+
+function updateSidebarDc() {
+    if (!currentUser || currentUser.r !== 'admin') return;
+    let container = document.getElementById('sidebar-names-list-dc'); if (!container) return;
+    let selectedValues = []; let absentees = getAbsenteesForDay(currentSidebarDcDay, true);
+    let prevAllocated = []; let currentIdx = escDiasConf.findIndex(d => d.id === currentSidebarDcDay);
+    if (currentIdx > 0) { let prevDiaId = escDiasConf[currentIdx - 1].id; let prevGrid = liveEscalaDcSemana[prevDiaId]?.grid; if (prevGrid) Object.values(prevGrid).forEach(op => { if(op) prevAllocated.push(op); }); }
+
+    dcLayout.forEach(sec => { let slots = sec.rows * sec.cols; for(let i=0; i<slots; i++) { let el = document.getElementById(`esc-dc-cell-${currentSidebarDcDay}-${sec.id}_${i}`); if (el && el.value) selectedValues.push(el.value); } });
+
+    let html = ''; let availableCount = 0;
+    operadoresList.forEach(op => { 
+        if (!selectedValues.includes(op) && !absentees.includes(op) && !prevAllocated.includes(op)) { 
+            html += `<div class="sidebar-name-item"><div style="display:flex; align-items:center; gap:8px;"><i class="fas fa-user"></i> ${op}</div><i class="fas fa-times" style="color:var(--danger); cursor:pointer; font-size:1rem; padding:0 5px;" onclick="removeCollaborator('${op}')"></i></div>`; 
+            availableCount++; 
+        } 
+    });
+    if(availableCount === 0) { html = `<div style="text-align:center; color: var(--success); font-weight: bold; margin-top: 20px; font-size: 1rem;"><i class="fas fa-check-circle"></i> Todos Alocados ou Sem Efetivo!</div>`; }
+    container.innerHTML = html; let countEl = document.getElementById('sidebar-count-dc'); if(countEl) countEl.innerText = `(${availableCount})`; 
+    let sideSelect = document.getElementById('sidebar-day-select-dc'); if(sideSelect) sideSelect.value = currentSidebarDcDay;
+}
+
+function changeSidebarDay(tipo) { 
+    if(tipo === 'lugares') { currentSidebarDay = document.getElementById('sidebar-day-select').value; updateSidebar(); }
+    else { currentSidebarDcDay = document.getElementById('sidebar-day-select-dc').value; updateSidebarDc(); }
+}
+
+function toggleDayVisibility(diaId) {
+    if (!currentUser || currentUser.r !== 'admin') return;
+    if (!liveEscalaSemana[diaId]) liveEscalaSemana[diaId] = { hc: '16', pct: '0', cap: '16980', dw: '0', phd: '0', capphd: '630', dataDia: '(inserir data)', visible: false, grid: {} };
+    liveEscalaSemana[diaId].visible = !liveEscalaSemana[diaId].visible;
+    dbFirebase.ref(`shopee_escala_semana_live/${diaId}/visible`).set(liveEscalaSemana[diaId].visible);
+}
+
+function toggleDayVisibilityDc(diaId) {
+    if (!currentUser || currentUser.r !== 'admin') return;
+    if (!liveEscalaDcSemana[diaId]) liveEscalaDcSemana[diaId] = { dataDia: '(inserir data)', visible: false, grid: {} };
+    liveEscalaDcSemana[diaId].visible = !liveEscalaDcSemana[diaId].visible;
+    dbFirebase.ref(`shopee_escala_dc_live/${diaId}/visible`).set(liveEscalaDcSemana[diaId].visible);
+}
+
+function clearEscalaSemana() {
+    if(confirm("Tem certeza que deseja limpar TODA a escala de Processamento?")) {
+        let oldData = {...liveEscalaSemana}; liveEscalaSemana = {};
+        escDiasConf.forEach(d => { let prevData = oldData[d.id] ? oldData[d.id].dataDia : '(inserir data)'; let prevVis = oldData[d.id] && oldData[d.id].visible !== undefined ? oldData[d.id].visible : false; liveEscalaSemana[d.id] = { hc: '16', pct: '0', cap: '16980', dw: '0', phd: '0', capphd: '630', dataDia: prevData, visible: prevVis, grid: {} }; });
+        dbFirebase.ref('shopee_escala_semana_live').set(liveEscalaSemana).then(() => { showToast("Escala limpa com sucesso!"); }).catch(e => console.error(e));
+    }
+}
+
+function clearEscalaDc() {
+    if(confirm("Tem certeza que deseja limpar TODA a escala de Doblecheck?")) {
+        let oldData = {...liveEscalaDcSemana}; liveEscalaDcSemana = {};
+        escDiasConf.forEach(d => { let prevData = oldData[d.id] ? oldData[d.id].dataDia : '(inserir data)'; let prevVis = oldData[d.id] && oldData[d.id].visible !== undefined ? oldData[d.id].visible : false; liveEscalaDcSemana[d.id] = { dataDia: prevData, visible: prevVis, grid: {} }; });
+        dbFirebase.ref('shopee_escala_dc_live').set(liveEscalaDcSemana).then(() => { showToast("Escala DC limpa!"); }).catch(e => console.error(e));
+    }
+}
+
+window.replicateMonday = function() {
+    if(!confirm("Isso vai copiar a escala de SEGUNDA-FEIRA para todos os outros dias da semana. Deseja continuar?")) return;
+    let baseGrid = liveEscalaSemana['segunda']?.grid;
+    if(!baseGrid || Object.keys(baseGrid).length === 0) return showToast("A escala de Segunda está vazia!");
+    escDiasConf.forEach((d, idx) => {
+        if (idx === 0) return; let diaId = d.id;
+        if(!liveEscalaSemana[diaId]) liveEscalaSemana[diaId] = { hc: '16', pct: '0', cap: '16980', dw: '0', phd: '0', capphd: '630', dataDia: '(inserir data)', visible: false, grid: {} };
+        let absentees = getAbsenteesForDay(diaId, false); let clonedGrid = {};
+        for(let r in baseGrid) { clonedGrid[r] = {}; for(let c in baseGrid[r]) { let op = baseGrid[r][c]; if (op && !absentees.includes(op)) clonedGrid[r][c] = op; else clonedGrid[r][c] = ""; } }
+        liveEscalaSemana[diaId].grid = clonedGrid;
+    });
+    dbFirebase.ref('shopee_escala_semana_live').set(liveEscalaSemana).then(() => { showToast("Semana preenchida baseada na Segunda!"); });
+};
+
+function autoDistributeAllLugares() { if(confirm("Sortear a semana toda? Isso substituirá as vagas atuais.")) { escDiasConf.forEach(d => { autoDistributeOperators(d.id, false); }); dbFirebase.ref('shopee_escala_semana_live').set(liveEscalaSemana).then(() => { showToast("Semana completa sorteada!"); }).catch(e => console.error(e)); } }
+function autoDistributeAllDc() { if(confirm("Sortear a semana toda de DC? Lembre-se que quem rodar em um dia não roda no dia seguinte.")) { escDiasConf.forEach(d => { autoDistributeDc(d.id, false); }); dbFirebase.ref('shopee_escala_dc_live').set(liveEscalaDcSemana).then(() => { showToast("Semana DC sorteada!"); }).catch(e => console.error(e)); } }
+
+function autoDistributeOperators(diaId, autoSave = true) {
+    if(!liveEscalaSemana[diaId]) liveEscalaSemana[diaId] = { hc: '16', pct: '0', cap: '16980', dw: '0', phd: '0', capphd: '630', dataDia: '(inserir data)', visible: false, grid: {} };
+    liveEscalaSemana[diaId].grid = {}; for(let r=0; r<escRows.length; r++) liveEscalaSemana[diaId].grid[r] = {};
+    let lastRoles = {}; let currentIdx = escDiasConf.findIndex(d => d.id === diaId);
+    if (currentIdx > 0) { let prevDiaId = escDiasConf[currentIdx - 1].id; let prevGrid = liveEscalaSemana[prevDiaId]?.grid; if (prevGrid) escRows.forEach((cargo, rIdx) => { if (prevGrid[rIdx]) Object.values(prevGrid[rIdx]).forEach(op => { if(op) lastRoles[op] = rIdx; }); }); }
+    let absentees = getAbsenteesForDay(diaId, false); let pool = operadoresList.filter(op => !absentees.includes(op)); pool.sort(() => Math.random() - 0.5); 
+    for (let cIdx = 0; cIdx < escCols.length; cIdx++) {
+        for (let rIdx = 0; rIdx < escRows.length; rIdx++) {
+            if (pool.length === 0) break;
+            const isMergedRow = (rIdx === 0 || rIdx === 3); const isSkipCol = (isMergedRow && (cIdx === 1 || cIdx === 3 || cIdx === 5 || cIdx === 7)); if (isSkipCol) continue;
+            let foundIdx = pool.findIndex(op => lastRoles[op] !== rIdx); if (foundIdx === -1) foundIdx = 0; 
+            let chosenOp = pool.splice(foundIdx, 1)[0]; liveEscalaSemana[diaId].grid[rIdx][cIdx] = chosenOp;
+        }
+        if(pool.length === 0) break;
+    }
+    if(autoSave) dbFirebase.ref('shopee_escala_semana_live').set(liveEscalaSemana).then(() => { showToast("Sorteio feito para " + diaId.toUpperCase()); }).catch(e => console.error(e));
+}
+
+function autoDistributeDc(diaId, autoSave = true) {
+    if(!liveEscalaDcSemana[diaId]) liveEscalaDcSemana[diaId] = { dataDia: '(inserir data)', visible: false, grid: {} };
+    liveEscalaDcSemana[diaId].grid = {};
+    let prevAllocated = []; let currentIdx = escDiasConf.findIndex(d => d.id === diaId);
+    if (currentIdx > 0) { let prevDiaId = escDiasConf[currentIdx - 1].id; let prevGrid = liveEscalaDcSemana[prevDiaId]?.grid; if (prevGrid) { Object.values(prevGrid).forEach(op => { if(op) prevAllocated.push(op); }); } }
+    let absentees = getAbsenteesForDay(diaId, true); let pool = operadoresList.filter(op => !absentees.includes(op) && !prevAllocated.includes(op)); pool.sort(() => Math.random() - 0.5); 
+    dcLayout.forEach(sec => { let slots = sec.rows * sec.cols; for(let i=0; i<slots; i++) { let cellId = `${sec.id}_${i}`; let chosenOp = pool.length > 0 ? pool.shift() : ""; liveEscalaDcSemana[diaId].grid[cellId] = chosenOp; } });
+    if(autoSave) dbFirebase.ref('shopee_escala_dc_live').set(liveEscalaDcSemana).then(() => { showToast("Sorteio DC feito para " + diaId.toUpperCase()); }).catch(e => console.error(e));
+}
+
+// =========================================================
+// SALVAMENTO DE HISTÓRICO COM CONTAGEM DE DIAS TRABALHADOS
+// =========================================================
+async function archiveEscalaSemanal() {
+    let dataInput = document.getElementById('hist-date-input').value; if(!dataInput) { showToast("Selecione a semana de referência no topo."); return; }
+    showToast("Salvando Semana no Histórico...");
+    let resumoDias = {};
+    escDiasConf.forEach(diaConf => {
+        let escDia = liveEscalaSemana[diaConf.id];
+        if(escDia && escDia.grid) {
+            escRows.forEach((cargo, rIdx) => {
+                escCols.forEach((col, cIdx) => {
+                    let op = escDia.grid[rIdx] ? escDia.grid[rIdx][cIdx] : null;
+                    if(op) {
+                        if(!resumoDias[op]) resumoDias[op] = { Total: 0 };
+                        let roleName = `${cargo} - ${col.replace(' VOLUMOSO','')}`;
+                        resumoDias[op][roleName] = (resumoDias[op][roleName] || 0) + 1;
+                        resumoDias[op].Total += 1;
+                    }
+                });
+            });
+        }
+    });
+    liveEscalaSemana.resumoDias = resumoDias;
+    try { await dbFirebase.ref('shopee_escala_history/' + dataInput).set(liveEscalaSemana); showToast("Semana Salva com Sucesso!"); } catch(e) { console.error(e); showToast("Erro."); }
+}
+
+async function archiveEscalaDc() {
+    let dataInput = document.getElementById('hist-date-input-dc').value; if(!dataInput) { showToast("Selecione a semana de referência no topo."); return; }
+    showToast("Salvando Semana DC...");
+    let resumoDias = {};
+    escDiasConf.forEach(diaConf => {
+        let escDia = liveEscalaDcSemana[diaConf.id];
+        if(escDia && escDia.grid) {
+            dcLayout.forEach(sec => {
+                let slots = sec.rows * sec.cols;
+                for(let i=0; i<slots; i++) {
+                    let op = escDia.grid[`${sec.id}_${i}`];
+                    if(op) {
+                        if(!resumoDias[op]) resumoDias[op] = { Total: 0 };
+                        let roleName = sec.title;
+                        resumoDias[op][roleName] = (resumoDias[op][roleName] || 0) + 1;
+                        resumoDias[op].Total += 1;
+                    }
+                }
+            });
+        }
+    });
+    liveEscalaDcSemana.resumoDias = resumoDias;
+    try { await dbFirebase.ref('shopee_escala_dc_history/' + dataInput).set(liveEscalaDcSemana); showToast("Semana Salva com Sucesso!"); } catch(e) { console.error(e); showToast("Erro."); }
+}
+
+function renderHistEscala(tipo) {
+    let containerId = tipo === 'lugares' ? 'hist-escala-list' : 'hist-escala-dc-list';
+    let cacheSource = tipo === 'lugares' ? historyDataCache : historyDcDataCache;
+    const container = document.getElementById(containerId); if(!container) return;
+    let keys = Object.keys(cacheSource).sort((a,b) => b.localeCompare(a)); 
+    if(keys.length === 0) { container.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:40px">Nenhum histórico encontrado.</div>'; return; }
+    container.innerHTML = '';
+    
+    keys.forEach((dateKey, index) => {
+        const semanaData = cacheSource[dateKey];
+        let displayWeek = dateKey; if(dateKey.includes('-W')) { let pts = dateKey.split('-W'); displayWeek = "Semana " + pts[1] + " de " + pts[0]; }
+
+        let tableHtml = `<div class="hidden" id="hist-det-${tipo}-${index}" style="margin-top: 15px; border-top: 1px solid var(--glass-border); padding-top: 15px; overflow-x: auto;"><table class="hist-table"><tr><th>COLABORADOR</th>`;
+        escDiasConf.forEach(diaConf => { let dData = semanaData[diaConf.id]?.dataDia || diaConf.nome.replace('ESCALA ', ''); tableHtml += `<th>${diaConf.nome.replace('ESCALA ', '')}<br><span style="font-size:9px; color:var(--text-muted)">${dData}</span></th>`; });
+        tableHtml += `</tr>`;
+
+        let workedOps = new Set();
+        escDiasConf.forEach(d => { let grid = semanaData[d.id]?.grid; if(grid) { Object.values(grid).forEach(op => { if(typeof op === 'string' && op) workedOps.add(op); else if (typeof op === 'object') { Object.values(op).forEach(v => { if(v) workedOps.add(v); }); } }); } });
+        let sortedOps = Array.from(workedOps).sort();
+
+        if(sortedOps.length === 0) {
+            tableHtml += `<tr><td colspan="7" style="color:var(--text-muted); font-size:10px;">Nenhum operador alocado.</td></tr>`;
+        } else {
+            sortedOps.forEach(op => {
+                tableHtml += `<tr><td style="text-align:left; font-size:10px; font-weight:bold;">${op}</td>`;
+                escDiasConf.forEach(d => {
+                    let grid = semanaData[d.id]?.grid; let roleStr = "-";
+                    if(grid) {
+                        if(tipo === 'lugares') {
+                            for(let r=0; r<escRows.length; r++) { if(grid[r]) { for(let c=0; c<escCols.length; c++) { if(grid[r][c] === op) { roleStr = `<span style="color:var(--primary); font-weight:800;">${escRows[r]}</span><br><span style="font-size:9px; color:var(--text-muted)">${escCols[c]}</span>`; } } } }
+                        } else {
+                            dcLayout.forEach(sec => { let slots = sec.rows * sec.cols; for(let i=0; i<slots; i++) { if(grid[`${sec.id}_${i}`] === op) { roleStr = `<span style="color:var(--primary); font-weight:800;">${sec.title}</span><br><span style="font-size:9px; color:var(--text-muted)">Vaga ${i+1}</span>`; } } });
+                        }
+                    }
+                    tableHtml += `<td style="font-size:10px;">${roleStr}</td>`;
+                });
+                tableHtml += `</tr>`;
+            });
+        }
+        
+        let resumoHtml = '';
+        if(semanaData.resumoDias) {
+            resumoHtml = `<div style="background: rgba(0,0,0,0.1); padding: 15px; border-radius: 8px; margin-top: 15px;">
+                          <h4 style="color:var(--primary); font-size: 0.9rem; margin-bottom: 10px;">Resumo de Atuação na Semana</h4>
+                          <table class="hist-table">
+                          <tr><th style="width: 30%;">Operador</th><th style="width: 15%;">Total Dias</th><th>Detalhamento</th></tr>`;
+            Object.keys(semanaData.resumoDias).sort().forEach(op => {
+                let data = semanaData.resumoDias[op];
+                let details = Object.keys(data).filter(k => k !== 'Total').map(k => `<span style="color:var(--accent)">${k}:</span> <b>${data[k]}x</b>`).join(' | ');
+                resumoHtml += `<tr><td style="text-align:left; font-weight:bold;">${op}</td><td>${data.Total}</td><td style="text-align:left; font-size:10px;">${details}</td></tr>`;
+            });
+            resumoHtml += `</table></div>`;
+        }
+
+        tableHtml += `</table> ${resumoHtml} </div>`;
+
+        const div = document.createElement('div'); div.className = `stat-card`; div.style.padding = "20px"; div.style.marginBottom = "15px";
+        let kpis = '';
+        if(tipo === 'lugares') {
+            let resumo = semanaData['segunda'] || {hc:'0', pct:'0', dw:'0'};
+            kpis = `<div style="display:grid; grid-template-columns: repeat(3, 1fr); gap: 15px;"><div class="si"><div class="si-l">Headcount (Segunda)</div><div class="si-v" style="font-size: 1.2rem;">${resumo.hc}</div></div><div class="si"><div class="si-l">Pct Proc. (Segunda)</div><div class="si-v" style="color:var(--success); font-size: 1.2rem;">${resumo.pct}</div></div><div class="si"><div class="si-l">Nec. DW (Segunda)</div><div class="si-v" style="color:var(--danger); font-size: 1.2rem;">${resumo.dw}</div></div></div>`;
+        }
+        div.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px; border-bottom: 1px solid var(--glass-border); padding-bottom: 15px;"><div style="font-weight: 800; font-size: 1.2rem; color: var(--primary);"><i class="fas fa-calendar-week" style="margin-right: 8px;"></i> ${displayWeek}</div><button class="btn-ghost" style="padding: 6px 12px; font-size: 0.75rem;" onclick="document.getElementById('hist-det-${tipo}-${index}').classList.toggle('hidden')"><i class="fas fa-search"></i> Ver Relatório</button></div>${kpis}${tableHtml}`;
+        container.appendChild(div);
+    });
+}
+function clearEscalaHistory(tipo) {
+    let desc = tipo === 'lugares' ? 'PROCESSAMENTO' : 'DOBLECHECK';
+    let refNode = tipo === 'lugares' ? 'shopee_escala_history' : 'shopee_escala_dc_history';
+    if(confirm(`ATENÇÃO: Deseja apagar permanentemente TODO o histórico de escalas ${desc}? Esta ação não pode ser desfeita.`)) {
+        dbFirebase.ref(refNode).remove().then(() => { renderHistEscala(tipo); showToast("Histórico apagado!"); }).catch(e => console.error(e));
+    }
+}
+function getDateOfISOWeek(w, y) { let simple = new Date(y, 0, 1 + (w - 1) * 7); let dow = simple.getDay(); let ISOweekStart = simple; if (dow <= 4) ISOweekStart.setDate(simple.getDate() - simple.getDay() + 1); else ISOweekStart.setDate(simple.getDate() + 8 - simple.getDay()); return ISOweekStart; }
+function formatShortName(fullName) { if (!fullName) return ""; let p = fullName.split(/\s+/).filter(Boolean); if (p.length > 1) { return p[0] + " " + p[1]; } return p[0]; }
+function getAbsenteesForDay(diaId, isDc = false) { let absentees = []; let objAlvo = isDc ? liveEscalaDcSemana : liveEscalaSemana; let escDia = objAlvo[diaId]; if(!escDia || !escDia.dataDia) return absentees; let match = escDia.dataDia.match(/(\d{1,2})/); if(match) { let day = parseInt(match[1]); for(let op in livePresenca) { if(livePresenca[op] && (livePresenca[op][day] === 'F' || livePresenca[op][day] === 'FG' || livePresenca[op][day] === 'AT')) { absentees.push(op); } } } return absentees; }
+function addNewCollaborator(inputId) { const input = document.getElementById(inputId); if(!input) return; const name = input.value.trim().toUpperCase(); if(!name) return showToast("Digite o nome completo."); if(operadoresList.includes(name)) return showToast("Este colaborador já existe."); dbFirebase.ref('shopee_colaboradores/' + name).set(name).then(() => { input.value = ""; showToast("Colaborador cadastrado!"); }).catch(e => console.error(e)); }
+function removeCollaborator(name) { if(confirm(`Deseja realmente desligar o colaborador ${name}?`)) { dbFirebase.ref('shopee_colaboradores/' + name).remove().then(() => { showToast("Colaborador removido!"); }).catch(e => console.error(e)); } }
+function loadPresencaData() { renderPresencaGrid(); }
+
+// =========================================================
+// PUXAR NOMES DA ESCALA PARA A PRODUTIVIDADE (AUTO-FILL)
+// =========================================================
+let selectedShiftTemp = '';
+function openShiftModal() { let el = document.getElementById('shift-modal-overlay'); if(el) el.classList.remove('hidden'); }
+function closeShiftModal() { let el = document.getElementById('shift-modal-overlay'); if(el) el.classList.add('hidden'); }
+function confirmShift(shift) { selectedShiftTemp = shift; let el = document.getElementById('shift-display'); if(el) el.innerText = "| TURNO: " + shift; closeShiftModal(); document.getElementById('file-prod').click(); }
+
 window.autoFillStations = function() {
     try {
         let dateInput = document.getElementById('p-data');
         let dateVal = dateInput ? dateInput.value : '';
-        if (!dateVal) {
-            showToast("Preencha a Data primeiro!");
-            return;
-        }
+        if (!dateVal) { showToast("Preencha a Data primeiro!"); return; }
 
-        let [y, m, d] = dateVal.split('-');
-        let dateObj = new Date(y, m - 1, d);
+        let [y, m, d] = dateVal.split('-'); let dateObj = new Date(y, m - 1, d);
         let daysMap = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
         let dayStr = daysMap[dateObj.getDay()];
 
@@ -859,7 +1120,6 @@ window.autoFillStations = function() {
         if (escDia && escDia.grid) {
             let bipadorRow = escDia.grid[1]; 
             let etiquetadorRow = escDia.grid[2]; 
-
             let changed = false;
             for (let i = 0; i < 10; i++) {
                 let name = "";
@@ -871,282 +1131,12 @@ window.autoFillStations = function() {
                     if (select) {
                         let exists = Array.from(select.options).some(opt => opt.value === name);
                         if (!exists) { select.innerHTML += `<option value="${name}">${name}</option>`; }
-                        select.value = name;
-                        changed = true;
+                        select.value = name; changed = true;
                     }
                 }
             }
-            if(changed) {
-                refreshProdGridData();
-                saveProdState();
-                showToast("Nomes puxados da Escala com Sucesso!");
-            } else {
-                showToast("Nenhum Bipador/Etiquetador nesta data.");
-            }
-        } else {
-            showToast("A Escala deste dia está vazia.");
-        }
-    } catch(e) {
-        console.error("Erro no autoFill:", e);
-        showToast("Erro ao ler escala.");
-    }
+            if(changed) { refreshProdGridData(); saveProdState(); showToast("Nomes puxados da Escala com Sucesso!"); } 
+            else { showToast("Nenhum Bipador/Etiquetador nesta data."); }
+        } else { showToast("A Escala deste dia está vazia."); }
+    } catch(e) { console.error("Erro no autoFill:", e); showToast("Erro ao ler escala."); }
 };
-
-// =========================================================
-// PRODUTIVIDADE H/H (LEITURA DO EXCEL)
-// =========================================================
-async function importProdData(input) {
-    if(input.files.length === 0) return;
-    try {
-        const data = await readExcelFile(input.files[0], true); 
-        if (!data || data.length === 0) { showToast("Arquivo vazio."); return; }
-        
-        globalProdData = {}; let headers = data[0] || []; let colHoursMap = {};
-        let allowedHours = [];
-        if (selectedShiftTemp === 'AM') { allowedHours = ['23:00', '00:00', '01:00', '02:00', '03:00', '04:00']; } 
-        else if (selectedShiftTemp === 'PM') { allowedHours = ['07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00']; }
-
-        for (let c = 3; c < headers.length; c++) {
-            let timeVal = headers[c]; if (timeVal === undefined || timeVal === null || timeVal === '') continue;
-            let hourStr = null;
-            if (timeVal instanceof Date) { hourStr = timeVal.getHours().toString().padStart(2, '0') + ":00"; } 
-            else if (typeof timeVal === 'number') { let totalSeconds = Math.round((timeVal - Math.floor(timeVal)) * 86400); let h = Math.floor(totalSeconds / 3600); hourStr = h.toString().padStart(2, '0') + ":00"; } 
-            else { let match = String(timeVal).match(/(?:^|\s)(\d{1,2}):/); if(match) hourStr = match[1].padStart(2, '0') + ":00"; }
-            if (hourStr && (!selectedShiftTemp || allowedHours.includes(hourStr))) { colHoursMap[c] = hourStr; }
-        }
-
-        for(let i = 1; i < data.length; i++) {
-            let row = data[i]; if(!row || !row[0]) continue; let rawName = String(row[0]); 
-            let tempName = rawName.replace(/\[.*?\]/g, '').replace(/^(AT|OPS?)\s*-?\s*\d*\s*-?\s*/gi, '').replace(/^\d+\s*-?\s*/, '').trim().toUpperCase(); tempName = tempName.replace(/[.\#$\[\]\/]/g, '');
-            let parts = tempName.split(/\s+/).filter(Boolean); let cleanName = "";
-            if(parts.length > 1) { cleanName = parts[0] + " " + parts[1].charAt(0); } else if(parts.length === 1) { cleanName = parts[0]; }
-            if (!cleanName) continue;
-            
-            let hasValidData = false;
-            for (let c in colHoursMap) { let valStr = String(row[c] || '').replace(/[^\d.,]/g, '').replace(',', '.'); let val = parseFloat(valStr) || 0; if(val > 0) hasValidData = true; }
-            if(!hasValidData) continue;
-
-            if(!globalProdData[cleanName]) globalProdData[cleanName] = {};
-            for (let c in colHoursMap) {
-                let mappedHour = colHoursMap[c]; let valStr = String(row[c] || '').replace(/[^\d.,]/g, '').replace(',', '.'); let val = parseFloat(valStr) || 0; 
-                globalProdData[cleanName][mappedHour] = (globalProdData[cleanName][mappedHour] || 0) + val;
-            }
-        }
-        updateDropdowns(); 
-        saveProdToCloud(); 
-        showToast("Produtividade Processada!");
-    } catch(e) { console.error("Erro na importação:", e); showToast("Erro."); }
-}
-
-function updateDropdowns() {
-    let names = Object.keys(globalProdData).sort();
-    for(let j = 1; j <= 10; j++) {
-        let select = document.getElementById(`station-select-${j}`); 
-        if(select) { 
-            let currentVal = select.value; 
-            select.style.maxWidth = "80px"; select.style.textOverflow = "ellipsis";
-            select.innerHTML = `<option value="">Estação ${j}</option>`; 
-            names.forEach(n => { select.innerHTML += `<option value="${n}">${n}</option>`; }); 
-            if(names.includes(currentVal)) select.value = currentVal; 
-        }
-    }
-    refreshProdGridData();
-}
-
-function refreshProdGridData() {
-    for(let i = 0; i < 24; i++) {
-        let hourCell = document.getElementById(`p-hour-${i}`); let rawHour = hourCell ? hourCell.innerText.trim() : '';
-        let hourRef = null; let match = rawHour.match(/^(\d{1,2})(:\d{2})?/); if(match) { hourRef = match[1].padStart(2, '0') + ":00"; }
-        for(let j = 1; j <= 10; j++) {
-            let select = document.getElementById(`station-select-${j}`); let name = select ? select.value : ''; let val = 0;
-            if(hourRef && name && globalProdData[name] && globalProdData[name][hourRef]) { val = globalProdData[name][hourRef]; }
-            let cell = document.getElementById(`p-cell-${i}-${j}`); if(cell) cell.innerText = val || '';
-        }
-    }
-    calculateProdTotals(true);
-}
-
-function calculateProdTotals(triggerSave = false) {
-    let colTotals = [0,0,0,0,0,0,0,0,0,0]; let grandTotal = 0;
-    for(let i = 0; i < 24; i++) {
-        let rowTotal = 0; let hourCell = document.getElementById(`p-hour-${i}`); let rawHour = hourCell ? hourCell.innerText.trim() : '';
-        let hourRef = null; let match = rawHour.match(/^(\d{1,2})(:\d{2})?/); if(match) hourRef = match[1].padStart(2, '0') + ":00";
-        for(let j = 1; j <= 10; j++) {
-            let cell = document.getElementById(`p-cell-${i}-${j}`); if(!cell) continue;
-            let strVal = cell.innerText.replace(/[^\d.,]/g, '').replace(',', '.'); let val = parseFloat(strVal) || 0; rowTotal += val; colTotals[j-1] += val;
-            let select = document.getElementById(`station-select-${j}`);
-            if(select && triggerSave) { let name = select.value; if(name && hourRef) { if(!globalProdData[name]) globalProdData[name] = {}; globalProdData[name][hourRef] = val; } }
-        }
-        grandTotal += rowTotal; let rowTotalCell = document.getElementById(`p-row-total-${i}`); if(rowTotalCell) rowTotalCell.innerText = rowTotal > 0 ? rowTotal.toLocaleString('pt-BR') : '';
-    }
-    for(let j = 1; j <= 10; j++) { let colEl = document.getElementById(`p-col-total-${j}`); if(colEl) colEl.innerText = colTotals[j-1] || '0'; }
-    let grandTotalCell = document.getElementById('p-grand-total'); if(grandTotalCell) grandTotalCell.innerText = grandTotal.toLocaleString('pt-BR');
-    let volRotEl = document.getElementById('p-vol-rot'); let volRot = volRotEl ? (parseInt(volRotEl.innerText.replace(/\D/g, '')) || 0) : 0;
-    let backlogEl = document.getElementById('p-backlog'); let backlog = backlogEl ? (parseInt(backlogEl.innerText.replace(/\D/g, '')) || 0) : 0;
-    let xptEl = document.getElementById('p-xpt'); let xpt = xptEl ? (parseInt(xptEl.innerText.replace(/\D/g, '')) || 0) : 0;
-    let totalAlvo = volRot; let qtdRealizada = grandTotal + backlog + xpt; 
-    let pRealizada = document.getElementById('p-realizada'); if(pRealizada) pRealizada.innerText = qtdRealizada.toLocaleString('pt-BR');
-    let pendente = totalAlvo - qtdRealizada; if(pendente < 0) pendente = 0; 
-    let pPendente = document.getElementById('p-pendente'); if(pPendente) pPendente.innerText = pendente.toLocaleString('pt-BR');
-    let percentEtiquetado = totalAlvo > 0 ? parseInt(((qtdRealizada / totalAlvo) * 100).toFixed(0)) : 0; if (percentEtiquetado > 100) percentEtiquetado = 100; 
-    let percentPendente = totalAlvo > 0 ? parseInt(((pendente / totalAlvo) * 100).toFixed(0)) : 0; if (percentPendente < 0) percentPendente = 0; 
-    let percEtiqEl = document.getElementById('p-perc-etiquetado'); if(percEtiqEl) percEtiqEl.innerText = percentEtiquetado + '%';
-    let percPendEl = document.getElementById('p-perc-pendente'); if(percPendEl) percPendEl.innerText = percentPendente + '%';
-    let giantPerc = document.getElementById('p-giant-percent');
-    if(giantPerc) { giantPerc.innerText = percentEtiquetado + '%'; if (percentEtiquetado >= 97) giantPerc.style.color = '#00b050'; else giantPerc.style.color = '#ff0000'; }
-    if(triggerSave) { saveProdToCloud(); renderRankProd(); saveProdState(); }
-}
-
-function initProdGrid() {
-    const tbody = document.getElementById('prod-body-grid'); let html = '';
-    for (let i = 0; i < 24; i++) {
-        let h = (i === 0) ? 23 : i - 1; let hour = h.toString().padStart(2, '0') + ':00';
-        html += `<tr><td style="border-left: 2px solid #000; font-weight: bold; background:#f0f8ff;" class="editable-cell" contenteditable="true" id="p-hour-${i}" onblur="refreshProdGridData(); saveProdState();">${hour}</td>`;
-        for (let j = 1; j <= 10; j++) { html += `<td id="p-cell-${i}-${j}" class="editable-cell" contenteditable="true" onblur="calculateProdTotals(true)"></td>`; }
-        html += `<td id="p-row-total-${i}" style="font-weight: bold; background: #e2e8f0; color: #0f172a;"></td>`;
-        if (i === 0) { html += `<td rowspan="24" class="spx-percent-giant"><span class="spx-percent-text" id="p-giant-percent">0%</span></td>`; }
-        html += `</tr>`;
-    }
-    html += `<tr class="spx-navy-prod"><td style="border-left: 2px solid #000; padding: 4px;">Total</td>`;
-    for (let j = 1; j <= 10; j++) html += `<td style="color:#fff;" id="p-col-total-${j}">0</td>`;
-    html += `<td style="color:#fff; font-weight: 900;" id="p-grand-total">0</td><td style="background:#fff; border:2px solid #000; border-top:none;"></td></tr>`;
-    if(tbody) tbody.innerHTML = html;
-}
-
-window.onload = function() { checkSession(); let pw = document.getElementById('pass'); if(pw) pw.addEventListener('keypress', e => { if(e.key==='Enter') login(); }); };
-
-// =========================================================
-// RANKING DIÁRIO (CONTROLE HUB)
-// =========================================================
-async function handleSingleFile(input) {
-    if(input.files.length === 0) return; dailyData = []; ctrlData = initCtrl();
-    try { const data = await readExcelFile(input.files[0], false); processData([data], true); let el = document.getElementById('st-single'); if(el) el.innerText = "Carregado com sucesso!"; showToast("Importação Concluída"); } catch (e) { console.error(e); showToast("Erro."); }
-}
-
-async function handleMassFiles(input) {
-    if(input.files.length === 0) return; dailyData = []; 
-    try { const files = Array.from(input.files); const promises = files.map(f => readExcelFile(f, false)); const results = await Promise.all(promises); processData(results, false); let el = document.getElementById('st-mass'); if(el) el.innerText = `${files.length} Arquivos`; showToast("Importação em Massa Concluída"); } catch (e) { console.error(e); showToast("Erro."); }
-}
-
-function processData(allFilesData, isSingleImport) {
-    try {
-        const map = {};
-        allFilesData.forEach(rows => {
-            for(let i=1; i<rows.length; i++) {
-                const r = rows[i]; let rawName = String(r[9] || ""); if(!rawName.trim()) continue;
-                let tempName = rawName.replace(/\[.*?\]/g, '').replace(/^(AT|OPS?)\s*-?\s*\d*\s*-?\s*/gi, '').replace(/^\d+\s*-?\s*/, '').trim().toUpperCase(); tempName = tempName.replace(/[.\#$\[\]\/]/g, '');
-                let parts = tempName.split(/\s+/).filter(Boolean); let cleanName = "";
-                if(parts.length > 1) { cleanName = parts[0] + " " + parts[1].charAt(0); } else if(parts.length === 1) { cleanName = parts[0]; }
-                if (!cleanName) continue;
-                
-                let volRank = parseFloat(String(r[3]||'').replace(/[^\d,-]/g,'').replace(',','.')) || 0; 
-                let volCtrl = parseFloat(String(r[2]||'').replace(/[^\d,-]/g,'').replace(',','.')) || 0; 
-                let volValid = parseFloat(String(r[4]||'').replace(/[^\d,-]/g,'').replace(',','.')) || 0; 
-                let valF = parseFloat(String(r[5]||'').replace(/[^\d,-]/g,'').replace(',','.')) || 0; 
-                let valG = parseFloat(String(r[6]||'').replace(/[^\d,-]/g,'').replace(',','.')) || 0; 
-                let rec = parseFloat(String(r[11]||'').replace(',','.')) || 0;
-                let tStart = r[7]; let tEnd = r[8]; let time = 0; 
-                if(typeof tStart==='number' && typeof tEnd==='number') { let diff = tEnd - tStart; if(diff < 0) diff += 1; time = Math.round(diff * 86400); }
-                
-                if(!map[cleanName]) map[cleanName] = { nome: cleanName, rotas:0, vol:0, reconf:0, time:0, doblecheck: 0 };
-                map[cleanName].rotas += 1; map[cleanName].vol += volRank; map[cleanName].time += time; map[cleanName].reconf += rec;
-                
-                if (isSingleImport) {
-                    let status = String(r[12] || "").trim().toUpperCase(); 
-                    if(!ctrlData.date && tStart) ctrlData.date = excelDate(tStart); ctrlData.totalVol += volCtrl; ctrlData.totalRotas++;
-                    if(tStart) { if(ctrlData.minTime===null || tStart<ctrlData.minTime) ctrlData.minTime = tStart; }
-                    if(tEnd) { if(ctrlData.maxTime===null || tEnd>ctrlData.maxTime) ctrlData.maxTime = tEnd; }
-                    if(time > 0) { ctrlData.sumDurHI += time; ctrlData.countDurHI++; }
-                    if(status === 'VALIDATED') { ctrlData.finRot++; ctrlData.finVol += volValid; if(valF > 0) { ctrlData.missRot++; ctrlData.missVol += valF; } if(valG > 0) { ctrlData.missingRot++; ctrlData.missingVol += valG; } }
-                    if(typeof tStart === 'number') { let sDay = Math.round(tStart * 86400) % 86400; let h = Math.floor(sDay / 3600); let hStr = `${String(h).padStart(2,'0')}:00 - ${String(h+1).padStart(2,'0')}:00`; if(!ctrlData.hourly[hStr]) ctrlData.hourly[hStr] = {r:0, v:0}; ctrlData.hourly[hStr].r++; ctrlData.hourly[hStr].v += volCtrl; }
-                }
-            }
-        });
-        dailyData = Object.values(map); saveDailyToCloud(); renderDaily(); 
-        if (isSingleImport && currentUser && currentUser.r === 'admin') dbFirebase.ref('shopee_ctrl_live').set(ctrlData);
-    } catch(err) { console.error("Falha no Processamento Diario:", err); showToast("Erro Crítico no Arquivo."); }
-}
-
-function clearData() { dailyData=[]; ctrlData=initCtrl(); saveDailyToCloud(); if(currentUser && currentUser.r === 'admin') dbFirebase.ref('shopee_ctrl_live').set(ctrlData); let st1 = document.getElementById('st-single'); if(st1) st1.innerText="Selecionar CSV"; let st2 = document.getElementById('st-mass'); if(st2) st2.innerText="Múltiplos arquivos"; renderDaily(); renderControl(); showToast("Tela Limpa"); }
-
-let currentDcName = ""; window.openDoblecheck = function(nome) { currentDcName = nome; let el = document.getElementById('dc-modal-driver-name'); if(el) el.innerText = "Motorista: " + nome; let m = document.getElementById('dc-modal-overlay'); if(m) m.classList.remove('hidden'); }; window.closeDcModal = function() { let m = document.getElementById('dc-modal-overlay'); if(m) m.classList.add('hidden'); }; window.applyDc = function(val) { let d = dailyData.find(x => x.nome === currentDcName); if(d) { d.doblecheck = val; saveDailyToCloud(); } closeDcModal(); };
-
-function renderDaily() {
-    const grid = document.getElementById('grid-diario'); if(!grid) return; grid.innerHTML = '';
-    let safeData = Array.isArray(dailyData) ? dailyData : Object.values(dailyData || {});
-    let sorted = safeData.map(d => { const avg = d.rotas>0 ? d.time/d.rotas : 0; let dc = d.doblecheck || 0; let totalErrosTela = d.reconf + dc; let errosAcuracidade = d.reconf + (dc * 5); let acur = d.vol > 0 ? ((d.vol - errosAcuracidade) / d.vol) * 100 : 100; if(acur < 0) acur = 0; return {...d, avg, acur, totalErrosTela}; }).sort((a,b) => (b.rotas-a.rotas) || (b.vol-a.vol));
-    sorted.forEach((d, i) => {
-        const pos = i+1; let css = ''; let icon = ''; if(pos===1) { css='rank-1'; icon='🥇'; } else if(pos===2) { css='rank-2'; icon='🥈'; } else if(pos===3) { css='rank-3'; icon='🥉'; }
-        const div = document.createElement('div'); div.className = `stat-card ${css}`;
-        let dcBtn = currentUser && currentUser.r === 'admin' ? `<button class="btn-ghost" style="padding: 6px; font-size: 0.65rem; width: 100%; border-color: var(--primary); color: var(--primary);" onclick="openDoblecheck('${d.nome}')"><i class="fas fa-edit"></i> DOBLECHECK ${d.doblecheck > 0 ? '('+d.doblecheck+')' : ''}</button>` : ``;
-        div.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;"><div class="sc-name">${icon} ${d.nome}</div><div class="sc-rank r-txt">#${pos}</div></div><div class="sc-hero"><div class="sc-val">${d.rotas}</div><div class="sc-lbl">ROTAS CONCLUÍDAS</div></div><div class="sc-grid"><div class="si"><div class="si-l">Volume</div><div class="si-v">${d.vol}</div></div><div class="si"><div class="si-l">Acuracidade</div><div class="si-v" style="color:${d.acur>=99?'var(--success)':'var(--danger)'}">${d.acur.toFixed(2)}%</div></div><div class="si"><div class="si-l">Erros Totais</div><div class="si-v" style="color:${d.totalErrosTela>0?'var(--danger)':'#eee'}">${d.totalErrosTela}</div></div><div class="si" style="display:flex; align-items:flex-end;">${dcBtn}</div></div><div style="text-align:center; padding-top:15px; margin-top:15px; border-top: 1px solid rgba(255,255,255,0.05);"><div class="si-l">Tempo Médio: <span style="color:#fff; font-size: 0.85rem;">${fmtTime(d.avg)}</span></div></div>`;
-        grid.appendChild(div);
-    });
-}
-
-function renderControl() {
-    const d = ctrlData; const el = (id)=>document.getElementById(id); if(!el('c-data')) return;
-    el('c-data').innerText = d.date || "-"; el('c-vol').innerText = d.totalVol; el('c-rotas').innerText = d.totalRotas; el('c-ini').innerText = fmtExcelTime(d.minTime); el('c-fim').innerText = fmtExcelTime(d.maxTime);
-    let durSec = 0; if(d.minTime && d.maxTime) durSec = Math.round((d.maxTime - d.minTime)*86400); el('c-dur').innerText = secToHHMMSS(durSec);
-    let avgHI = d.countDurHI>0 ? d.sumDurHI/d.countDurHI : 0; el('c-avg-time').innerText = secToHHMMSS(avgHI);
-    let total = d.totalVol; let finPerc = total>0 ? (d.finVol/total)*100 : 0; let pendPerc = total>0 ? (100 - finPerc) : 0; let pendRot = d.totalRotas - d.finRot; let pendVol = d.totalVol - d.finVol;
-    el('c-fin-rot').innerText = d.finRot; el('c-fin-vol').innerText = d.finVol; el('c-fin-perc').innerText = finPerc.toFixed(2).replace('.',',') + "%";
-    el('c-pen-rot').innerText = pendRot; el('c-pen-vol').innerText = pendVol; el('c-pen-perc').innerText = pendPerc.toFixed(2).replace('.',',') + "%";
-    const tbody = document.getElementById('c-hourly-body'); if(tbody) { tbody.innerHTML = ''; Object.keys(d.hourly).sort().forEach(h => { tbody.innerHTML += `<tr><td>${h}</td><td style="text-align:center">${d.hourly[h].r}</td><td style="text-align:center">${d.hourly[h].v}</td></tr>`; }); }
-}
-
-async function saveToMonthly() {
-    if(dailyData.length===0) return showToast("Sem dados para arquivar."); showToast("Salvando na Nuvem...");
-    try { let db = {...monthlyDataCache}; dailyData.forEach(d => { const k = d.nome; if(!db[k]) db[k] = {nome:k, rotas:0, vol:0, reconf:0, time:0, doblecheck:0}; db[k].rotas += d.rotas; db[k].vol += d.vol; db[k].reconf += d.reconf; db[k].doblecheck = (db[k].doblecheck || 0) + (d.doblecheck || 0); db[k].time += d.time; }); await dbFirebase.ref('shopee_gold_db').set(db); showToast("Arquivado na Nuvem!"); } catch(e) { console.error(e); }
-}
-
-function renderMonthly() {
-    const container = document.getElementById('monthly-list'); if(!container) return;
-    let list = Object.values(monthlyDataCache).map(d => { let dc = d.doblecheck || 0; let totalErrosTela = d.reconf + dc; let errosAcuracidade = d.reconf + (dc * 5); let acur = d.vol > 0 ? ((d.vol - errosAcuracidade) / d.vol) * 100 : 100; if(acur < 0) acur = 0; let avg = d.rotas > 0 ? d.time / d.rotas : 0; return {...d, acur, avg, totalErrosTela}; }).sort((a,b) => (b.rotas-a.rotas) || (b.vol-a.vol));
-    container.innerHTML = '';
-    if(list.length===0) { container.innerHTML = '<div style="text-align:center;color:#666;padding:40px">Histórico Vazio</div>'; return; }
-    list.forEach((d, i) => {
-        const pos = i+1; let css = ''; let icon = ''; if(pos===1) { css='mr-1'; icon='🥇'; } else if(pos===2) { css='rank-2'; icon='🥈'; } else if(pos===3) { css='rank-3'; icon='🥉'; }
-        const div = document.createElement('div'); div.className = `stat-card m-row ${css}`; div.style.padding = "15px 30px";
-        div.innerHTML = `<div class="m-idx">#${pos}</div><div style="font-weight:700;display:flex;gap:10px;align-items:center; color:#fff;">${icon} ${d.nome}</div><div class="m-stat"><div class="ms-l">Rotas</div><div class="ms-v">${d.rotas}</div></div><div class="m-stat"><div class="ms-l">Vol Total</div><div class="ms-v">${d.vol}</div></div><div class="m-stat"><div class="ms-l">Erros Totais</div><div class="ms-v" style="color:${d.totalErrosTela>0?'var(--danger)':'inherit'}">${d.totalErrosTela}</div></div><div class="m-stat"><div class="ms-l">Acuracidade Global</div><div class="ms-v" style="color:${d.acur>=99?'var(--success)':'var(--danger)'}">${d.acur.toFixed(2)}%</div></div><div class="m-stat"><div class="ms-l">T. Médio Global</div><div class="ms-v">${fmtTime(d.avg)}</div></div>`;
-        container.appendChild(div);
-    });
-}
-async function resetMonthly() { if(confirm("Apagar o histórico MENSAL?")) { await dbFirebase.ref('shopee_gold_db').remove(); showToast("Apagado!"); } }
-
-function renderRankProd() {
-    const listContainer = document.getElementById('rankprod-list'); if(!listContainer) return; listContainer.innerHTML = '';
-    let arr = Object.keys(globalProdData).map(name => { let sum = 0; for(let h in globalProdData[name]) sum += globalProdData[name][h]; return { name, vol: sum }; }).sort((a,b) => b.vol - a.vol);
-    if(arr.length===0) { listContainer.innerHTML = '<div style="text-align:center;color:#666;padding:40px">Aguardando Importação...</div>'; return; }
-    arr.forEach((d, i) => { listContainer.innerHTML += `<div class="stat-card m-row" style="margin-bottom:10px; padding:15px 30px;"><div class="m-idx">#${i+1}</div><div style="font-weight:700; color:#fff;">${d.name}</div><div class="m-stat"><div class="ms-l">Total Bipado (AM)</div><div class="ms-v" style="color:var(--success); font-weight:800;">${d.vol.toLocaleString('pt-BR')} pacotes</div></div></div>`; });
-}
-
-async function renderBIChart() {
-    const canvas = document.getElementById('biChartCanvas'); if(!canvas) return; const ctx = canvas.getContext('2d');
-    let hours = Object.keys(ctrlData.hourly).sort(); let labels = hours.length > 0 ? hours : ['Sem Dados']; let volumes = hours.length > 0 ? hours.map(h => ctrlData.hourly[h].v) : [0]; let rotas = hours.length > 0 ? hours.map(h => ctrlData.hourly[h].r) : [0];
-    if(window.biChartInstance) window.biChartInstance.destroy();
-    window.biChartInstance = new Chart(ctx, { type: 'bar', data: { labels: labels, datasets: [ { label: 'Volume', data: volumes, backgroundColor: 'rgba(99, 102, 241, 0.8)', borderRadius: 6, yAxisID: 'y' }, { label: 'Rotas', data: rotas, type: 'line', borderColor: '#fbbf24', backgroundColor: '#fbbf24', borderWidth: 3, tension: 0.4, yAxisID: 'y1' } ] }, options: { responsive: true, maintainAspectRatio: false } });
-}
-
-// =========================================================
-// FUNÇÕES DE SERVIÇO E LIMPEZA
-// =========================================================
-function initEmptyEscalaSemana() {
-    liveEscalaSemana = {};
-    escDiasConf.forEach(d => { liveEscalaSemana[d.id] = { hc: '16', pct: '0', cap: '16980', dw: '0', phd: '0', capphd: '630', dataDia: '(inserir data)', visible: false, grid: {} }; });
-}
-function initEmptyEscalaDcSemana() {
-    liveEscalaDcSemana = {};
-    escDiasConf.forEach(d => { liveEscalaDcSemana[d.id] = { dataDia: '(inserir data)', visible: false, grid: {} }; });
-}
-
-function saveProdToCloud() { if(currentUser && currentUser.r === 'admin') { dbFirebase.ref('shopee_prod_live').set(globalProdData).catch(e => console.error(e)); } }
-function checkSession() { const saved = localStorage.getItem('spxUser'); if(saved) { const found = JSON.parse(saved); currentUser = found; document.getElementById('login-screen').style.display = 'none'; document.getElementById('app-shell').style.display = 'flex'; document.getElementById('display-user').innerText = found.u.toUpperCase(); if(found.r === 'admin') { document.body.classList.add('is-admin'); } initProdGrid(); let pm = document.getElementById('pres-month-select'); if(pm) pm.value = currentPresMes; switchTab('escala'); } }
-function login() { const u = document.getElementById('user').value; const p = document.getElementById('pass').value; const found = USERS.find(x => x.u === u && x.p === p); if(found) { currentUser = found; localStorage.setItem('spxUser', JSON.stringify(found)); document.getElementById('login-screen').style.display = 'none'; document.getElementById('app-shell').style.display = 'flex'; document.getElementById('display-user').innerText = u.toUpperCase(); if(found.r === 'admin') { document.body.classList.add('is-admin'); } initProdGrid(); let pm = document.getElementById('pres-month-select'); if(pm) pm.value = currentPresMes; switchTab('escala'); } else { document.getElementById('login-err').style.display = 'block'; } }
-function logout() { localStorage.removeItem('spxUser'); location.reload(); }
-function showToast(msg) { const t = document.getElementById('toast'); if(!t) return; t.innerText = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 3000); }
-function fmtTime(s) { const m = Math.floor(s/60); const sec = Math.round(s%60); return `${m}m ${sec}s`; }
-function secToHHMMSS(s) { if(!s) return "00:00:00"; const h = Math.floor(s/3600).toString().padStart(2,'0'); const m = Math.floor((s%3600)/60).toString().padStart(2,'0'); const sec = Math.floor(s%60).toString().padStart(2,'0'); return `${h}:${m}:${sec}`; }
-function excelDate(serial) { if(!serial) return "-"; const date = new Date((serial - 25569) * 86400 * 1000); return date.toLocaleDateString('pt-BR'); }
-function fmtExcelTime(dec) { if(!dec) return "-"; let s = Math.round(dec * 86400); return secToHHMMSS(s).substring(0,5); }
-function readExcelFile(file, parseDates = false) { return new Promise(resolve => { const reader = new FileReader(); reader.onload = e => { const workbook = XLSX.read(new Uint8Array(e.target.result), { type: 'array', cellDates: parseDates }); const data = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], {header:1}); resolve(data); }; reader.readAsArrayBuffer(file); }); }
