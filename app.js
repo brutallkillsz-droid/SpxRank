@@ -65,7 +65,7 @@ let isEscalaDcSemanaRendered = false;
 function initCtrl() { return { date: '', totalVol: 0, totalRotas: 0, minTime: null, maxTime: null, finRot: 0, finVol: 0, missRot: 0, missVol: 0, missingRot: 0, missingVol: 0, hourly: {}, sumDurHI: 0, countDurHI: 0 }; }
 
 // =========================================================
-// SIDEBAR MENU & NAVEGAÇÃO
+// SIDEBAR MENU & NAVEGAÇÃO 
 // =========================================================
 function toggleMenu(menuId, headerEl) {
     let el = document.getElementById(menuId);
@@ -104,20 +104,21 @@ function switchTab(id) {
 }
 
 // =========================================================
-// CÉREBRO MATEMÁTICO E SALVAMENTO CÉLULA A CÉLULA
+// SALVAMENTO CÉLULA A CÉLULA (FIM DO ZERAMENTO E DO LAG)
 // =========================================================
 window.updateScaleField = function(diaId, field, element) {
     if (!currentUser || currentUser.r !== 'admin') return;
     let valueText = element.innerText.trim();
+    
     if(!liveEscalaSemana[diaId]) liveEscalaSemana[diaId] = { hc: '16', pct: '0', cap: '16980', dw: '0', phd: '0', capphd: '630', dataDia: '', visible: true, grid: {} };
     
     liveEscalaSemana[diaId][field] = valueText;
     dbFirebase.ref(`shopee_escala_semana_live/${diaId}/${field}`).set(valueText);
 
     if(field === 'hc' || field === 'dw' || field === 'pct') {
-        let hc = parseFloat(liveEscalaSemana[diaId].hc.replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
-        let dw = parseFloat(liveEscalaSemana[diaId].dw.replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
-        let pct = parseFloat(liveEscalaSemana[diaId].pct.replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
+        let hc = parseFloat(String(liveEscalaSemana[diaId].hc).replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
+        let dw = parseFloat(String(liveEscalaSemana[diaId].dw).replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
+        let pct = parseFloat(String(liveEscalaSemana[diaId].pct).replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
         let totalEfetivo = hc + dw;
         let phdCalculado = totalEfetivo > 0 ? Math.round(pct / totalEfetivo) : 0;
         
@@ -136,6 +137,9 @@ window.handleEscalaSelect = function(diaId, rIdx, cIdx, selectElement) {
     
     liveEscalaSemana[diaId].grid[rIdx][cIdx] = selectElement.value || "";
     dbFirebase.ref(`shopee_escala_semana_live/${diaId}/grid/${rIdx}/${cIdx}`).set(selectElement.value || "");
+    
+    document.getElementById('sidebar-day-select').value = diaId; 
+    currentSidebarDay = diaId; 
     updateDropdownsAvailability(diaId);
     updateSidebar();
 };
@@ -155,6 +159,9 @@ window.handleEscalaDcSelect = function(diaId, cellId, selectElement) {
     
     liveEscalaDcSemana[diaId].grid[cellId] = selectElement.value || "";
     dbFirebase.ref(`shopee_escala_dc_live/${diaId}/grid/${cellId}`).set(selectElement.value || "");
+    
+    document.getElementById('sidebar-day-select-dc').value = diaId; 
+    currentSidebarDcDay = diaId;
     updateDropdownsAvailabilityDc(diaId);
     updateSidebarDc();
 };
@@ -164,27 +171,323 @@ window.saveMetaPHD = function() {
     let inputEl = document.getElementById('meta-phd-input'); if(!inputEl) return;
     let val = parseInt(inputEl.value) || 530;
     dbFirebase.ref('shopee_meta_phd').set(val);
-    showToast("Meta PHD atualizada para " + val + "!");
+    showToast("Meta PHD atualizada!");
 };
+
+// =========================================================
+// RENDERIZAÇÃO INTELIGENTE DAS ESCALAS (SEM TRAVAMENTOS)
+// =========================================================
+function syncEscalaSemanaUI() {
+    const isAdm = currentUser && currentUser.r === 'admin';
+    escDiasConf.forEach(diaConf => {
+        let id = diaConf.id;
+        let escDia = liveEscalaSemana[id] || {};
+        
+        let dtEl = document.getElementById(`esc-datadia-${id}`); if(dtEl && document.activeElement !== dtEl) dtEl.innerText = escDia.dataDia || '(inserir data)';
+        let hcEl = document.getElementById(`esc-hc-${id}`); if(hcEl && document.activeElement !== hcEl) hcEl.innerText = escDia.hc || '0';
+        let pctEl = document.getElementById(`esc-pct-${id}`); if(pctEl && document.activeElement !== pctEl) pctEl.innerText = escDia.pct || '0';
+        let capEl = document.getElementById(`esc-cap-${id}`); if(capEl && document.activeElement !== capEl) capEl.innerText = escDia.cap || '0';
+        let dwEl = document.getElementById(`esc-dw-${id}`); if(dwEl && document.activeElement !== dwEl) dwEl.innerText = escDia.dw || '0';
+        let phdEl = document.getElementById(`esc-phd-${id}`); if(phdEl) phdEl.innerText = escDia.phd || '0';
+        let capphdEl = document.getElementById(`esc-capphd-${id}`); if(capphdEl && document.activeElement !== capphdEl) capphdEl.innerText = escDia.capphd || '0';
+
+        escRows.forEach((cargo, rIdx) => {
+            escCols.forEach((col, cIdx) => {
+                let cellVal = (escDia.grid && escDia.grid[rIdx]) ? (escDia.grid[rIdx][cIdx] || "") : "";
+                if(isAdm) {
+                    let sel = document.getElementById(`esc-cell-${id}-${rIdx}-${cIdx}`);
+                    if(sel && sel.value !== cellVal) sel.value = cellVal;
+                } else {
+                    let td = document.getElementById(`esc-cell-view-${id}-${rIdx}-${cIdx}`);
+                    if(td) td.innerText = formatShortName(cellVal);
+                }
+            });
+        });
+        if(isAdm) updateDropdownsAvailability(id);
+    });
+    if(isAdm) updateSidebar();
+}
+
+function renderEscalaSemana() {
+    if(isEscalaSemanaRendered) {
+        syncEscalaSemanaUI();
+        return;
+    }
+
+    const container = document.getElementById('escala-semanal-container'); if(!container) return; container.innerHTML = '';
+    const isAdm = currentUser && currentUser.r === 'admin'; 
+    const editAttr = isAdm ? 'contenteditable="true"' : ''; 
+    const editClass = isAdm ? 'editable-cell' : '';
+    let renderedAny = false;
+
+    escDiasConf.forEach((diaConf, index) => {
+        let escDia = liveEscalaSemana[diaConf.id] || {hc:'0', pct:'0', cap:'0', dw:'0', phd:'0', capphd:'0', dataDia: '(inserir data)', visible: false, grid:{}};
+        if (!isAdm && escDia.visible !== true) return; 
+        renderedAny = true;
+        
+        let prevDayName = index > 0 ? escDiasConf[index - 1].nome.replace('ESCALA ', '') : "";
+        let btnCopiar = (isAdm && index > 0) ? `<button class="esc-day-btn" style="border-color: #3b82f6; color: #3b82f6;" onclick="copyFromPreviousDay('${diaConf.id}')"><i class="fas fa-copy"></i> Copiar Anter.</button>` : '';
+        let btnSortear = isAdm ? `<button class="esc-day-btn" onclick="autoDistributeOperators('${diaConf.id}')"><i class="fas fa-random"></i> Sortear</button>` : '';
+        let eyeClass = escDia.visible ? 'esc-day-btn' : 'esc-day-btn eye-off'; 
+        let btnEye = isAdm ? `<button class="${eyeClass}" onclick="toggleDayVisibility('${diaConf.id}')"><i class="fas fa-eye"></i> ${escDia.visible ? 'Visível' : 'Oculto'}</button>` : '';
+        let headerControls = isAdm ? `<div style="display:flex; gap:8px; align-items:center;">${btnCopiar}${btnSortear}${btnEye}</div>` : '';
+
+        let html = `<div class="esc-block"><table class="esc-table" style="border-bottom:none; margin-bottom: 5px;">
+                <tr><td colspan="7" style="background-color: ${diaConf.bg} !important; color: ${diaConf.cor} !important; padding: 0;"><div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 15px;"><span style="font-size: 14px; font-weight: 800;">${diaConf.nome}</span>${headerControls}</div></td></tr>
+                <tr>
+                    <td class="esc-gray-light ${editClass}" ${editAttr} id="esc-datadia-${diaConf.id}" onblur="updateScaleField('${diaConf.id}', 'dataDia', this)" style="text-align: left; padding-left: 10px; font-weight: bold; font-size: 11px; color: #002f6c; width:20%;">${escDia.dataDia || '(inserir data)'}</td>
+                    <td class="esc-gray-light" style="width:10%">Quantidade HC</td><td class="${editClass}" ${editAttr} id="esc-hc-${diaConf.id}" onblur="updateScaleField('${diaConf.id}', 'hc', this)" style="width:10%">${escDia.hc}</td>
+                    <td class="esc-gray-light" style="width:10%">PCT. PROCESSADOS</td><td class="esc-green ${editClass}" ${editAttr} id="esc-pct-${diaConf.id}" onblur="updateScaleField('${diaConf.id}', 'pct', this)" style="width:10%">${escDia.pct}</td>
+                    <td class="esc-gray-light" style="width:10%">CAP PROCESSAMENTO</td><td class="esc-cyan ${editClass}" ${editAttr} id="esc-cap-${diaConf.id}" onblur="updateScaleField('${diaConf.id}', 'cap', this)" style="width:10%">${escDia.cap}</td>
+                </tr>
+                <tr>
+                    <td class="esc-gray-light" style="border-top: none;"></td>
+                    <td class="esc-gray-light">Necessidade DW</td><td class="esc-red-txt ${editClass}" ${editAttr} id="esc-dw-${diaConf.id}" onblur="updateScaleField('${diaConf.id}', 'dw', this)">${escDia.dw}</td>
+                    <td class="esc-gray-light esc-red-txt">PHD Atingido</td><td class="esc-red-txt" id="esc-phd-${diaConf.id}">${escDia.phd}</td>
+                    <td class="esc-gray-light">CAP PHD</td><td class="esc-cyan esc-red-txt ${editClass}" ${editAttr} id="esc-capphd-${diaConf.id}" onblur="updateScaleField('${diaConf.id}', 'capphd', this)">${escDia.capphd}</td>
+                </tr>
+            </table>
+            <table class="esc-table"><tr class="esc-gray-light"><th style="width:8%">OPERADOR</th>`;
+        escCols.forEach(col => { html += `<th>${col.toUpperCase()}</th>`; }); html += `</tr>`;
+        
+        escRows.forEach((cargo, rIdx) => {
+            html += `<tr><td class="esc-gray-dark" style="text-align:left; padding-left:5px; font-size: 10px;">${cargo}</td>`;
+            escCols.forEach((col, cIdx) => {
+                const isMergedRow = (rIdx === 0 || rIdx === 3); const isMesaGroupCol = (cIdx === 0 || cIdx === 2 || cIdx === 4 || cIdx === 6); const isSkipCol = (cIdx === 1 || cIdx === 3 || cIdx === 5 || cIdx === 7);
+                if (isMergedRow && isSkipCol) return; 
+                let cellVal = (escDia.grid && escDia.grid[rIdx]) ? (escDia.grid[rIdx][cIdx] || "") : "";
+                let colspanAttr = (isMergedRow && isMesaGroupCol) ? 'colspan="2"' : '';
+                
+                if (isAdm) {
+                    let selectHtml = `<select class="esc-select" id="esc-cell-${diaConf.id}-${rIdx}-${cIdx}" onchange="handleEscalaSelect('${diaConf.id}', '${rIdx}', '${cIdx}', this)"><option value="">--</option>`;
+                    operadoresList.forEach(op => { 
+                        let short = formatShortName(op); let selected = (cellVal === op) ? 'selected' : ''; 
+                        selectHtml += `<option value="${op}" ${selected}>${short}</option>`;
+                    });
+                    selectHtml += `</select>`; html += `<td ${colspanAttr} style="padding:0;">${selectHtml}</td>`;
+                } else { html += `<td id="esc-cell-view-${diaConf.id}-${rIdx}-${cIdx}" ${colspanAttr} class="esc-gray-light" style="color:#000; font-size: 9px; font-weight: 800;">${formatShortName(cellVal)}</td>`; }
+            });
+            html += `</tr>`;
+        });
+        html += `</table></div>`; container.innerHTML += html;
+    });
+
+    if (!isAdm && !renderedAny) container.innerHTML = '<div style="text-align:center; padding: 50px; color: var(--text-muted); font-size: 1.2rem; font-weight: bold;">A Escala ainda não foi publicada.</div>';
+    if(isAdm) { escDiasConf.forEach(d => updateDropdownsAvailability(d.id)); updateSidebar(); }
+    isEscalaSemanaRendered = true;
+}
+
+function syncEscalaDcUI() {
+    const isAdm = currentUser && currentUser.r === 'admin';
+    escDiasConf.forEach(diaConf => {
+        let id = diaConf.id;
+        let escDia = liveEscalaDcSemana[id] || {};
+        let dtEl = document.getElementById(`esc-dc-datadia-${id}`); if(dtEl && document.activeElement !== dtEl) dtEl.innerText = escDia.dataDia || '(inserir data)';
+        
+        dcLayout.forEach(sec => {
+            let slots = sec.rows * sec.cols;
+            for(let i=0; i<slots; i++) {
+                let cellId = `${sec.id}_${i}`;
+                let cellVal = escDia.grid ? (escDia.grid[cellId] || "") : "";
+                if(isAdm) {
+                    let sel = document.getElementById(`esc-dc-cell-${id}-${cellId}`);
+                    if(sel && sel.value !== cellVal) sel.value = cellVal;
+                } else {
+                    let td = document.getElementById(`esc-dc-cell-view-${id}-${cellId}`);
+                    if(td) td.innerText = formatShortName(cellVal);
+                }
+            }
+        });
+        if(isAdm) updateDropdownsAvailabilityDc(id);
+    });
+    if(isAdm) updateSidebarDc();
+}
+
+function renderEscalaDcSemana() {
+    if(isEscalaDcSemanaRendered) {
+        syncEscalaDcUI();
+        return;
+    }
+
+    const container = document.getElementById('escala-dc-container'); if(!container) return; container.innerHTML = '';
+    const isAdm = currentUser && currentUser.r === 'admin'; 
+    let renderedAny = false;
+
+    escDiasConf.forEach((diaConf, index) => {
+        let escDia = liveEscalaDcSemana[diaConf.id] || { dataDia: '(inserir data)', visible: false, grid:{}};
+        if (!isAdm && escDia.visible !== true) return; 
+        renderedAny = true;
+        
+        let btnSortear = isAdm ? `<button class="esc-day-btn" onclick="autoDistributeDc('${diaConf.id}')"><i class="fas fa-random"></i> Sortear</button>` : '';
+        let eyeClass = escDia.visible ? 'esc-day-btn' : 'esc-day-btn eye-off'; 
+        let btnEye = isAdm ? `<button class="${eyeClass}" onclick="toggleDayVisibilityDc('${diaConf.id}')"><i class="fas fa-eye"></i> ${escDia.visible ? 'Visível' : 'Oculto'}</button>` : '';
+        let headerControls = isAdm ? `<div style="display:flex; gap:8px; align-items:center;">${btnSortear}${btnEye}</div>` : '';
+
+        let html = `<div class="esc-block"><table class="esc-table" style="border-bottom:none; margin-bottom: 5px;">
+                <tr><td style="background-color: ${diaConf.bg} !important; color: ${diaConf.cor} !important; padding: 0;"><div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 15px;"><span style="font-size: 14px; font-weight: 800;">${diaConf.nome}</span>${headerControls}</div></td></tr>
+                <tr><td class="esc-gray-light editable-cell" contenteditable="${isAdm}" id="esc-dc-datadia-${diaConf.id}" onblur="updateScaleDcField('${diaConf.id}', 'dataDia', this)" style="text-align: left; padding-left: 10px; font-weight: bold; font-size: 11px; color: #002f6c;">${escDia.dataDia || '(inserir data)'}</td></tr>
+            </table>
+            <table class="esc-table">`;
+        
+        dcLayout.forEach(sec => {
+            html += `<tr class="spx-navy"><td colspan="${sec.cols}" style="color:#fff; font-size:10px;">${sec.title}</td></tr>`;
+            let cellCounter = 0;
+            for(let r=0; r<sec.rows; r++) {
+                html += `<tr>`;
+                for(let c=0; c<sec.cols; c++) {
+                    let cellId = `${sec.id}_${cellCounter}`;
+                    let cellVal = escDia.grid ? escDia.grid[cellId] : '';
+                    
+                    if (isAdm) {
+                        let selectHtml = `<select class="esc-select" id="esc-dc-cell-${diaConf.id}-${cellId}" onchange="handleEscalaDcSelect('${diaConf.id}', '${cellId}', this)"><option value="">--</option>`;
+                        operadoresList.forEach(op => { 
+                            let short = formatShortName(op); let selected = (cellVal === op) ? 'selected' : ''; 
+                            selectHtml += `<option value="${op}" ${selected}>${short}</option>`; 
+                        });
+                        selectHtml += `</select>`; html += `<td style="padding:0; width: 25%;">${selectHtml}</td>`;
+                    } else { html += `<td id="esc-dc-cell-view-${diaConf.id}-${cellId}" class="esc-gray-light" style="color:#000; font-size: 9px; font-weight: 800; width: 25%;">${formatShortName(cellVal)}</td>`; }
+                    cellCounter++;
+                }
+                html += `</tr>`;
+            }
+        });
+        html += `</table></div>`; container.innerHTML += html;
+    });
+
+    if (!isAdm && !renderedAny) container.innerHTML = '<div style="text-align:center; padding: 50px; color: var(--text-muted); font-size: 1.2rem; font-weight: bold;">A Escala Doblecheck ainda não foi publicada.</div>';
+    if(isAdm) { escDiasConf.forEach(d => updateDropdownsAvailabilityDc(d.id)); updateSidebarDc(); }
+    isEscalaDcSemanaRendered = true;
+}
+
+// =========================================================
+// SALVAMENTO DE HISTÓRICO COM CONTAGEM DE DIAS TRABALHADOS
+// =========================================================
+async function archiveEscalaSemanal() {
+    let dataInput = document.getElementById('hist-date-input').value; if(!dataInput) { showToast("Selecione a semana de referência no topo."); return; }
+    showToast("Salvando Semana no Histórico...");
+    
+    let resumoDias = {};
+    escDiasConf.forEach(diaConf => {
+        let escDia = liveEscalaSemana[diaConf.id];
+        if(escDia && escDia.grid) {
+            escRows.forEach((cargo, rIdx) => {
+                escCols.forEach((col, cIdx) => {
+                    let op = escDia.grid[rIdx] ? escDia.grid[rIdx][cIdx] : null;
+                    if(op) {
+                        if(!resumoDias[op]) resumoDias[op] = { Total: 0 };
+                        let roleName = `${cargo} - ${col.replace(' VOLUMOSO','')}`;
+                        resumoDias[op][roleName] = (resumoDias[op][roleName] || 0) + 1;
+                        resumoDias[op].Total += 1;
+                    }
+                });
+            });
+        }
+    });
+    liveEscalaSemana.resumoDias = resumoDias;
+
+    try { await dbFirebase.ref('shopee_escala_history/' + dataInput).set(liveEscalaSemana); showToast("Semana Salva com Sucesso!"); } catch(e) { console.error(e); showToast("Erro."); }
+}
+
+async function archiveEscalaDc() {
+    let dataInput = document.getElementById('hist-date-input-dc').value; if(!dataInput) { showToast("Selecione a semana de referência no topo."); return; }
+    showToast("Salvando Semana DC...");
+
+    let resumoDias = {};
+    escDiasConf.forEach(diaConf => {
+        let escDia = liveEscalaDcSemana[diaConf.id];
+        if(escDia && escDia.grid) {
+            dcLayout.forEach(sec => {
+                let slots = sec.rows * sec.cols;
+                for(let i=0; i<slots; i++) {
+                    let op = escDia.grid[`${sec.id}_${i}`];
+                    if(op) {
+                        if(!resumoDias[op]) resumoDias[op] = { Total: 0 };
+                        let roleName = sec.title;
+                        resumoDias[op][roleName] = (resumoDias[op][roleName] || 0) + 1;
+                        resumoDias[op].Total += 1;
+                    }
+                }
+            });
+        }
+    });
+    liveEscalaDcSemana.resumoDias = resumoDias;
+
+    try { await dbFirebase.ref('shopee_escala_dc_history/' + dataInput).set(liveEscalaDcSemana); showToast("Semana Salva com Sucesso!"); } catch(e) { console.error(e); showToast("Erro."); }
+}
+
+function renderHistEscala(tipo) {
+    let containerId = tipo === 'lugares' ? 'hist-escala-list' : 'hist-escala-dc-list';
+    let cacheSource = tipo === 'lugares' ? historyDataCache : historyDcDataCache;
+    const container = document.getElementById(containerId); if(!container) return;
+    
+    let keys = Object.keys(cacheSource).sort((a,b) => b.localeCompare(a)); 
+    if(keys.length === 0) { container.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:40px">Nenhum histórico encontrado.</div>'; return; }
+    container.innerHTML = '';
+    
+    keys.forEach((dateKey, index) => {
+        const semanaData = cacheSource[dateKey];
+        let displayWeek = dateKey; if(dateKey.includes('-W')) { let pts = dateKey.split('-W'); displayWeek = "Semana " + pts[1] + " de " + pts[0]; }
+
+        let tableHtml = `<div class="hidden" id="hist-det-${tipo}-${index}" style="margin-top: 15px; border-top: 1px solid var(--glass-border); padding-top: 15px; overflow-x: auto;"><table class="hist-table"><tr><th>COLABORADOR</th>`;
+        
+        escDiasConf.forEach(diaConf => { let dData = semanaData[diaConf.id]?.dataDia || diaConf.nome.replace('ESCALA ', ''); tableHtml += `<th>${diaConf.nome.replace('ESCALA ', '')}<br><span style="font-size:9px; color:var(--text-muted)">${dData}</span></th>`; });
+        tableHtml += `</tr>`;
+
+        let workedOps = new Set();
+        escDiasConf.forEach(d => { let grid = semanaData[d.id]?.grid; if(grid) { Object.values(grid).forEach(op => { if(typeof op === 'string' && op) workedOps.add(op); else if (typeof op === 'object') { Object.values(op).forEach(v => { if(v) workedOps.add(v); }); } }); } });
+        let sortedOps = Array.from(workedOps).sort();
+
+        if(sortedOps.length === 0) {
+            tableHtml += `<tr><td colspan="7" style="color:var(--text-muted); font-size:10px;">Nenhum operador alocado.</td></tr>`;
+        } else {
+            sortedOps.forEach(op => {
+                tableHtml += `<tr><td style="text-align:left; font-size:10px; font-weight:bold;">${op}</td>`;
+                escDiasConf.forEach(d => {
+                    let grid = semanaData[d.id]?.grid; let roleStr = "-";
+                    if(grid) {
+                        if(tipo === 'lugares') {
+                            for(let r=0; r<escRows.length; r++) { if(grid[r]) { for(let c=0; c<escCols.length; c++) { if(grid[r][c] === op) { roleStr = `<span style="color:var(--primary); font-weight:800;">${escRows[r]}</span><br><span style="font-size:9px; color:var(--text-muted)">${escCols[c]}</span>`; } } } }
+                        } else {
+                            dcLayout.forEach(sec => { let slots = sec.rows * sec.cols; for(let i=0; i<slots; i++) { if(grid[`${sec.id}_${i}`] === op) { roleStr = `<span style="color:var(--primary); font-weight:800;">${sec.title}</span><br><span style="font-size:9px; color:var(--text-muted)">Vaga ${i+1}</span>`; } } });
+                        }
+                    }
+                    tableHtml += `<td style="font-size:10px;">${roleStr}</td>`;
+                });
+                tableHtml += `</tr>`;
+            });
+        }
+        
+        let resumoHtml = '';
+        if(semanaData.resumoDias) {
+            resumoHtml = `<div style="background: rgba(0,0,0,0.1); padding: 15px; border-radius: 8px; margin-top: 15px;">
+                          <h4 style="color:var(--primary); font-size: 0.9rem; margin-bottom: 10px;">Resumo de Atuação na Semana</h4>
+                          <table class="hist-table">
+                          <tr><th style="width: 30%;">Operador</th><th style="width: 15%;">Total Dias</th><th>Detalhamento</th></tr>`;
+            Object.keys(semanaData.resumoDias).sort().forEach(op => {
+                let data = semanaData.resumoDias[op];
+                let details = Object.keys(data).filter(k => k !== 'Total').map(k => `<span style="color:var(--accent)">${k}:</span> <b>${data[k]}x</b>`).join(' | ');
+                resumoHtml += `<tr><td style="text-align:left; font-weight:bold;">${op}</td><td>${data.Total}</td><td style="text-align:left; font-size:10px;">${details}</td></tr>`;
+            });
+            resumoHtml += `</table></div>`;
+        }
+
+        tableHtml += `</table> ${resumoHtml} </div>`;
+
+        const div = document.createElement('div'); div.className = `stat-card`; div.style.padding = "20px"; div.style.marginBottom = "15px";
+        let kpis = '';
+        if(tipo === 'lugares') {
+            let resumo = semanaData['segunda'] || {hc:'0', pct:'0', dw:'0'};
+            kpis = `<div style="display:grid; grid-template-columns: repeat(3, 1fr); gap: 15px;"><div class="si"><div class="si-l">Headcount (Segunda)</div><div class="si-v" style="font-size: 1.2rem;">${resumo.hc}</div></div><div class="si"><div class="si-l">Pct Proc. (Segunda)</div><div class="si-v" style="color:var(--success); font-size: 1.2rem;">${resumo.pct}</div></div><div class="si"><div class="si-l">Nec. DW (Segunda)</div><div class="si-v" style="color:var(--danger); font-size: 1.2rem;">${resumo.dw}</div></div></div>`;
+        }
+
+        div.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px; border-bottom: 1px solid var(--glass-border); padding-bottom: 15px;"><div style="font-weight: 800; font-size: 1.2rem; color: var(--primary);"><i class="fas fa-calendar-week" style="margin-right: 8px;"></i> ${displayWeek}</div><button class="btn-ghost" style="padding: 6px 12px; font-size: 0.75rem;" onclick="document.getElementById('hist-det-${tipo}-${index}').classList.toggle('hidden')"><i class="fas fa-search"></i> Ver Relatório</button></div>${kpis}${tableHtml}`;
+        container.appendChild(div);
+    });
+}
 
 // =========================================================
 // DASHBOARD SITELIDER & ANÁLISE DE GAP REALTIME
 // =========================================================
-function colorizePHD(elementId, value) {
-    let el = document.getElementById(elementId);
-    if(!el) return;
-    el.innerText = value;
-    if(value >= globalMetaPHD && value > 0) {
-        el.style.background = 'linear-gradient(to bottom, #fff, #10b981)';
-    } else if (value > 0) {
-        el.style.background = 'linear-gradient(to bottom, #fff, #ef4444)';
-    } else {
-        el.style.background = 'linear-gradient(to bottom, #fff, #3b82f6)';
-    }
-    el.style.webkitBackgroundClip = 'text';
-    el.style.webkitTextFillColor = 'transparent';
-}
-
 async function renderSiteliderDashboard() {
     try {
         let weekInput = document.getElementById('sl-week-select');
@@ -307,9 +610,6 @@ async function renderSiteliderDashboard() {
             document.getElementById('sl-phd-mes-lbl').innerText = `MÉDIA DO MÊS (${percMesPHD}% DA META)`;
         }
 
-        // ==================================================
-        // LABELS DE TEMPO E ANÁLISE DE GAP (BLINDADO)
-        // ==================================================
         let elMetaDisplay = document.getElementById('sa-meta-display');
         if (elMetaDisplay) elMetaDisplay.innerText = globalMetaPHD;
 
@@ -539,257 +839,62 @@ presencaListener = dbFirebase.ref('shopee_presenca_live/' + currentPresMes).on('
 });
 
 // =========================================================
-// RENDERIZADOR SUAVE DAS ESCALAS (FIM DO LAG E RESET)
+// AUTO-FILL ESTAÇÕES (MESA DA ESCALA) - ISOLADO E BLINDADO
 // =========================================================
-function syncEscalaSemanaUI() {
-    const isAdm = currentUser && currentUser.r === 'admin';
-    escDiasConf.forEach(diaConf => {
-        let id = diaConf.id;
-        let escDia = liveEscalaSemana[id] || {};
-        
-        let dtEl = document.getElementById(`esc-datadia-${id}`); if(dtEl && document.activeElement !== dtEl) dtEl.innerText = escDia.dataDia || '(inserir data)';
-        let hcEl = document.getElementById(`esc-hc-${id}`); if(hcEl && document.activeElement !== hcEl) hcEl.innerText = escDia.hc || '0';
-        let pctEl = document.getElementById(`esc-pct-${id}`); if(pctEl && document.activeElement !== pctEl) pctEl.innerText = escDia.pct || '0';
-        let capEl = document.getElementById(`esc-cap-${id}`); if(capEl && document.activeElement !== capEl) capEl.innerText = escDia.cap || '0';
-        let dwEl = document.getElementById(`esc-dw-${id}`); if(dwEl && document.activeElement !== dwEl) dwEl.innerText = escDia.dw || '0';
-        let phdEl = document.getElementById(`esc-phd-${id}`); if(phdEl) phdEl.innerText = escDia.phd || '0';
-        let capphdEl = document.getElementById(`esc-capphd-${id}`); if(capphdEl && document.activeElement !== capphdEl) capphdEl.innerText = escDia.capphd || '0';
-
-        escRows.forEach((cargo, rIdx) => {
-            escCols.forEach((col, cIdx) => {
-                let cellVal = (escDia.grid && escDia.grid[rIdx]) ? (escDia.grid[rIdx][cIdx] || "") : "";
-                if(isAdm) {
-                    let sel = document.getElementById(`esc-cell-${id}-${rIdx}-${cIdx}`);
-                    if(sel && sel.value !== cellVal) sel.value = cellVal;
-                } else {
-                    let td = document.getElementById(`esc-cell-view-${id}-${rIdx}-${cIdx}`);
-                    if(td) td.innerText = formatShortName(cellVal);
-                }
-            });
-        });
-        if(isAdm) updateDropdownsAvailability(id);
-    });
-    if(isAdm) updateSidebar();
-}
-
-function renderEscalaSemana() {
-    if(isEscalaSemanaRendered) {
-        syncEscalaSemanaUI();
-        return;
-    }
-
-    const container = document.getElementById('escala-semanal-container'); if(!container) return; container.innerHTML = '';
-    const isAdm = currentUser && currentUser.r === 'admin'; 
-    const editAttr = isAdm ? 'contenteditable="true"' : ''; 
-    const editClass = isAdm ? 'editable-cell' : '';
-    let renderedAny = false;
-
-    escDiasConf.forEach((diaConf, index) => {
-        let escDia = liveEscalaSemana[diaConf.id] || {hc:'0', pct:'0', cap:'0', dw:'0', phd:'0', capphd:'0', dataDia: '(inserir data)', visible: false, grid:{}};
-        if (!isAdm && escDia.visible !== true) return; 
-        renderedAny = true;
-        
-        let prevDayName = index > 0 ? escDiasConf[index - 1].nome.replace('ESCALA ', '') : "";
-        let btnCopiar = (isAdm && index > 0) ? `<button class="esc-day-btn" style="border-color: #3b82f6; color: #3b82f6;" onclick="copyFromPreviousDay('${diaConf.id}')"><i class="fas fa-copy"></i> Copiar Anter.</button>` : '';
-        let btnSortear = isAdm ? `<button class="esc-day-btn" onclick="autoDistributeOperators('${diaConf.id}')"><i class="fas fa-random"></i> Sortear</button>` : '';
-        let eyeClass = escDia.visible ? 'esc-day-btn' : 'esc-day-btn eye-off'; 
-        let btnEye = isAdm ? `<button class="${eyeClass}" onclick="toggleDayVisibility('${diaConf.id}')"><i class="fas fa-eye"></i> ${escDia.visible ? 'Visível' : 'Oculto'}</button>` : '';
-
-        let html = `<div class="esc-block"><table class="esc-table" style="border-bottom:none; margin-bottom: 5px;">
-                <tr><td colspan="7" style="background-color: ${diaConf.bg} !important; color: ${diaConf.cor} !important; padding: 0;"><div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 15px;"><span style="font-size: 14px; font-weight: 800;">${diaConf.nome}</span><div style="display:flex; gap:8px;">${btnCopiar}${btnSortear}${btnEye}</div></div></td></tr>
-                <tr>
-                    <td class="esc-gray-light ${editClass}" ${editAttr} id="esc-datadia-${diaConf.id}" onblur="updateScaleField('${diaConf.id}', 'dataDia', this)" style="text-align: left; padding-left: 10px; font-weight: bold; font-size: 11px; color: #002f6c; width:20%;">${escDia.dataDia || '(inserir data)'}</td>
-                    <td class="esc-gray-light" style="width:10%">Quantidade HC</td><td class="${editClass}" ${editAttr} id="esc-hc-${diaConf.id}" onblur="updateScaleField('${diaConf.id}', 'hc', this)" style="width:10%">${escDia.hc}</td>
-                    <td class="esc-gray-light" style="width:10%">PCT. PROCESSADOS</td><td class="esc-green ${editClass}" ${editAttr} id="esc-pct-${diaConf.id}" onblur="updateScaleField('${diaConf.id}', 'pct', this)" style="width:10%">${escDia.pct}</td>
-                    <td class="esc-gray-light" style="width:10%">CAP PROCESSAMENTO</td><td class="esc-cyan ${editClass}" ${editAttr} id="esc-cap-${diaConf.id}" onblur="updateScaleField('${diaConf.id}', 'cap', this)" style="width:10%">${escDia.cap}</td>
-                </tr>
-                <tr>
-                    <td class="esc-gray-light" style="border-top: none;"></td>
-                    <td class="esc-gray-light">Necessidade DW</td><td class="esc-red-txt ${editClass}" ${editAttr} id="esc-dw-${diaConf.id}" onblur="updateScaleField('${diaConf.id}', 'dw', this)">${escDia.dw}</td>
-                    <td class="esc-gray-light esc-red-txt">PHD Atingido</td><td class="esc-red-txt" id="esc-phd-${diaConf.id}">${escDia.phd}</td>
-                    <td class="esc-gray-light">CAP PHD</td><td class="esc-cyan esc-red-txt ${editClass}" ${editAttr} id="esc-capphd-${diaConf.id}" onblur="updateScaleField('${diaConf.id}', 'capphd', this)">${escDia.capphd}</td>
-                </tr>
-            </table>
-            <table class="esc-table"><tr class="esc-gray-light"><th style="width:8%">OPERADOR</th>`;
-        escCols.forEach(col => { html += `<th>${col.toUpperCase()}</th>`; }); html += `</tr>`;
-        
-        escRows.forEach((cargo, rIdx) => {
-            html += `<tr><td class="esc-gray-dark" style="text-align:left; padding-left:5px; font-size: 10px;">${cargo}</td>`;
-            escCols.forEach((col, cIdx) => {
-                const isMergedRow = (rIdx === 0 || rIdx === 3); const isMesaGroupCol = (cIdx === 0 || cIdx === 2 || cIdx === 4 || cIdx === 6); const isSkipCol = (cIdx === 1 || cIdx === 3 || cIdx === 5 || cIdx === 7);
-                if (isMergedRow && isSkipCol) return; 
-                let cellVal = (escDia.grid && escDia.grid[rIdx]) ? (escDia.grid[rIdx][cIdx] || "") : "";
-                let colspanAttr = (isMergedRow && isMesaGroupCol) ? 'colspan="2"' : '';
-                
-                if (isAdm) {
-                    let selectHtml = `<select class="esc-select" id="esc-cell-${diaConf.id}-${rIdx}-${cIdx}" onchange="handleEscalaSelect('${diaConf.id}', ${rIdx}, ${cIdx}, this)"><option value="">--</option>`;
-                    operadoresList.forEach(op => { 
-                        let short = formatShortName(op); let selected = (cellVal === op) ? 'selected' : ''; 
-                        selectHtml += `<option value="${op}" ${selected}>${short}</option>`;
-                    });
-                    selectHtml += `</select>`; html += `<td ${colspanAttr} style="padding:0;">${selectHtml}</td>`;
-                } else { html += `<td id="esc-cell-view-${diaConf.id}-${rIdx}-${cIdx}" ${colspanAttr} class="esc-gray-light" style="color:#000; font-size: 9px; font-weight: 800;">${formatShortName(cellVal)}</td>`; }
-            });
-            html += `</tr>`;
-        });
-        html += `</table></div>`; container.innerHTML += html;
-    });
-
-    if (!isAdm && !renderedAny) container.innerHTML = '<div style="text-align:center; padding: 50px; color: var(--text-muted); font-size: 1.2rem; font-weight: bold;">A Escala ainda não foi publicada.</div>';
-    if(isAdm) { escDiasConf.forEach(d => updateDropdownsAvailability(d.id)); updateSidebar(); }
-    isEscalaSemanaRendered = true;
-}
-
-function syncEscalaDcUI() {
-    const isAdm = currentUser && currentUser.r === 'admin';
-    escDiasConf.forEach(diaConf => {
-        let id = diaConf.id;
-        let escDia = liveEscalaDcSemana[id] || {};
-        let dtEl = document.getElementById(`esc-dc-datadia-${id}`); if(dtEl && document.activeElement !== dtEl) dtEl.innerText = escDia.dataDia || '(inserir data)';
-        
-        dcLayout.forEach(sec => {
-            let slots = sec.rows * sec.cols;
-            for(let i=0; i<slots; i++) {
-                let cellId = `${sec.id}_${i}`;
-                let cellVal = escDia.grid ? (escDia.grid[cellId] || "") : "";
-                if(isAdm) {
-                    let sel = document.getElementById(`esc-dc-cell-${id}-${cellId}`);
-                    if(sel && sel.value !== cellVal) sel.value = cellVal;
-                } else {
-                    let td = document.getElementById(`esc-dc-cell-view-${id}-${cellId}`);
-                    if(td) td.innerText = formatShortName(cellVal);
-                }
-            }
-        });
-        if(isAdm) updateDropdownsAvailabilityDc(id);
-    });
-    if(isAdm) updateSidebarDc();
-}
-
-function renderEscalaDcSemana() {
-    if(isEscalaDcSemanaRendered) {
-        syncEscalaDcUI();
-        return;
-    }
-
-    const container = document.getElementById('escala-dc-container'); if(!container) return; container.innerHTML = '';
-    const isAdm = currentUser && currentUser.r === 'admin'; 
-    let renderedAny = false;
-
-    escDiasConf.forEach((diaConf, index) => {
-        let escDia = liveEscalaDcSemana[diaConf.id] || { dataDia: '(inserir data)', visible: false, grid:{}};
-        if (!isAdm && escDia.visible !== true) return; 
-        renderedAny = true;
-        
-        let btnSortear = isAdm ? `<button class="esc-day-btn" onclick="autoDistributeDc('${diaConf.id}')"><i class="fas fa-random"></i> Sortear</button>` : '';
-        let eyeClass = escDia.visible ? 'esc-day-btn' : 'esc-day-btn eye-off'; 
-        let btnEye = isAdm ? `<button class="${eyeClass}" onclick="toggleDayVisibilityDc('${diaConf.id}')"><i class="fas fa-eye"></i> ${escDia.visible ? 'Visível' : 'Oculto'}</button>` : '';
-        let headerControls = isAdm ? `<div style="display:flex; gap:8px; align-items:center;">${btnSortear}${btnEye}</div>` : '';
-
-        let html = `<div class="esc-block"><table class="esc-table" style="border-bottom:none; margin-bottom: 5px;">
-                <tr><td style="background-color: ${diaConf.bg} !important; color: ${diaConf.cor} !important; padding: 0;"><div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 15px;"><span style="font-size: 14px; font-weight: 800;">${diaConf.nome}</span>${headerControls}</div></td></tr>
-                <tr><td class="esc-gray-light editable-cell" contenteditable="${isAdm}" id="esc-dc-datadia-${diaConf.id}" onblur="updateScaleDcField('${diaConf.id}', 'dataDia', this)" style="text-align: left; padding-left: 10px; font-weight: bold; font-size: 11px; color: #002f6c;">${escDia.dataDia || '(inserir data)'}</td></tr>
-            </table>
-            <table class="esc-table">`;
-        
-        dcLayout.forEach(sec => {
-            html += `<tr class="spx-navy"><td colspan="${sec.cols}" style="color:#fff; font-size:10px;">${sec.title}</td></tr>`;
-            let cellCounter = 0;
-            for(let r=0; r<sec.rows; r++) {
-                html += `<tr>`;
-                for(let c=0; c<sec.cols; c++) {
-                    let cellId = `${sec.id}_${cellCounter}`;
-                    let cellVal = escDia.grid ? escDia.grid[cellId] : '';
-                    
-                    if (isAdm) {
-                        let selectHtml = `<select class="esc-select" id="esc-dc-cell-${diaConf.id}-${cellId}" onchange="handleEscalaDcSelect('${diaConf.id}', '${cellId}', this)"><option value="">--</option>`;
-                        operadoresList.forEach(op => { 
-                            let short = formatShortName(op); let selected = (cellVal === op) ? 'selected' : ''; 
-                            selectHtml += `<option value="${op}" ${selected}>${short}</option>`; 
-                        });
-                        selectHtml += `</select>`; html += `<td style="padding:0; width: 25%;">${selectHtml}</td>`;
-                    } else { html += `<td id="esc-dc-cell-view-${diaConf.id}-${cellId}" class="esc-gray-light" style="color:#000; font-size: 9px; font-weight: 800; width: 25%;">${formatShortName(cellVal)}</td>`; }
-                    cellCounter++;
-                }
-                html += `</tr>`;
-            }
-        });
-        html += `</table></div>`; container.innerHTML += html;
-    });
-
-    if (!isAdm && !renderedAny) container.innerHTML = '<div style="text-align:center; padding: 50px; color: var(--text-muted); font-size: 1.2rem; font-weight: bold;">A Escala Doblecheck ainda não foi publicada.</div>';
-    if(isAdm) { escDiasConf.forEach(d => updateDropdownsAvailabilityDc(d.id)); updateSidebarDc(); }
-    isEscalaDcSemanaRendered = true;
-}
-
-// =========================================================
-// O RESTANTE DO SISTEMA (DEMAIS TELAS E LÓGICAS)
-// =========================================================
-
-function saveProdState() {
-    if (!currentUser || currentUser.r !== 'admin') return;
-    try {
-        let dateVal = document.getElementById('p-data')?.value || '';
-        let state = { data: dateVal, horaIni: document.getElementById('p-hora-ini')?.value || '', horaFim: document.getElementById('p-hora-fim')?.value || '', backlog: document.getElementById('p-backlog')?.innerText || '0', xpt: document.getElementById('p-xpt')?.innerText || '0', volRot: document.getElementById('p-vol-rot')?.innerText || '0', stations: [] };
-        for(let j=1; j<=10; j++) { let sel = document.getElementById(`station-select-${j}`); state.stations.push(sel ? sel.value : ""); }
-        dbFirebase.ref('shopee_prod_state').set(state);
-
-        if (dateVal && Object.keys(globalProdData).length > 0) {
-            let dailyTotals = {};
-            for(let name in globalProdData) {
-                let sum = 0; for(let h in globalProdData[name]) sum += globalProdData[name][h];
-                if (sum > 0) dailyTotals[name] = sum;
-            }
-            dbFirebase.ref('shopee_prod_history/' + dateVal).set(dailyTotals);
-        }
-    } catch(e) { console.error(e); }
-}
-
-function checkSession() { const saved = localStorage.getItem('spxUser'); if(saved) { const found = JSON.parse(saved); currentUser = found; document.getElementById('login-screen').style.display = 'none'; document.getElementById('app-shell').style.display = 'flex'; document.getElementById('display-user').innerText = found.u.toUpperCase(); if(found.r === 'admin') { document.body.classList.add('is-admin'); } initProdGrid(); let pm = document.getElementById('pres-month-select'); if(pm) pm.value = currentPresMes; switchTab('escala'); } }
-function login() { const u = document.getElementById('user').value; const p = document.getElementById('pass').value; const found = USERS.find(x => x.u === u && x.p === p); if(found) { currentUser = found; localStorage.setItem('spxUser', JSON.stringify(found)); document.getElementById('login-screen').style.display = 'none'; document.getElementById('app-shell').style.display = 'flex'; document.getElementById('display-user').innerText = u.toUpperCase(); if(found.r === 'admin') { document.body.classList.add('is-admin'); } initProdGrid(); let pm = document.getElementById('pres-month-select'); if(pm) pm.value = currentPresMes; switchTab('escala'); } else { document.getElementById('login-err').style.display = 'block'; } }
-function logout() { localStorage.removeItem('spxUser'); location.reload(); }
-function showToast(msg) { const t = document.getElementById('toast'); if(!t) return; t.innerText = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 3000); }
-function fmtTime(s) { const m = Math.floor(s/60); const sec = Math.round(s%60); return `${m}m ${sec}s`; }
-function secToHHMMSS(s) { if(!s) return "00:00:00"; const h = Math.floor(s/3600).toString().padStart(2,'0'); const m = Math.floor((s%3600)/60).toString().padStart(2,'0'); const sec = Math.floor(s%60).toString().padStart(2,'0'); return `${h}:${m}:${sec}`; }
-function excelDate(serial) { if(!serial) return "-"; const date = new Date((serial - 25569) * 86400 * 1000); return date.toLocaleDateString('pt-BR'); }
-function fmtExcelTime(dec) { if(!dec) return "-"; let s = Math.round(dec * 86400); return secToHHMMSS(s).substring(0,5); }
-function readExcelFile(file, parseDates = false) { return new Promise(resolve => { const reader = new FileReader(); reader.onload = e => { const workbook = XLSX.read(new Uint8Array(e.target.result), { type: 'array', cellDates: parseDates }); const data = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], {header:1}); resolve(data); }; reader.readAsArrayBuffer(file); }); }
-
-let selectedShiftTemp = '';
-function openShiftModal() { let el = document.getElementById('shift-modal-overlay'); if(el) el.classList.remove('hidden'); }
-function closeShiftModal() { let el = document.getElementById('shift-modal-overlay'); if(el) el.classList.add('hidden'); }
-function confirmShift(shift) { selectedShiftTemp = shift; let el = document.getElementById('shift-display'); if(el) el.innerText = "| TURNO: " + shift; closeShiftModal(); document.getElementById('file-prod').click(); }
-
 window.autoFillStations = function() {
     try {
-        let dateVal = document.getElementById('p-data')?.value || '';
-        if (!dateVal) { showToast("Preencha a Data primeiro!"); return; }
-        let [y, m, d] = dateVal.split('-'); let dateObj = new Date(y, m - 1, d);
+        let dateInput = document.getElementById('p-data');
+        let dateVal = dateInput ? dateInput.value : '';
+        if (!dateVal) {
+            showToast("Preencha a Data primeiro!");
+            return;
+        }
+
+        let [y, m, d] = dateVal.split('-');
+        let dateObj = new Date(y, m - 1, d);
         let daysMap = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
         let dayStr = daysMap[dateObj.getDay()];
 
         let escDia = liveEscalaSemana[dayStr];
         if (escDia && escDia.grid) {
-            let bipadorRow = escDia.grid[1]; let etiquetadorRow = escDia.grid[2]; 
+            let bipadorRow = escDia.grid[1]; 
+            let etiquetadorRow = escDia.grid[2]; 
+
             let changed = false;
             for (let i = 0; i < 10; i++) {
                 let name = "";
                 if (bipadorRow && bipadorRow[i]) name = bipadorRow[i];
                 else if (etiquetadorRow && etiquetadorRow[i]) name = etiquetadorRow[i];
+
                 if (name) {
                     let select = document.getElementById(`station-select-${i+1}`);
                     if (select) {
-                        if (!Array.from(select.options).some(opt => opt.value === name)) { select.innerHTML += `<option value="${name}">${name}</option>`; }
-                        select.value = name; changed = true;
+                        let exists = Array.from(select.options).some(opt => opt.value === name);
+                        if (!exists) { select.innerHTML += `<option value="${name}">${name}</option>`; }
+                        select.value = name;
+                        changed = true;
                     }
                 }
             }
-            if(changed) { refreshProdGridData(); saveProdState(); showToast("Estações alocadas pela Escala!"); }
-            else { showToast("Nenhum Bipador alocado na escala deste dia."); }
-        } else { showToast("A escala de processamento deste dia está vazia."); }
-    } catch(e) { console.error(e); showToast("Erro ao sincronizar escala."); }
+            if(changed) {
+                refreshProdGridData();
+                saveProdState();
+                showToast("Nomes puxados da Escala com Sucesso!");
+            } else {
+                showToast("Nenhum Bipador/Etiquetador nesta data.");
+            }
+        } else {
+            showToast("A Escala deste dia está vazia.");
+        }
+    } catch(e) {
+        console.error("Erro no autoFill:", e);
+        showToast("Erro ao ler escala.");
+    }
 };
 
+// =========================================================
+// PRODUTIVIDADE H/H (LEITURA DO EXCEL)
+// =========================================================
 async function importProdData(input) {
     if(input.files.length === 0) return;
     try {
@@ -830,7 +935,7 @@ async function importProdData(input) {
         updateDropdowns(); 
         saveProdToCloud(); 
         showToast("Produtividade Processada!");
-    } catch(e) { console.error(e); showToast("Erro."); }
+    } catch(e) { console.error("Erro na importação:", e); showToast("Erro."); }
 }
 
 function updateDropdowns() {
@@ -910,6 +1015,9 @@ function initProdGrid() {
 
 window.onload = function() { checkSession(); let pw = document.getElementById('pass'); if(pw) pw.addEventListener('keypress', e => { if(e.key==='Enter') login(); }); };
 
+// =========================================================
+// RANKING DIÁRIO (CONTROLE HUB)
+// =========================================================
 async function handleSingleFile(input) {
     if(input.files.length === 0) return; dailyData = []; ctrlData = initCtrl();
     try { const data = await readExcelFile(input.files[0], false); processData([data], true); let el = document.getElementById('st-single'); if(el) el.innerText = "Carregado com sucesso!"; showToast("Importação Concluída"); } catch (e) { console.error(e); showToast("Erro."); }
@@ -956,7 +1064,7 @@ function processData(allFilesData, isSingleImport) {
         });
         dailyData = Object.values(map); saveDailyToCloud(); renderDaily(); 
         if (isSingleImport && currentUser && currentUser.r === 'admin') dbFirebase.ref('shopee_ctrl_live').set(ctrlData);
-    } catch(err) { console.error(err); }
+    } catch(err) { console.error("Falha no Processamento Diario:", err); showToast("Erro Crítico no Arquivo."); }
 }
 
 function clearData() { dailyData=[]; ctrlData=initCtrl(); saveDailyToCloud(); if(currentUser && currentUser.r === 'admin') dbFirebase.ref('shopee_ctrl_live').set(ctrlData); let st1 = document.getElementById('st-single'); if(st1) st1.innerText="Selecionar CSV"; let st2 = document.getElementById('st-mass'); if(st2) st2.innerText="Múltiplos arquivos"; renderDaily(); renderControl(); showToast("Tela Limpa"); }
@@ -988,8 +1096,8 @@ function renderControl() {
 }
 
 async function saveToMonthly() {
-    if(dailyData.length===0) return showToast("Sem dados."); showToast("Salvando na Nuvem...");
-    try { let db = {...monthlyDataCache}; dailyData.forEach(d => { const k = d.nome; if(!db[k]) db[k] = {nome:k, rotas:0, vol:0, reconf:0, time:0, doblecheck:0}; db[k].rotas += d.rotas; db[k].vol += d.vol; db[k].reconf += d.reconf; db[k].doblecheck = (db[k].doblecheck || 0) + (d.doblecheck || 0); db[k].time += d.time; }); await dbFirebase.ref('shopee_gold_db').set(db); showToast("Arquivado!"); } catch(e) { console.error(e); }
+    if(dailyData.length===0) return showToast("Sem dados para arquivar."); showToast("Salvando na Nuvem...");
+    try { let db = {...monthlyDataCache}; dailyData.forEach(d => { const k = d.nome; if(!db[k]) db[k] = {nome:k, rotas:0, vol:0, reconf:0, time:0, doblecheck:0}; db[k].rotas += d.rotas; db[k].vol += d.vol; db[k].reconf += d.reconf; db[k].doblecheck = (db[k].doblecheck || 0) + (d.doblecheck || 0); db[k].time += d.time; }); await dbFirebase.ref('shopee_gold_db').set(db); showToast("Arquivado na Nuvem!"); } catch(e) { console.error(e); }
 }
 
 function renderMonthly() {
@@ -1020,5 +1128,25 @@ async function renderBIChart() {
     window.biChartInstance = new Chart(ctx, { type: 'bar', data: { labels: labels, datasets: [ { label: 'Volume', data: volumes, backgroundColor: 'rgba(99, 102, 241, 0.8)', borderRadius: 6, yAxisID: 'y' }, { label: 'Rotas', data: rotas, type: 'line', borderColor: '#fbbf24', backgroundColor: '#fbbf24', borderWidth: 3, tension: 0.4, yAxisID: 'y1' } ] }, options: { responsive: true, maintainAspectRatio: false } });
 }
 
-// INICIALIZADORES E LISTENERS
-initProdGrid();
+// =========================================================
+// FUNÇÕES DE SERVIÇO E LIMPEZA
+// =========================================================
+function initEmptyEscalaSemana() {
+    liveEscalaSemana = {};
+    escDiasConf.forEach(d => { liveEscalaSemana[d.id] = { hc: '16', pct: '0', cap: '16980', dw: '0', phd: '0', capphd: '630', dataDia: '(inserir data)', visible: false, grid: {} }; });
+}
+function initEmptyEscalaDcSemana() {
+    liveEscalaDcSemana = {};
+    escDiasConf.forEach(d => { liveEscalaDcSemana[d.id] = { dataDia: '(inserir data)', visible: false, grid: {} }; });
+}
+
+function saveProdToCloud() { if(currentUser && currentUser.r === 'admin') { dbFirebase.ref('shopee_prod_live').set(globalProdData).catch(e => console.error(e)); } }
+function checkSession() { const saved = localStorage.getItem('spxUser'); if(saved) { const found = JSON.parse(saved); currentUser = found; document.getElementById('login-screen').style.display = 'none'; document.getElementById('app-shell').style.display = 'flex'; document.getElementById('display-user').innerText = found.u.toUpperCase(); if(found.r === 'admin') { document.body.classList.add('is-admin'); } initProdGrid(); let pm = document.getElementById('pres-month-select'); if(pm) pm.value = currentPresMes; switchTab('escala'); } }
+function login() { const u = document.getElementById('user').value; const p = document.getElementById('pass').value; const found = USERS.find(x => x.u === u && x.p === p); if(found) { currentUser = found; localStorage.setItem('spxUser', JSON.stringify(found)); document.getElementById('login-screen').style.display = 'none'; document.getElementById('app-shell').style.display = 'flex'; document.getElementById('display-user').innerText = u.toUpperCase(); if(found.r === 'admin') { document.body.classList.add('is-admin'); } initProdGrid(); let pm = document.getElementById('pres-month-select'); if(pm) pm.value = currentPresMes; switchTab('escala'); } else { document.getElementById('login-err').style.display = 'block'; } }
+function logout() { localStorage.removeItem('spxUser'); location.reload(); }
+function showToast(msg) { const t = document.getElementById('toast'); if(!t) return; t.innerText = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 3000); }
+function fmtTime(s) { const m = Math.floor(s/60); const sec = Math.round(s%60); return `${m}m ${sec}s`; }
+function secToHHMMSS(s) { if(!s) return "00:00:00"; const h = Math.floor(s/3600).toString().padStart(2,'0'); const m = Math.floor((s%3600)/60).toString().padStart(2,'0'); const sec = Math.floor(s%60).toString().padStart(2,'0'); return `${h}:${m}:${sec}`; }
+function excelDate(serial) { if(!serial) return "-"; const date = new Date((serial - 25569) * 86400 * 1000); return date.toLocaleDateString('pt-BR'); }
+function fmtExcelTime(dec) { if(!dec) return "-"; let s = Math.round(dec * 86400); return secToHHMMSS(s).substring(0,5); }
+function readExcelFile(file, parseDates = false) { return new Promise(resolve => { const reader = new FileReader(); reader.onload = e => { const workbook = XLSX.read(new Uint8Array(e.target.result), { type: 'array', cellDates: parseDates }); const data = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], {header:1}); resolve(data); }; reader.readAsArrayBuffer(file); }); }
