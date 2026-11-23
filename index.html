@@ -197,9 +197,11 @@
                     </div>
                 </div>
 
+                <div class="sl-turnos" id="sl-turnos"></div>
+
                 <div class="sl-grid">
                     <div class="sl-panel sl-span2">
-                        <div class="sl-panel-tit"><i class="fas fa-chart-bar"></i> Absenteísmo diário do mês <small>verde = dentro da meta • amarelo = atenção • vermelho = acima</small></div>
+                        <div class="sl-panel-tit"><i class="fas fa-chart-bar"></i> Absenteísmo diário do mês <small>ABS = (F + FJ + AM) ÷ (presentes + F + FJ + AM) • folga, DSR e outros códigos não entram • verde = dentro da meta • amarelo = atenção • vermelho = acima</small></div>
                         <div class="sl-chart"><canvas id="slChartABS"></canvas></div>
                     </div>
                     <div class="sl-panel">
@@ -211,7 +213,7 @@
                         <div id="sl-semana-quadro"></div>
                     </div>
                     <div class="sl-panel">
-                        <div class="sl-panel-tit"><i class="fas fa-exclamation-triangle"></i> Maiores ausências do mês</div>
+                        <div class="sl-panel-tit"><i class="fas fa-user-times"></i> Maiores ausências do mês <small>faltas (F, FJ) e atestados (AM)</small></div>
                         <div id="sl-top-ausencias" class="sl-rank"></div>
                     </div>
                 </div>
