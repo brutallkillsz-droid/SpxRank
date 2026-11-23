@@ -116,7 +116,9 @@ function switchTab(id) {
     if(id==='escala-dc') renderEscalaDcSemana(); 
     if(id==='hist-escala') renderHistEscala('lugares');
     if(id==='hist-escala-dc') renderHistEscala('dc');
-    if(id==='presenca') loadPresencaData(); 
+    if(id==='presenca') { loadPresencaData(); autoAtualizarPlanilha(); }
+    if(id==='escala' || id==='escala-dc') autoAtualizarPlanilha();
+
     if(id==='bi') renderBIChart(); 
     if(id==='sitelider') renderSiteliderDashboard(); 
 }
@@ -1477,7 +1479,12 @@ function prepararExtras() {
             </select>
             <button type="button" class="btn-ghost btn-planilha" onclick="abrirImportPlanilha()" title="Planilha de controle baixada do Google Sheets (Arquivo > Fazer download > .xlsx)">
                 <i class="fas fa-file-import"></i> Importar Planilha</button>
-            <input type="file" id="pres-file" accept=".xlsx,.xls,.csv" style="display:none;" onclick="this.value=null" onchange="importarPlanilhaPresenca(this)">`);
+            <input type="file" id="pres-file" accept=".xlsx,.xls,.csv" style="display:none;" onclick="this.value=null" onchange="importarPlanilhaPresenca(this)">
+            <button type="button" class="btn-ghost btn-link-planilha" onclick="atualizarPeloLink()" title="Lê a planilha vinculada pelo link"><i class="fas fa-sync"></i> Atualizar pelo Link</button>
+            <button type="button" class="btn-ghost" onclick="configurarLinkPlanilha()" title="Vincular link da planilha" style="padding:10px 12px;"><i class="fas fa-cog"></i></button>`);
+        const sub = document.querySelector('#view-presenca h2 + div');
+        if (sub && !document.getElementById('info-link-planilha')) sub.insertAdjacentHTML('afterend', '<div id="info-link-planilha" class="info-link"></div>');
+        atualizarInfoLink();
     }
 }
 
@@ -1656,4 +1663,73 @@ async function importarPlanilhaPresenca(input) {
         console.error('[Importar planilha]', e);
         alert('Erro ao ler a planilha:\n\n' + (e && e.message ? e.message : e));
     }
+}
+
+// ---------- Leitura automática pelo LINK (planilha espelho) ----------
+// O link fica salvo no Firebase (todos os PCs usam o mesmo). A planilha do link precisa
+// estar como "Qualquer pessoa com o link -> Leitor". Nada é escrito na planilha.
+let planilhaConfig = {};
+dbFirebase.ref('shopee_config/planilha').on('value', snap => { planilhaConfig = snap.val() || {}; atualizarInfoLink(); });
+
+function atualizarInfoLink() {
+    const el = document.getElementById('info-link-planilha');
+    if (!el) return;
+    el.innerHTML = planilhaConfig.link
+        ? `<i class="fas fa-link"></i> Planilha vinculada${planilhaConfig.ultimaLeitura ? ' • lida em ' + new Date(planilhaConfig.ultimaLeitura).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''}`
+        : '<i class="fas fa-unlink"></i> Nenhuma planilha vinculada';
+}
+
+function configurarLinkPlanilha() {
+    if (!currentUser || currentUser.r !== 'admin') return;
+    const link = prompt('Cole o link da planilha espelho (compartilhada como "Qualquer pessoa com o link -> Leitor").\nDeixe vazio para desvincular.', planilhaConfig.link || '');
+    if (link === null) return;
+    const limpo = link.trim();
+    if (limpo && !/\/spreadsheets\/d\/[a-zA-Z0-9-_]+/.test(limpo)) { alert('Esse não parece um link do Google Sheets.'); return; }
+    dbFirebase.ref('shopee_config/planilha/link').set(limpo || null).then(() => showToast(limpo ? 'Planilha vinculada!' : 'Planilha desvinculada.'));
+}
+
+async function atualizarPeloLink(silencioso = false) {
+    if (!currentUser || currentUser.r !== 'admin') return;
+    if (!planilhaConfig.link) { if (!silencioso) configurarLinkPlanilha(); return; }
+    const mesRef = currentPresMes;
+    const nomeAba = 'Controle-' + ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'][+mesRef.slice(5) - 1];
+    const id = (planilhaConfig.link.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/) || [])[1];
+    const linha = parseInt(planilhaConfig.linhaCabecalho || 1);
+    const url = `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&headers=1&sheet=${encodeURIComponent(nomeAba)}${linha > 1 ? `&range=A${linha}:AZ1000` : ''}`;
+    try {
+        if (!silencioso) showToast('Lendo a planilha pelo link...');
+        let resp;
+        try { resp = await fetch(url, { cache: 'no-store' }); }
+        catch (e) { throw new Error('Não consegui acessar a planilha. Ela precisa estar como "Qualquer pessoa com o link -> Leitor".'); }
+        if (!resp.ok) throw new Error(`O Google respondeu com erro ${resp.status}. Confira se existe a aba "${nomeAba}".`);
+        const txt = await resp.text();
+        if (txt.trim().startsWith('<')) throw new Error('A planilha não está compartilhada como "Qualquer pessoa com o link -> Leitor".');
+        const res = lerAbaControle(lerCSV(txt), mesRef, true);
+        if (!res) throw new Error(`A aba "${nomeAba}" não foi encontrada ou está em outro formato (precisa do cabeçalho "Nome do colaborador", "Lider" e as datas).`);
+
+        const upPres = {}, upTurno = {}, upColab = {};
+        Object.entries(res.pessoas).forEach(([nome, p]) => {
+            upPres[nome] = Object.keys(p.dias).length ? p.dias : null;
+            upTurno[nome] = p.turno; upColab[nome] = nome;
+        });
+        await dbFirebase.ref('shopee_presenca_live/' + mesRef).update(upPres);
+        await dbFirebase.ref('shopee_colab_turno/' + mesRef).update(upTurno);
+        await dbFirebase.ref('shopee_colaboradores').update(upColab);
+        await dbFirebase.ref('shopee_config/planilha/ultimaLeitura').set(new Date().toISOString());
+        await dbFirebase.ref('shopee_presenca_import/' + mesRef).set({ em: new Date().toISOString(), por: currentUser.u, aba: nomeAba, turno: 'AM + PM (link)' });
+        if (!silencioso) showToast(`Planilha atualizada: ${Object.keys(upPres).length} colaboradores (${nomeAba}).`);
+    } catch (e) {
+        console.error('[Link planilha]', e);
+        if (!silencioso) alert('Erro ao ler pelo link:\n\n' + e.message);
+        else showToast('Não consegui atualizar pela planilha: ' + e.message);
+    }
+}
+
+// Atualiza sozinho quando o admin abre a Presença ou as Escalas (no máximo a cada 10 minutos)
+let ultimaAutoLeitura = 0;
+function autoAtualizarPlanilha() {
+    if (!currentUser || currentUser.r !== 'admin' || !planilhaConfig.link) return;
+    if (Date.now() - ultimaAutoLeitura < 10 * 60 * 1000) return;
+    ultimaAutoLeitura = Date.now();
+    atualizarPeloLink(true);
 }
