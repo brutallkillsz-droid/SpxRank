@@ -235,7 +235,19 @@ async function renderSiteliderDashboard() {
     kpiPhd('sl-phd-sem', pSem, pSemAnt, `${ddmm(semana[0])} a ${ddmm(semana[6])}`, 'semana anterior');
     kpiPhd('sl-phd-mes', pMes, pMesAnt, SL_MESES[rM - 1], SL_MESES[(rM + 10) % 12].toLowerCase());
 
-    const nomeTurno = { GERAL: 'Todos os turnos', AM: 'Turno AM • Felipe', PM: 'Turno PM • Malane' }[slFiltroTurno];
+    const nomeTurno = { GERAL: 'Todos os turnos', AM: 'Turno AM', PM: 'Turno PM' }[slFiltroTurno];
+    const mapaRef = turnoMapAll[refMes] || {};
+    const cont = { AM: 0, PM: 0, SEM: 0 }; Object.values(mapaRef).forEach(t => { cont[t] = (cont[t] || 0) + 1; });
+    const aviso = document.getElementById('sl-aviso-turno');
+    if (aviso) {
+        if (!Object.keys(mapaRef).length) {
+            aviso.className = 'sl-aviso bad';
+            aviso.innerHTML = `<i class="fas fa-exclamation-triangle"></i> A planilha de ${SL_MESES[rM - 1]} ainda não foi importada, então o sistema ainda não sabe quem é do turno AM e quem é do PM. Vá em <b>Presença Mensal</b> e clique em <b>Atualizar pelo Link</b> ou <b>Importar Planilha</b>.`;
+        } else {
+            aviso.className = 'sl-aviso';
+            aviso.innerHTML = `<i class="fas fa-users"></i> Planilha de ${SL_MESES[rM - 1]}: <b class="am">${cont.AM} no turno AM</b> • <b class="pm">${cont.PM} no turno PM</b>${cont.SEM ? ` • <b class="sem">${cont.SEM} sem turno</b> (só entram no Geral)` : ''}`;
+        }
+    }
     slSet('sl-sub', `${nomeTurno} • Semana ${ddmm(semana[0])} (dom) a ${ddmm(semana[6])} (sáb) • Mês de referência: ${SL_MESES[rM - 1]}/${rA} • Atualizado ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`);
 
     // ---------- Comparativo por turno (AM x PM), sempre visível ----------
@@ -282,7 +294,7 @@ async function renderSiteliderDashboard() {
             const cls = v => v == null ? '' : v <= meta ? 'ok' : v <= meta * 1.5 ? 'warn' : 'bad';
             const presHoje = dia ? dia.p : 0;
             return `<div class="slt-card ${t.toLowerCase()}">
-                <div class="slt-head"><span><i class="fas ${t === 'AM' ? 'fa-sun' : 'fa-moon'}"></i> Turno ${t}</span><small>${t === 'AM' ? 'Felipe' : 'Malane'}${dia && dia.base ? ` • ${presHoje} presentes em ${ddmm(dia.data)}` : ''}</small></div>
+                <div class="slt-head"><span><i class="fas ${t === 'AM' ? 'fa-sun' : 'fa-moon'}"></i> Turno ${t}</span><small>${dia && dia.base ? `${presHoje} presentes em ${ddmm(dia.data)}` : ''}</small></div>
                 <div class="slt-grid">${linha.map(([rot, v, ehAbs]) => `<div class="slt-item"><span>${rot}</span><b class="${ehAbs ? cls(v) : 'phd'}">${v == null ? '—' : ehAbs ? fmt(v, 1) + '%' : fmt(v)}</b></div>`).join('')}</div>
             </div>`;
         });
@@ -1423,11 +1435,21 @@ function renderHistEscala(tipo) {
             if(grid) { Object.values(grid).forEach(op => { if(typeof op === 'string' && op) workedOps.add(op); else if (typeof op === 'object') { Object.values(op).forEach(v => { if(v) workedOps.add(v); }); } }); }
         });
         let sortedOps = Array.from(workedOps).sort();
+        // Separa os nomes pelo líder da planilha (Felipe = AM, Malane = PM) nos meses daquela semana
+        const mesesSemana = [...new Set(escDiasConf.map(d => mesDoDataDia(semanaData[d.id]?.dataDia)).filter(Boolean))];
+        const grupoDe = op => { for (const m of mesesSemana) { const t = (turnoMapAll[m] || {})[op]; if (t) return t; } return extrasMap[op] || 'SEM'; };
+        const grupos = { AM: [], PM: [], SEM: [] };
+        sortedOps.forEach(op => (grupos[grupoDe(op)] || grupos.SEM).push(op));
+        const rotuloGrupo = { AM: '<i class="fas fa-sun"></i> TURNO AM', PM: '<i class="fas fa-moon"></i> TURNO PM', SEM: '<i class="fas fa-question-circle"></i> SEM TURNO NA PLANILHA' };
+        const ordemGrupos = currentTurno === 'PM' ? ['PM', 'AM', 'SEM'] : ['AM', 'PM', 'SEM'];
+        const chipsTurno = ordemGrupos.filter(g => grupos[g].length).map(g => `<span class="hist-chip ${g.toLowerCase()}">${g === 'SEM' ? 'Sem turno' : g} ${grupos[g].length}</span>`).join('');
 
         if(sortedOps.length === 0) {
             tableHtml += `<tr><td colspan="7" style="color:var(--text-muted); font-size:10px;">Nenhum operador alocado.</td></tr>`;
         } else {
-            sortedOps.forEach(op => {
+            ordemGrupos.filter(g => grupos[g].length).forEach(g => {
+            tableHtml += `<tr class="hist-grupo ${g.toLowerCase()}"><td colspan="7">${rotuloGrupo[g]} <span>(${grupos[g].length})</span></td></tr>`;
+            grupos[g].forEach(op => {
                 tableHtml += `<tr><td style="text-align:left; font-size:10px; font-weight:bold;">${op}</td>`;
                 escDiasConf.forEach(d => {
                     let grid = semanaData[d.id]?.grid;
@@ -1446,6 +1468,7 @@ function renderHistEscala(tipo) {
                 });
                 tableHtml += `</tr>`;
             });
+            });
         }
         tableHtml += `</table></div>`;
 
@@ -1459,7 +1482,7 @@ function renderHistEscala(tipo) {
 
         div.innerHTML = `
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px; border-bottom: 1px solid var(--glass-border); padding-bottom: 15px;">
-                <div style="font-weight: 800; font-size: 1.2rem; color: var(--primary);"><i class="fas fa-calendar-week" style="margin-right: 8px;"></i> ${displayWeek}</div>
+                <div style="font-weight: 800; font-size: 1.2rem; color: var(--primary);"><i class="fas fa-calendar-week" style="margin-right: 8px;"></i> ${displayWeek} <span class="hist-chip esc">Escala do turno ${currentTurno}</span> ${chipsTurno}</div>
                 <button class="btn-ghost" style="padding: 6px 12px; font-size: 0.75rem;" onclick="document.getElementById('hist-det-${tipo}-${index}').classList.toggle('hidden')"><i class="fas fa-search"></i> Ver Relatório</button>
             </div>
             ${kpis}
@@ -1665,8 +1688,8 @@ function prepararExtras() {
         const h2 = document.querySelector(`#${id} h2`);
         if (!h2 || document.querySelector(`#${id} .turno-toggle`)) return;
         h2.insertAdjacentHTML('afterend', `<div class="turno-toggle">
-            <button type="button" data-turno-btn="AM" onclick="trocarTurno('AM')"><i class="fas fa-sun"></i> AM <small>Felipe</small></button>
-            <button type="button" data-turno-btn="PM" onclick="trocarTurno('PM')"><i class="fas fa-moon"></i> PM <small>Malane</small></button></div>`);
+            <button type="button" data-turno-btn="AM" onclick="trocarTurno('AM')"><i class="fas fa-sun"></i> AM</button>
+            <button type="button" data-turno-btn="PM" onclick="trocarTurno('PM')"><i class="fas fa-moon"></i> PM</button></div>`);
     });
     document.querySelectorAll('[data-turno-btn]').forEach(b => b.classList.toggle('ativo', b.dataset.turnoBtn === currentTurno));
 
@@ -1676,8 +1699,8 @@ function prepararExtras() {
         inp.insertAdjacentHTML('afterend', `
             <select id="pres-turno-filter" class="btn-ghost" onchange="renderPresencaGrid()" style="background:rgba(255,255,255,0.05); color:#fff;">
                 <option value="TODOS" style="color:#000">Todos os turnos</option>
-                <option value="AM" style="color:#000">AM (Felipe)</option>
-                <option value="PM" style="color:#000">PM (Malane)</option>
+                <option value="AM" style="color:#000">Turno AM</option>
+                <option value="PM" style="color:#000">Turno PM</option>
             </select>
             <button type="button" class="btn-ghost btn-planilha" onclick="abrirImportPlanilha()" title="Planilha de controle baixada do Google Sheets (Arquivo > Fazer download > .xlsx)">
                 <i class="fas fa-file-import"></i> Importar Planilha</button>
@@ -1802,8 +1825,8 @@ function abrirImportPlanilha() {
             <div class="dc-modal-name" style="margin-bottom:22px; color:var(--text-muted); font-size:.85rem; font-weight:500; line-height:1.5;">
                 Baixe a planilha de controle no Google Sheets (<b>Arquivo &gt; Fazer download &gt; .xlsx</b>) e escolha qual turno importar.</div>
             <div style="display:flex; gap:15px; margin-bottom:15px;">
-                <button type="button" class="dc-btn" style="flex:1; border-color:#fbbf24;" onclick="escolherTurnoImport('AM')"><i class="fas fa-sun" style="color:#fbbf24; margin-bottom:8px; display:block; font-size:1.8rem;"></i>AM<div style="font-size:.7rem; opacity:.6; margin-top:4px;">Felipe</div></button>
-                <button type="button" class="dc-btn" style="flex:1; border-color:#94a3b8;" onclick="escolherTurnoImport('PM')"><i class="fas fa-moon" style="color:#94a3b8; margin-bottom:8px; display:block; font-size:1.8rem;"></i>PM<div style="font-size:.7rem; opacity:.6; margin-top:4px;">Malane</div></button>
+                <button type="button" class="dc-btn" style="flex:1; border-color:#fbbf24;" onclick="escolherTurnoImport('AM')"><i class="fas fa-sun" style="color:#fbbf24; margin-bottom:8px; display:block; font-size:1.8rem;"></i>AM</button>
+                <button type="button" class="dc-btn" style="flex:1; border-color:#94a3b8;" onclick="escolherTurnoImport('PM')"><i class="fas fa-moon" style="color:#94a3b8; margin-bottom:8px; display:block; font-size:1.8rem;"></i>PM</button>
             </div>
             <button type="button" class="dc-btn" style="width:100%; margin-bottom:15px; border-color:#22c55e; font-size:1rem;" onclick="escolherTurnoImport('AMBOS')"><i class="fas fa-users" style="color:#22c55e;"></i> AMBOS OS TURNOS</button>
             <button type="button" class="btn-ghost" style="width:100%; padding:12px;" onclick="document.getElementById('import-turno-overlay').classList.add('hidden')">CANCELAR</button></div>`;
@@ -1859,7 +1882,7 @@ async function importarPlanilhaPresenca(input) {
 
         let msg = `Planilha importada!\n\nAba: ${aba}\nTurno: ${desc}\nColaboradores: ${qtd}`;
         const sem = res.semLider.filter(n => n in upTurno);
-        if (sem.length) msg += `\n\n${sem.length} sem líder Felipe/Malane (aparecem nos dois turnos):\n- ${sem.slice(0, 8).join('\n- ')}${sem.length > 8 ? '\n- ...' : ''}`;
+        if (sem.length) msg += `\n\n${sem.length} sem turno definido na planilha (aparecem só no Geral e nos dois turnos da escala):\n- ${sem.slice(0, 8).join('\n- ')}${sem.length > 8 ? '\n- ...' : ''}`;
         alert(msg);
     } catch (e) {
         console.error('[Importar planilha]', e);
