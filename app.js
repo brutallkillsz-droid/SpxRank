@@ -127,119 +127,222 @@ function switchTab(id) {
 // DASHBOARD SITELIDER
 // =========================================================
 async function renderSiteliderDashboard() {
-    let weekInput = document.getElementById('sl-week-select');
-    if(!weekInput.value) {
-        let d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + 4 - (d.getDay() || 7));
-        let yearStart = new Date(d.getFullYear(), 0, 1);
-        let weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
-        weekInput.value = d.getFullYear() + '-W' + String(weekNo).padStart(2, '0');
-    }
-    
-    let weekVal = weekInput.value; let parts = weekVal.split('-W'); let year = parseInt(parts[0]); let week = parseInt(parts[1]);
-    let simple = new Date(year, 0, 1 + (week - 1) * 7); let dow = simple.getDay(); let ISOweekStart = simple;
-    if (dow <= 4) ISOweekStart.setDate(simple.getDate() - simple.getDay() + 1); else ISOweekStart.setDate(simple.getDate() + 8 - simple.getDay());
+    const weekInput = document.getElementById('sl-week-select');
+    if (!weekInput) return;
+    if (!weekInput.value) weekInput.value = slSemanaISO(new Date());
+    const [ano, sem] = weekInput.value.split('-W').map(Number);
+    const seg = getDateOfISOWeek(sem, ano);
+    const segAnt = new Date(seg.getTime()); segAnt.setDate(segAnt.getDate() - 7);
+    const semana = slDatasEscala(seg), semanaAnt = slDatasEscala(segAnt);
+    const refMes = slMesDe(semana[2]);
+    const [rA, rM] = refMes.split('-').map(Number);
+    const mesAnt = slMesDe(new Date(rA, rM - 2, 1));
+    const hojeISO = new Date(); hojeISO.setHours(23, 59, 59, 999);
+    document.querySelectorAll('[data-sl-turno]').forEach(b => b.classList.toggle('ativo', b.dataset.slTurno === slFiltroTurno));
+    const metaEl = document.getElementById('sl-meta-abs'); if (metaEl) metaEl.innerText = slMetas.abs.toString().replace('.', ',') + '%';
 
-    let weekDates = []; let offsets = [2, 3, 4, 5, 6, 7]; 
-    offsets.forEach(off => { let d = new Date(ISOweekStart.getTime()); d.setDate(d.getDate() + off); weekDates.push(d); });
-    let friday = weekDates[2]; let refMonthStr = friday.getFullYear() + '-' + String(friday.getMonth() + 1).padStart(2, '0');
-    
-    // ===== ABS vindo da Presença (planilha): faltas (F/FJ) + atestados (AM) ÷ (presentes + faltas + atestados) =====
-    const mesDe = dt => dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0');
-    const presMeses = {};
-    for (const m of [...new Set([refMonthStr, ...weekDates.map(mesDe)])]) {
-        if (m === currentPresMes) presMeses[m] = livePresenca;
-        else if (presCache[m]) presMeses[m] = presCache[m];
-        else { const sn = await dbFirebase.ref('shopee_presenca_live/' + m).once('value'); presMeses[m] = sn.val() || {}; presCache[m] = presMeses[m]; }
-    }
-    const statDia = dt => {
-        const d = dt.getDate(); let p = 0, f = 0, at = 0;
-        Object.values(presMeses[mesDe(dt)] || {}).forEach(op => {
+    // ---------- Presença (ABS) ----------
+    const meses = [...new Set([refMes, mesAnt, ...semana.map(slMesDe), ...semanaAnt.map(slMesDe)])];
+    const pres = {};
+    await Promise.all(meses.map(async m => {
+        if (m === currentPresMes) pres[m] = livePresenca;
+        else if (presCache[m]) pres[m] = presCache[m];
+        else { const sn = await dbFirebase.ref('shopee_presenca_live/' + m).once('value'); pres[m] = presCache[m] = sn.val() || {}; }
+    }));
+    const doFiltro = (mes, nome) => slFiltroTurno === 'GERAL' || ((turnoMapAll[mes] || {})[nome] || extrasMap[nome] || 'SEM') === slFiltroTurno;
+    const stat = dt => {
+        const m = slMesDe(dt), d = dt.getDate(), r = { p: 0, f: 0, at: 0, fg: 0, out: 0, base: 0, data: dt };
+        Object.entries(pres[m] || {}).forEach(([nome, op]) => {
+            if (!doFiltro(m, nome)) return;
             const v = String((op || {})[d] || '').toUpperCase();
-            if (v === 'P') p++; else if (v === 'F') f++; else if (v === 'AT') at++;
+            if (v === 'P') r.p++; else if (v === 'F') r.f++; else if (v === 'AT') r.at++; else if (v === 'FG') r.fg++; else if (v) r.out++;
         });
-        return { p, f, at, base: p + f + at };
+        r.base = r.p + r.f + r.at;
+        return r;
     };
-    const soma = lista => lista.reduce((a, x) => ({ p: a.p + x.p, f: a.f + x.f, at: a.at + x.at, base: a.base + x.base }), { p: 0, f: 0, at: 0, base: 0 });
-    const pct = x => x.base ? ((x.f + x.at) / x.base * 100).toFixed(1) : '0.0';
+    const soma = l => l.reduce((a, x) => ({ p: a.p + x.p, f: a.f + x.f, at: a.at + x.at, fg: a.fg + x.fg, out: a.out + x.out, base: a.base + x.base }), { p: 0, f: 0, at: 0, fg: 0, out: 0, base: 0 });
+    const abs = x => x && x.base ? (x.f + x.at) / x.base * 100 : null;
+    const diasMes = m => { const [y, mm] = m.split('-').map(Number); return Array.from({ length: new Date(y, mm, 0).getDate() }, (_, i) => new Date(y, mm - 1, i + 1)); };
+
+    const semS = semana.map(stat), semAntS = semanaAnt.map(stat);
+    const mesS = diasMes(refMes).map(stat), mesAntS = diasMes(mesAnt).map(stat);
+    const comDado = l => l.filter(x => x.base > 0 && x.data <= hojeISO);
+    const ultimoDia = comDado(semS).pop();
+    const todosDias = [...mesAntS, ...mesS].filter(x => x.base > 0).sort((a, b) => a.data - b.data);
+    const diaAnterior = ultimoDia ? todosDias.filter(x => x.data < ultimoDia.data).pop() : null;
+
+    // ---------- PHD (campo "PHD Atingido" das escalas) ----------
+    const sufixos = slFiltroTurno === 'GERAL' ? ['', '_pm'] : [slFiltroTurno === 'PM' ? '_pm' : ''];
+    const fontes = await Promise.all(sufixos.map(async suf => {
+        const [h, l] = await Promise.all([dbFirebase.ref('shopee_escala_history' + suf).once('value'), dbFirebase.ref('shopee_escala_semana_live' + suf).once('value')]);
+        return { hist: h.val() || {}, live: l.val() || {} };
+    }));
     const ddmm = dt => String(dt.getDate()).padStart(2, '0') + '/' + String(dt.getMonth() + 1).padStart(2, '0');
-
-    const semana = weekDates.map(d => ({ d, s: statDia(d) }));
-    const ultimo = [...semana].reverse().find(x => x.s.base > 0);
-    const absSemS = soma(semana.map(x => x.s));
-    const [refAno, refMes] = refMonthStr.split('-').map(Number);
-    let daysInMonth = new Date(refAno, refMes, 0).getDate();
-    const mesStats = Array.from({ length: daysInMonth }, (_, i) => statDia(new Date(refAno, refMes - 1, i + 1)));
-    const absMesS = soma(mesStats);
-    const nomesMes = ['JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO', 'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO'];
-
-    const setAbs = (id, valor, rotulo) => {
-        const el = document.getElementById(id); if (!el) return;
-        el.innerText = valor;
-        if (el.nextElementSibling) el.nextElementSibling.innerText = rotulo;
+    const dadosSemana = (f, segunda) => {
+        const chave = slSemanaISO(segunda);
+        if (f.hist[chave]) return f.hist[chave];
+        const q = slDatasEscala(segunda)[0];
+        if (f.live && f.live.quarta && String(f.live.quarta.dataDia || '').startsWith(ddmm(q))) return f.live;
+        return null;
     };
-    setAbs('sl-abs-dia', ultimo ? pct(ultimo.s) + '%' : '0.0%',
-        ultimo ? `DIA ${ddmm(ultimo.d)} • ${ultimo.s.f} FALTA(S) • ${ultimo.s.at} ATESTADO(S)` : 'SEM LANÇAMENTO NA SEMANA');
-    setAbs('sl-abs-sem', pct(absSemS) + '%', `${ddmm(weekDates[0])} A ${ddmm(weekDates[weekDates.length - 1])} • ${absSemS.f} F • ${absSemS.at} AT`);
-    setAbs('sl-abs-mes', pct(absMesS) + '%', `${nomesMes[refMes - 1]} • ${absMesS.f} F • ${absMesS.at} AT`);
+    const phdSemana = segunda => escDiasConf.map(dc => {
+        const vals = [], caps = [];
+        fontes.forEach(f => { const w = dadosSemana(f, segunda); const d = w && w[dc.id]; if (!d) return; const p = parseFloat(String(d.phd || '').replace(',', '.')); const c = parseFloat(String(d.capphd || '').replace(',', '.')); if (p > 0) { vals.push(p); if (c > 0) caps.push(c); } });
+        return { phd: vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0, cap: caps.length ? caps.reduce((a, b) => a + b, 0) / caps.length : 0 };
+    });
+    const phdS = phdSemana(seg), phdAntS = phdSemana(segAnt);
+    const media = l => { const v = l.filter(x => x.phd > 0); return v.length ? { phd: v.reduce((a, x) => a + x.phd, 0) / v.length, cap: (v.filter(x => x.cap).reduce((a, x) => a + x.cap, 0) / (v.filter(x => x.cap).length || 1)) || 0 } : { phd: 0, cap: 0 }; };
+    const phdMes = m => {
+        const [y, mm] = m.split('-').map(Number);
+        const lista = [];
+        for (let d = new Date(y, mm - 1, 1); d.getMonth() === mm - 1; d.setDate(d.getDate() + 7)) {
+            const s = getDateOfISOWeek(+slSemanaISO(d).split('-W')[1], +slSemanaISO(d).split('-W')[0]);
+            phdSemana(s).forEach((x, i) => { if (slDatasEscala(s)[i].getMonth() === mm - 1) lista.push(x); });
+        }
+        return media(lista);
+    };
+    const pDia = [...phdS].map((x, i) => ({ ...x, data: semana[i] })).filter(x => x.phd > 0).pop();
+    const pSem = media(phdS), pSemAnt = media(phdAntS), pMes = phdMes(refMes), pMesAnt = phdMes(mesAnt);
 
-    let chartLabelsAbs = mesStats.map((_, i) => String(i + 1));
-    let dataAbsChart = mesStats.map(x => x.base ? +((x.f + x.at) / x.base * 100).toFixed(1) : null);
+    // ---------- KPIs ----------
+    const fmt = (n, dec = 0) => (n == null ? '—' : Number(n).toLocaleString('pt-BR', { minimumFractionDigits: dec, maximumFractionDigits: dec }));
+    const meta = slMetas.abs;
+    const kpiAbs = (id, s, ant, rotulo, rotAnt) => {
+        const v = abs(s), va = abs(ant);
+        slSet(id, v == null ? '—' : fmt(v, 1) + '%');
+        slSet(id + '-sub', s && s.base ? `${rotulo} • ${s.f} falta${s.f === 1 ? '' : 's'} • ${s.at} atestado${s.at === 1 ? '' : 's'}` : 'Sem lançamento');
+        slDelta(id + '-delta', v, va, true, rotAnt, '%');
+        const bar = document.getElementById(id + '-bar');
+        if (bar) { bar.style.width = (v == null ? 0 : Math.min(100, v / (meta * 2) * 100)) + '%'; bar.className = 'sl-bar-fill ' + (v == null ? '' : v <= meta ? 'ok' : v <= meta * 1.5 ? 'warn' : 'bad'); }
+        const card = document.getElementById(id)?.closest('.sl-kpi');
+        if (card) card.dataset.status = v == null ? '' : v <= meta ? 'ok' : v <= meta * 1.5 ? 'warn' : 'bad';
+    };
+    const kpiPhd = (id, x, ant, rotulo, rotAnt) => {
+        slSet(id, x && x.phd ? fmt(x.phd) : '—');
+        slSet(id + '-sub', x && x.phd ? `${rotulo}${x.cap ? ` • ${fmt(x.phd / x.cap * 100)}% do CAP (${fmt(x.cap)})` : ''}` : 'Sem PHD lançado nas escalas');
+        slDelta(id + '-delta', x && x.phd ? x.phd : null, ant && ant.phd ? ant.phd : null, false, rotAnt, '');
+        const bar = document.getElementById(id + '-bar');
+        if (bar) { const pc = x && x.cap ? x.phd / x.cap * 100 : 0; bar.style.width = Math.min(100, pc) + '%'; bar.className = 'sl-bar-fill ' + (!pc ? '' : pc >= 100 ? 'ok' : pc >= 85 ? 'warn' : 'bad'); }
+    };
+    kpiAbs('sl-abs-dia', ultimoDia, diaAnterior, ultimoDia ? 'Dia ' + ddmm(ultimoDia.data) : '', 'dia anterior');
+    kpiAbs('sl-abs-sem', soma(comDado(semS)), soma(comDado(semAntS)), `${ddmm(semana[0])} a ${ddmm(semana[5])}`, 'semana anterior');
+    kpiAbs('sl-abs-mes', soma(comDado(mesS)), soma(comDado(mesAntS)), SL_MESES[rM - 1], SL_MESES[(rM + 10) % 12].toLowerCase());
+    kpiPhd('sl-phd-dia', pDia, null, pDia ? 'Dia ' + ddmm(pDia.data) : '', '');
+    kpiPhd('sl-phd-sem', pSem, pSemAnt, `${ddmm(semana[0])} a ${ddmm(semana[5])}`, 'semana anterior');
+    kpiPhd('sl-phd-mes', pMes, pMesAnt, SL_MESES[rM - 1], SL_MESES[(rM + 10) % 12].toLowerCase());
 
-    let weekData = historyDataCache[weekVal];
-    let isWeekActiveTab = false;
-    if(liveEscalaSemana && liveEscalaSemana['quarta'] && liveEscalaSemana['quarta'].dataDia) {
-         let [dd, mm] = liveEscalaSemana['quarta'].dataDia.split('/');
-         if(dd && mm) {
-             let wStart = weekDates[0];
-             if(parseInt(dd) === wStart.getDate() && parseInt(mm) === (wStart.getMonth() + 1)) { isWeekActiveTab = true; }
-         }
+    const nomeTurno = { GERAL: 'Todos os turnos', AM: 'Turno AM • Felipe', PM: 'Turno PM • Malane' }[slFiltroTurno];
+    slSet('sl-sub', `${nomeTurno} • Semana ${ddmm(semana[0])} a ${ddmm(semana[5])} • Mês de referência: ${SL_MESES[rM - 1]}/${rA} • Atualizado ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`);
+
+    // ---------- Quadro da semana ----------
+    const qs = document.getElementById('sl-semana-quadro');
+    if (qs) {
+        const nomesDia = ['QUA', 'QUI', 'SEX', 'SÁB', 'DOM', 'SEG'];
+        const linha = (rot, fn, cls = '') => `<tr><th>${rot}</th>${semS.map((x, i) => `<td class="${cls}">${fn(x, i)}</td>`).join('')}</tr>`;
+        qs.innerHTML = `<table class="sl-tabela"><thead><tr><th></th>${semS.map((x, i) => `<th>${nomesDia[i]}<span>${ddmm(x.data)}</span></th>`).join('')}</tr></thead><tbody>
+            ${linha('Presentes', x => x.base ? x.p : '·', 'c-p')}
+            ${linha('Faltas', x => x.base ? x.f : '·', 'c-f')}
+            ${linha('Atestados', x => x.base ? x.at : '·', 'c-at')}
+            ${linha('Folga / DSR', x => x.base ? x.fg : '·', 'c-fg')}
+            ${linha('ABS', x => { const v = abs(x); return v == null ? '·' : `<span class="sl-chip ${v <= meta ? 'ok' : v <= meta * 1.5 ? 'warn' : 'bad'}">${fmt(v, 1)}%</span>`; })}
+            ${linha('PHD', (x, i) => phdS[i].phd ? `<b>${fmt(phdS[i].phd)}</b>${phdS[i].cap ? `<span class="sl-mini">${fmt(phdS[i].phd / phdS[i].cap * 100)}%</span>` : ''}` : '·')}
+        </tbody></table>`;
     }
 
-    if (!weekData && isWeekActiveTab) { weekData = liveEscalaSemana; } else if (!weekData) { weekData = {}; }
+    // ---------- Maiores ausências do mês ----------
+    const ta = document.getElementById('sl-top-ausencias');
+    if (ta) {
+        const cont = {};
+        Object.entries(pres[refMes] || {}).forEach(([nome, op]) => {
+            if (!doFiltro(refMes, nome)) return;
+            let f = 0, at = 0, ult = 0;
+            Object.entries(op || {}).forEach(([d, v]) => { v = String(v || '').toUpperCase(); if (v === 'F') { f++; ult = Math.max(ult, +d); } if (v === 'AT') { at++; ult = Math.max(ult, +d); } });
+            if (f + at) cont[nome] = { f, at, total: f + at, ult };
+        });
+        const top = Object.entries(cont).sort((a, b) => b[1].total - a[1].total || b[1].f - a[1].f).slice(0, 8);
+        const maxT = top.length ? top[0][1].total : 1;
+        ta.innerHTML = top.length ? top.map(([nome, c], i) => `<div class="sl-rank-item">
+            <span class="sl-rank-pos">${i + 1}</span>
+            <div class="sl-rank-info"><div class="sl-rank-nome">${formatShortName(nome)}<small>${((turnoMapAll[refMes] || {})[nome] || '').replace('SEM', '')}</small></div>
+                <div class="sl-rank-barra"><span class="f" style="width:${c.f / maxT * 100}%"></span><span class="at" style="width:${c.at / maxT * 100}%"></span></div></div>
+            <span class="sl-rank-num"><b>${c.total}</b><small>${c.f}F • ${c.at}AT</small></span></div>`).join('')
+            : '<div class="sl-vazio"><i class="fas fa-check-circle"></i> Nenhuma falta ou atestado no mês</div>';
+    }
 
-    let sumPhdSemana = 0; let countPhdSemana = 0; let lastPhdDia = 0;
-    let chartLabelsPhd = []; let dataPhdChart = [];
-
-    escDiasConf.forEach(dConf => {
-        let p = weekData[dConf.id] ? parseFloat(weekData[dConf.id].phd) : 0;
-        if(!isNaN(p) && p > 0) { sumPhdSemana += p; countPhdSemana++; lastPhdDia = p; chartLabelsPhd.push(dConf.nome.replace('ESCALA ', '')); dataPhdChart.push(p); } 
-        else if(weekData[dConf.id]) { chartLabelsPhd.push(dConf.nome.replace('ESCALA ', '')); dataPhdChart.push(0); }
+    // ---------- Gráficos ----------
+    if (typeof Chart === 'undefined') return;
+    const corBarra = v => v == null ? 'rgba(148,163,184,.2)' : v <= meta ? 'rgba(16,185,129,.75)' : v <= meta * 1.5 ? 'rgba(251,191,36,.8)' : 'rgba(239,68,68,.85)';
+    const absMes = mesS.map(x => x.data <= hojeISO && x.base ? +abs(x).toFixed(1) : null);
+    const eixo = { ticks: { color: '#94a3b8', font: { family: 'Outfit', size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' } };
+    const legenda = { labels: { color: '#cbd5e1', font: { family: 'Outfit', size: 11 }, boxWidth: 12 } };
+    if (window.slChartABSInstance) window.slChartABSInstance.destroy();
+    window.slChartABSInstance = new Chart(document.getElementById('slChartABS').getContext('2d'), {
+        data: {
+            labels: mesS.map(x => String(x.data.getDate())),
+            datasets: [
+                { type: 'bar', label: 'ABS % do dia', data: absMes, backgroundColor: absMes.map(corBarra), borderRadius: 4, order: 2 },
+                { type: 'line', label: `Meta ${String(meta).replace('.', ',')}%`, data: mesS.map(() => meta), borderColor: '#f87171', borderDash: [6, 4], borderWidth: 2, pointRadius: 0, order: 1 }
+            ]
+        },
+        options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: legenda, tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.parsed.y == null ? '-' : String(c.parsed.y).replace('.', ',') + '%'}` } } },
+            scales: { x: { ...eixo, grid: { display: false } }, y: { ...eixo, beginAtZero: true, ticks: { ...eixo.ticks, callback: v => v + '%' } } } }
     });
-
-    let avgPhdSemana = countPhdSemana > 0 ? Math.round(sumPhdSemana / countPhdSemana) : 0;
-    document.getElementById('sl-phd-dia').innerText = lastPhdDia;
-    document.getElementById('sl-phd-sem').innerText = avgPhdSemana;
-
-    try {
-        let sumMesPHD = 0; let countMesPHD = 0;
-        for(let wKey in historyDataCache) {
-            let wObj = historyDataCache[wKey]; let belongsToMonth = false;
-            for(let dia in wObj) {
-                if(wObj[dia] && wObj[dia].dataDia) { let [dd, mm] = wObj[dia].dataDia.split('/'); if(mm === refMonthStr.split('-')[1]) belongsToMonth = true; }
-            }
-            if(belongsToMonth) {
-                for(let dia in wObj) { let p = parseFloat(wObj[dia].phd) || 0; if(p > 0) { sumMesPHD += p; countMesPHD++; } }
-            }
-        }
-        if(isWeekActiveTab && refMonthStr === currentPresMes) { sumMesPHD += sumPhdSemana; countMesPHD += countPhdSemana; }
-        let avgMesPHD = countMesPHD > 0 ? Math.round(sumMesPHD / countMesPHD) : 0; document.getElementById('sl-phd-mes').innerText = avgMesPHD;
-    } catch(e) { console.error("Erro PHD Mensal", e); }
-
-    const ctxPHD = document.getElementById('slChartPHD').getContext('2d');
-    if(window.slChartPHDInstance) window.slChartPHDInstance.destroy();
-    window.slChartPHDInstance = new Chart(ctxPHD, {
-        type: 'bar',
-        data: { labels: chartLabelsPhd.length > 0 ? chartLabelsPhd : ['Nenhum dado'], datasets: [{ label: 'PHD Atingido (Semana Selecionada)', data: dataPhdChart.length > 0 ? dataPhdChart : [0], backgroundColor: 'rgba(59, 130, 246, 0.8)', borderRadius: 4 }] },
-        options: { responsive: true, maintainAspectRatio: false, scales: { y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } }, x: { ticks: { color: '#94a3b8' }, grid: { display: false } } }, plugins: { legend: { labels: { color: '#fff', font: { family: 'Outfit' } } } } }
+    if (window.slChartPHDInstance) window.slChartPHDInstance.destroy();
+    window.slChartPHDInstance = new Chart(document.getElementById('slChartPHD').getContext('2d'), {
+        data: {
+            labels: ['QUA', 'QUI', 'SEX', 'SÁB', 'DOM', 'SEG'].map((d, i) => `${d} ${ddmm(semana[i])}`),
+            datasets: [
+                { type: 'bar', label: 'PHD semana anterior', data: phdAntS.map(x => x.phd || null), backgroundColor: 'rgba(148,163,184,.25)', borderRadius: 4, order: 3 },
+                { type: 'bar', label: 'PHD atingido', data: phdS.map(x => x.phd || null), backgroundColor: phdS.map(x => !x.cap ? 'rgba(59,130,246,.8)' : x.phd >= x.cap ? 'rgba(16,185,129,.8)' : 'rgba(59,130,246,.8)'), borderRadius: 4, order: 2 },
+                { type: 'line', label: 'CAP PHD', data: phdS.map(x => x.cap || null), borderColor: '#fbbf24', borderDash: [6, 4], borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#fbbf24', spanGaps: true, order: 1 }
+            ]
+        },
+        options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: legenda },
+            scales: { x: { ...eixo, grid: { display: false } }, y: { ...eixo, beginAtZero: true } } }
     });
+}
 
-    const ctxABS = document.getElementById('slChartABS').getContext('2d');
-    if(window.slChartABSInstance) window.slChartABSInstance.destroy();
-    window.slChartABSInstance = new Chart(ctxABS, {
-        type: 'line',
-        data: { labels: chartLabelsAbs, datasets: [{ label: 'Taxa de Absenteísmo % (Mês Referência: ' + refMonthStr + ')', data: dataAbsChart, borderColor: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.1)', borderWidth: 3, tension: 0.3, fill: true, spanGaps: true }] },
-        options: { responsive: true, maintainAspectRatio: false, scales: { y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } }, x: { ticks: { color: '#94a3b8', maxTicksLimit: 15 }, grid: { display: false } } }, plugins: { legend: { labels: { color: '#fff', font: { family: 'Outfit' } } } } }
-    });
+const SL_MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+let slFiltroTurno = localStorage.getItem('spxSlTurno') || 'GERAL';
+let slMetas = { abs: 5 };
+dbFirebase.ref('shopee_config/metas').on('value', s => {
+    slMetas = Object.assign({ abs: 5 }, s.val() || {});
+    if (!document.getElementById('view-sitelider').classList.contains('hidden')) renderSiteliderDashboard();
+});
+function slMesDe(dt) { return dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0'); }
+function slDatasEscala(segunda) { return [2, 3, 4, 5, 6, 7].map(o => { const d = new Date(segunda.getTime()); d.setDate(d.getDate() + o); return d; }); }
+function slSemanaISO(dt) {
+    const d = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
+    const qui = new Date(d); qui.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7));
+    const jan4 = new Date(qui.getFullYear(), 0, 4);
+    const seg1 = new Date(jan4); seg1.setDate(jan4.getDate() - ((jan4.getDay() + 6) % 7));
+    return qui.getFullYear() + '-W' + String(Math.floor(Math.round((qui - seg1) / 864e5) / 7) + 1).padStart(2, '0');
+}
+function slSet(id, txt) { const el = document.getElementById(id); if (el) el.innerText = txt; }
+function slDelta(id, v, ant, maiorEhRuim, rotulo, suf) {
+    const el = document.getElementById(id); if (!el) return;
+    if (v == null || ant == null || !rotulo) { el.innerHTML = ''; el.className = 'sl-delta'; return; }
+    const dif = v - ant;
+    const ruim = maiorEhRuim ? dif > 0.05 : dif < -0.5;
+    const bom = maiorEhRuim ? dif < -0.05 : dif > 0.5;
+    el.className = 'sl-delta ' + (ruim ? 'bad' : bom ? 'ok' : '');
+    const n = Math.abs(dif).toLocaleString('pt-BR', { maximumFractionDigits: suf ? 1 : 0 });
+    el.innerHTML = `<i class="fas fa-caret-${dif > 0 ? 'up' : dif < 0 ? 'down' : 'right'}"></i> ${n}${suf ? ' p.p.' : ''} <span>vs ${rotulo}</span>`;
+}
+function slTrocarTurno(t) { slFiltroTurno = t; localStorage.setItem('spxSlTurno', t); renderSiteliderDashboard(); }
+function slMudarSemana(n) {
+    const inp = document.getElementById('sl-week-select');
+    const [a, w] = (inp.value || slSemanaISO(new Date())).split('-W').map(Number);
+    const seg = getDateOfISOWeek(w, a); seg.setDate(seg.getDate() + 7 * n);
+    inp.value = slSemanaISO(seg); renderSiteliderDashboard();
+}
+function slEditarMeta() {
+    if (!currentUser || currentUser.r !== 'admin') return;
+    const v = prompt('Meta de absenteísmo (%). Acima dela o indicador fica amarelo/vermelho:', String(slMetas.abs).replace('.', ','));
+    if (v === null) return;
+    const n = parseFloat(v.replace(',', '.'));
+    if (isNaN(n) || n <= 0 || n > 100) { alert('Valor inválido.'); return; }
+    dbFirebase.ref('shopee_config/metas/abs').set(n);
 }
 
 // =========================================================
