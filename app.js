@@ -143,42 +143,47 @@ async function renderSiteliderDashboard() {
     offsets.forEach(off => { let d = new Date(ISOweekStart.getTime()); d.setDate(d.getDate() + off); weekDates.push(d); });
     let friday = weekDates[2]; let refMonthStr = friday.getFullYear() + '-' + String(friday.getMonth() + 1).padStart(2, '0');
     
-    let monthPresData = {};
-    if(refMonthStr === currentPresMes) { monthPresData = livePresenca; } else {
-        let presSnap = await dbFirebase.ref('shopee_presenca_live/' + refMonthStr).once('value'); monthPresData = presSnap.val() || {};
+    // ===== ABS vindo da Presença (planilha): faltas (F/FJ) + atestados (AM) ÷ (presentes + faltas + atestados) =====
+    const mesDe = dt => dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0');
+    const presMeses = {};
+    for (const m of [...new Set([refMonthStr, ...weekDates.map(mesDe)])]) {
+        if (m === currentPresMes) presMeses[m] = livePresenca;
+        else if (presCache[m]) presMeses[m] = presCache[m];
+        else { const sn = await dbFirebase.ref('shopee_presenca_live/' + m).once('value'); presMeses[m] = sn.val() || {}; presCache[m] = presMeses[m]; }
     }
+    const statDia = dt => {
+        const d = dt.getDate(); let p = 0, f = 0, at = 0;
+        Object.values(presMeses[mesDe(dt)] || {}).forEach(op => {
+            const v = String((op || {})[d] || '').toUpperCase();
+            if (v === 'P') p++; else if (v === 'F') f++; else if (v === 'AT') at++;
+        });
+        return { p, f, at, base: p + f + at };
+    };
+    const soma = lista => lista.reduce((a, x) => ({ p: a.p + x.p, f: a.f + x.f, at: a.at + x.at, base: a.base + x.base }), { p: 0, f: 0, at: 0, base: 0 });
+    const pct = x => x.base ? ((x.f + x.at) / x.base * 100).toFixed(1) : '0.0';
+    const ddmm = dt => String(dt.getDate()).padStart(2, '0') + '/' + String(dt.getMonth() + 1).padStart(2, '0');
 
-    let daysInMonth = new Date(friday.getFullYear(), friday.getMonth() + 1, 0).getDate();
-    let absMes = { sch: 0, abs: 0 }; let absSem = { sch: 0, abs: 0 }; let absDia = { sch: 0, abs: 0 };
-    let diaChartAbs = []; let chartLabelsAbs = [];
-    for(let d=1; d<=daysInMonth; d++) { diaChartAbs[d] = { sch: 0, abs: 0 }; chartLabelsAbs.push(d.toString()); }
+    const semana = weekDates.map(d => ({ d, s: statDia(d) }));
+    const ultimo = [...semana].reverse().find(x => x.s.base > 0);
+    const absSemS = soma(semana.map(x => x.s));
+    const [refAno, refMes] = refMonthStr.split('-').map(Number);
+    let daysInMonth = new Date(refAno, refMes, 0).getDate();
+    const mesStats = Array.from({ length: daysInMonth }, (_, i) => statDia(new Date(refAno, refMes - 1, i + 1)));
+    const absMesS = soma(mesStats);
+    const nomesMes = ['JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO', 'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO'];
 
-    let weekDayNumbers = weekDates.filter(d => d.getMonth() === friday.getMonth()).map(d => d.getDate());
-    let lastDayOfWeekNum = weekDayNumbers[weekDayNumbers.length - 1]; 
+    const setAbs = (id, valor, rotulo) => {
+        const el = document.getElementById(id); if (!el) return;
+        el.innerText = valor;
+        if (el.nextElementSibling) el.nextElementSibling.innerText = rotulo;
+    };
+    setAbs('sl-abs-dia', ultimo ? pct(ultimo.s) + '%' : '0.0%',
+        ultimo ? `DIA ${ddmm(ultimo.d)} • ${ultimo.s.f} FALTA(S) • ${ultimo.s.at} ATESTADO(S)` : 'SEM LANÇAMENTO NA SEMANA');
+    setAbs('sl-abs-sem', pct(absSemS) + '%', `${ddmm(weekDates[0])} A ${ddmm(weekDates[weekDates.length - 1])} • ${absSemS.f} F • ${absSemS.at} AT`);
+    setAbs('sl-abs-mes', pct(absMesS) + '%', `${nomesMes[refMes - 1]} • ${absMesS.f} F • ${absMesS.at} AT`);
 
-    for(let op in monthPresData) {
-        for(let d=1; d<=daysInMonth; d++) {
-            let st = monthPresData[op][d];
-            if(st === 'P' || st === 'F' || st === 'AT') {
-                absMes.sch++; diaChartAbs[d].sch++;
-                let isAbs = (st === 'F' || st === 'AT');
-                if(isAbs) { absMes.abs++; diaChartAbs[d].abs++; }
-                if(weekDayNumbers.includes(d)) { absSem.sch++; if(isAbs) absSem.abs++; }
-                if(d === lastDayOfWeekNum) { absDia.sch++; if(isAbs) absDia.abs++; }
-            }
-        }
-    }
-
-    let percMes = absMes.sch > 0 ? (absMes.abs / absMes.sch * 100).toFixed(1) : "0.0";
-    let percSem = absSem.sch > 0 ? (absSem.abs / absSem.sch * 100).toFixed(1) : "0.0";
-    let percDia = absDia.sch > 0 ? (absDia.abs / absDia.sch * 100).toFixed(1) : "0.0";
-
-    document.getElementById('sl-abs-mes').innerText = percMes + "%";
-    document.getElementById('sl-abs-sem').innerText = percSem + "%";
-    document.getElementById('sl-abs-dia').innerText = percDia + "%";
-
-    let dataAbsChart = [];
-    for(let d=1; d<=daysInMonth; d++) { let val = diaChartAbs[d].sch > 0 ? (diaChartAbs[d].abs / diaChartAbs[d].sch * 100) : 0; dataAbsChart.push(val.toFixed(1)); }
+    let chartLabelsAbs = mesStats.map((_, i) => String(i + 1));
+    let dataAbsChart = mesStats.map(x => x.base ? +((x.f + x.at) / x.base * 100).toFixed(1) : null);
 
     let weekData = historyDataCache[weekVal];
     let isWeekActiveTab = false;
@@ -232,7 +237,7 @@ async function renderSiteliderDashboard() {
     if(window.slChartABSInstance) window.slChartABSInstance.destroy();
     window.slChartABSInstance = new Chart(ctxABS, {
         type: 'line',
-        data: { labels: chartLabelsAbs, datasets: [{ label: 'Taxa de Absenteísmo % (Mês Referência: ' + refMonthStr + ')', data: dataAbsChart, borderColor: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.1)', borderWidth: 3, tension: 0.3, fill: true }] },
+        data: { labels: chartLabelsAbs, datasets: [{ label: 'Taxa de Absenteísmo % (Mês Referência: ' + refMonthStr + ')', data: dataAbsChart, borderColor: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.1)', borderWidth: 3, tension: 0.3, fill: true, spanGaps: true }] },
         options: { responsive: true, maintainAspectRatio: false, scales: { y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } }, x: { ticks: { color: '#94a3b8', maxTicksLimit: 15 }, grid: { display: false } } }, plugins: { legend: { labels: { color: '#fff', font: { family: 'Outfit' } } } } }
     });
 }
