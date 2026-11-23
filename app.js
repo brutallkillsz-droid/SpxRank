@@ -238,6 +238,57 @@ async function renderSiteliderDashboard() {
     const nomeTurno = { GERAL: 'Todos os turnos', AM: 'Turno AM • Felipe', PM: 'Turno PM • Malane' }[slFiltroTurno];
     slSet('sl-sub', `${nomeTurno} • Semana ${ddmm(semana[0])} (dom) a ${ddmm(semana[6])} (sáb) • Mês de referência: ${SL_MESES[rM - 1]}/${rA} • Atualizado ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`);
 
+    // ---------- Comparativo por turno (AM x PM), sempre visível ----------
+    const elT = document.getElementById('sl-turnos');
+    if (elT) {
+        const fontesT = await Promise.all(['', '_pm'].map(async suf => {
+            const [h, l] = await Promise.all([dbFirebase.ref('shopee_escala_history' + suf).once('value'), dbFirebase.ref('shopee_escala_semana_live' + suf).once('value')]);
+            return { hist: h.val() || {}, live: l.val() || {} };
+        }));
+        const phdPorData = f => {
+            const mapa = {};
+            const ler = w => escDiasConf.forEach(dc => {
+                const d = w && w[dc.id]; if (!d) return;
+                const m = String(d.dataDia || '').match(/(\d{1,2})\/(\d{1,2})/); const mes = mesDoDataDia(d.dataDia); if (!m || !mes) return;
+                const k = mes + '-' + m[1].padStart(2, '0'); if (mapa[k]) return;
+                const p = parseFloat(String(d.phd || '').replace(',', '.')), c = parseFloat(String(d.capphd || '').replace(',', '.'));
+                if (p > 0) mapa[k] = { phd: p, cap: c > 0 ? c : 0 };
+            });
+            Object.values(f.hist).forEach(ler); ler(f.live);
+            return mapa;
+        };
+        const cards = ['AM', 'PM'].map((t, idx) => {
+            const filtroT = (mes, nome) => ((turnoMapAll[mes] || {})[nome] || extrasMap[nome] || 'SEM') === t;
+            const st = dt => {
+                const m = slMesDe(dt), d = dt.getDate(), r = { p: 0, f: 0, at: 0, base: 0, data: dt };
+                Object.entries(pres[m] || {}).forEach(([nome, op]) => {
+                    if (!filtroT(m, nome)) return;
+                    const v = String((op || {})[d] || '').toUpperCase();
+                    if (v === 'P') r.p++; else if (v === 'F') r.f++; else if (v === 'AT') r.at++;
+                });
+                r.base = r.p + r.f + r.at; return r;
+            };
+            const sm = l => l.reduce((a, x) => ({ p: a.p + x.p, f: a.f + x.f, at: a.at + x.at, base: a.base + x.base }), { p: 0, f: 0, at: 0, base: 0 });
+            const dSem = comDado(semana.map(st)), dMes = comDado(diasMes(refMes).map(st));
+            const dia = ultimoDia ? st(ultimoDia.data) : null;
+            const mapa = phdPorData(fontesT[idx]);
+            const ph = dt => mapa[isoD(dt)] || null;
+            const medP = l => { const v = l.filter(Boolean); return v.length ? v.reduce((a, x) => a + x.phd, 0) / v.length : null; };
+            const pDiaT = ph(pDia ? pDia.data : (ultimoDia ? ultimoDia.data : semana[6]));
+            const linha = [
+                ['ABS dia', abs(dia), true], ['ABS semana', abs(sm(dSem)), true], ['ABS mês', abs(sm(dMes)), true],
+                ['PHD dia', pDiaT ? pDiaT.phd : null, false], ['PHD semana', medP(semana.map(ph)), false], ['PHD mês', medP(diasMes(refMes).map(ph)), false]
+            ];
+            const cls = v => v == null ? '' : v <= meta ? 'ok' : v <= meta * 1.5 ? 'warn' : 'bad';
+            const presHoje = dia ? dia.p : 0;
+            return `<div class="slt-card ${t.toLowerCase()}">
+                <div class="slt-head"><span><i class="fas ${t === 'AM' ? 'fa-sun' : 'fa-moon'}"></i> Turno ${t}</span><small>${t === 'AM' ? 'Felipe' : 'Malane'}${dia && dia.base ? ` • ${presHoje} presentes em ${ddmm(dia.data)}` : ''}</small></div>
+                <div class="slt-grid">${linha.map(([rot, v, ehAbs]) => `<div class="slt-item"><span>${rot}</span><b class="${ehAbs ? cls(v) : 'phd'}">${v == null ? '—' : ehAbs ? fmt(v, 1) + '%' : fmt(v)}</b></div>`).join('')}</div>
+            </div>`;
+        });
+        elT.innerHTML = cards.join('');
+    }
+
     // ---------- Quadro da semana ----------
     const qs = document.getElementById('sl-semana-quadro');
     if (qs) {
@@ -256,21 +307,57 @@ async function renderSiteliderDashboard() {
     // ---------- Maiores ausências do mês ----------
     const ta = document.getElementById('sl-top-ausencias');
     if (ta) {
-        const cont = {};
+        const [ty, tm] = refMes.split('-').map(Number);
+        const nDias = new Date(ty, tm, 0).getDate();
+        const pessoas = [];
         Object.entries(pres[refMes] || {}).forEach(([nome, op]) => {
             if (!doFiltro(refMes, nome)) return;
-            let f = 0, at = 0, ult = 0;
-            Object.entries(op || {}).forEach(([d, v]) => { v = String(v || '').toUpperCase(); if (v === 'F') { f++; ult = Math.max(ult, +d); } if (v === 'AT') { at++; ult = Math.max(ult, +d); } });
-            if (f + at) cont[nome] = { f, at, total: f + at, ult };
+            const dias = {}; let f = 0, at = 0, ult = 0;
+            Object.entries(op || {}).forEach(([d, v]) => {
+                v = String(v || '').toUpperCase();
+                if (v === 'F' || v === 'AT') { dias[+d] = v; ult = Math.max(ult, +d); if (v === 'F') f++; else at++; }
+            });
+            if (f + at) pessoas.push({ nome, f, at, total: f + at, ult, dias, turno: ((turnoMapAll[refMes] || {})[nome] || extrasMap[nome] || '').replace('SEM', '') });
         });
-        const top = Object.entries(cont).sort((a, b) => b[1].total - a[1].total || b[1].f - a[1].f).slice(0, 8);
-        const maxT = top.length ? top[0][1].total : 1;
-        ta.innerHTML = top.length ? top.map(([nome, c], i) => `<div class="sl-rank-item">
-            <span class="sl-rank-pos">${i + 1}</span>
-            <div class="sl-rank-info"><div class="sl-rank-nome">${formatShortName(nome)}<small>${((turnoMapAll[refMes] || {})[nome] || '').replace('SEM', '')}</small></div>
-                <div class="sl-rank-barra"><span class="f" style="width:${c.f / maxT * 100}%"></span><span class="at" style="width:${c.at / maxT * 100}%"></span></div></div>
-            <span class="sl-rank-num"><b>${c.total}</b><small>${c.f}F • ${c.at}AT</small></span></div>`).join('')
-            : '<div class="sl-vazio"><i class="fas fa-check-circle"></i> Nenhuma falta ou atestado no mês</div>';
+        const ordem = { total: (a, b) => b.total - a.total || b.f - a.f, f: (a, b) => b.f - a.f || b.total - a.total, at: (a, b) => b.at - a.at || b.total - a.total };
+        pessoas.sort(ordem[slTopOrdem] || ordem.total);
+        const lista = pessoas.filter(x => slTopOrdem === 'total' || x[slTopOrdem] > 0);
+        const visiveis = slTopTodos ? lista : lista.slice(0, 6);
+        const totF = pessoas.reduce((a, x) => a + x.f, 0), totAT = pessoas.reduce((a, x) => a + x.at, 0);
+        const curto = n => { const p = n.split(/\s+/).filter(Boolean); return p.length > 1 ? p[0] + ' ' + p[p.length - 1] : n; };
+        const iniciais = n => { const p = n.split(/\s+/).filter(Boolean); return (p[0][0] + (p.length > 1 ? p[p.length - 1][0] : '')).toUpperCase(); };
+        const plural = (n, s, p) => `${n} ${n === 1 ? s : p}`;
+        const hojeD = new Date();
+        const ehFuturo = d => new Date(ty, tm - 1, d) > hojeD;
+        const tabs = [['total', 'Total'], ['f', 'Faltas'], ['at', 'Atestados']].map(([k, r]) => `<button type="button" class="${slTopOrdem === k ? 'ativo' : ''}" onclick="slTopOrdenar('${k}')">${r}</button>`).join('');
+        let h = `<div class="aus-resumo">
+                <div><b>${pessoas.length}</b><span>pessoa${pessoas.length === 1 ? '' : 's'}</span></div>
+                <div class="f"><b>${totF}</b><span>falta${totF === 1 ? '' : 's'}</span></div>
+                <div class="at"><b>${totAT}</b><span>atestado${totAT === 1 ? '' : 's'}</span></div>
+                <div class="aus-tabs">${tabs}</div>
+            </div>`;
+        if (!visiveis.length) h += '<div class="sl-vazio"><i class="fas fa-check-circle"></i> Nenhuma ausência no mês</div>';
+        h += visiveis.map((x, i) => {
+            const nivel = x.f >= 3 ? 'critico' : (x.f >= 2 || x.total >= 4) ? 'atencao' : '';
+            const tag = nivel === 'critico' ? '<span class="aus-tag critico">Reincidente</span>' : nivel === 'atencao' ? '<span class="aus-tag atencao">Atenção</span>' : '';
+            let pontos = '';
+            for (let d = 1; d <= nDias; d++) {
+                const c = x.dias[d];
+                const dow = new Date(ty, tm - 1, d).getDay();
+                pontos += `<i class="${c === 'F' ? 'f' : c === 'AT' ? 'at' : ehFuturo(d) ? 'fut' : ''}${dow === 0 ? ' dom' : ''}" title="${String(d).padStart(2, '0')}/${String(tm).padStart(2, '0')}${c ? ' • ' + (c === 'F' ? 'Falta' : 'Atestado') : ''}"></i>`;
+            }
+            return `<div class="aus-item ${nivel}">
+                <div class="aus-avatar">${iniciais(x.nome)}</div>
+                <div class="aus-info">
+                    <div class="aus-nome" title="${x.nome}"><span class="aus-nm">${curto(x.nome)}</span>${x.turno ? `<span class="aus-turno">${x.turno}</span>` : ''}${tag}</div>
+                    <div class="aus-cal">${pontos}</div>
+                    <div class="aus-det">${x.f ? `<span class="f">${plural(x.f, 'falta', 'faltas')}</span>` : ''}${x.at ? `<span class="at">${plural(x.at, 'atestado', 'atestados')}</span>` : ''}<span class="ult">última em ${String(x.ult).padStart(2, '0')}/${String(tm).padStart(2, '0')}</span></div>
+                </div>
+                <div class="aus-total"><b>${x.total}</b><span>${x.total === 1 ? 'dia' : 'dias'}</span></div>
+            </div>`;
+        }).join('');
+        if (lista.length > 6) h += `<button type="button" class="aus-mais" onclick="slTopTodos=!slTopTodos; renderSiteliderDashboard()">${slTopTodos ? 'Mostrar menos' : `Ver todos (${lista.length})`}</button>`;
+        ta.innerHTML = h;
     }
 
     // ---------- Gráficos ----------
@@ -308,6 +395,8 @@ async function renderSiteliderDashboard() {
 
 const SL_MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 let slFiltroTurno = localStorage.getItem('spxSlTurno') || 'GERAL';
+let slTopOrdem = 'total', slTopTodos = false;
+function slTopOrdenar(k) { slTopOrdem = k; renderSiteliderDashboard(); }
 let slMetas = { abs: 5 };
 dbFirebase.ref('shopee_config/metas').on('value', s => {
     slMetas = Object.assign({ abs: 5 }, s.val() || {});
