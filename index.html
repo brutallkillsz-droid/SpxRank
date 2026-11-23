@@ -65,6 +65,7 @@
     <div id="login-screen">
         <div class="login-card">
             <div class="brand-title">LOGISTICS ELITE</div>
+            <div class="login-sub">HUB LMG-48 • Painel Liderança</div>
             <input type="text" id="user" class="login-input" placeholder="ID Usuário">
             <input type="password" id="pass" class="login-input" placeholder="Senha">
             <button class="btn-primary" onclick="login()">Entrar no Sistema</button>
@@ -73,6 +74,7 @@
     </div>
 
     <div id="app-shell">
+        <button type="button" class="menu-mobile-btn" onclick="document.querySelector('.sidebar').classList.toggle('aberta')" title="Menu"><i class="fas fa-bars"></i></button>
         
         <aside class="sidebar">
             <div class="nav-logo">
@@ -459,6 +461,7 @@
                     <div style="display: flex; align-items: center; gap: 6px;"><div class="badge-pres badge-F">F</div> Falta</div>
                     <div style="display: flex; align-items: center; gap: 6px;"><div class="badge-pres badge-FG">FG</div> Folga</div>
                     <div style="display: flex; align-items: center; gap: 6px;"><div class="badge-pres badge-AT">AT</div> Atestado</div>
+                    <div style="display: flex; align-items: center; gap: 6px;"><div class="badge-pres badge-outro">FE</div> Outros da planilha (férias, afastamento, NC...)</div>
                 </div>
             </section>
 
