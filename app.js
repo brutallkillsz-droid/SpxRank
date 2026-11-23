@@ -151,7 +151,7 @@ async function renderSiteliderDashboard() {
         else if (presCache[m]) pres[m] = presCache[m];
         else { const sn = await dbFirebase.ref('shopee_presenca_live/' + m).once('value'); pres[m] = presCache[m] = sn.val() || {}; }
     }));
-    const doFiltro = (mes, nome) => slFiltroTurno === 'GERAL' || ((turnoMapAll[mes] || {})[nome] || extrasMap[nome] || 'SEM') === slFiltroTurno;
+    const doFiltro = (mes, nome) => slFiltroTurno === 'GERAL' || turnoDaPessoa(mes, nome) === slFiltroTurno;
     const stat = dt => {
         const m = slMesDe(dt), d = dt.getDate(), r = { p: 0, f: 0, at: 0, fg: 0, out: 0, base: 0, data: dt };
         Object.entries(pres[m] || {}).forEach(([nome, op]) => {
@@ -236,16 +236,17 @@ async function renderSiteliderDashboard() {
     kpiPhd('sl-phd-mes', pMes, pMesAnt, SL_MESES[rM - 1], SL_MESES[(rM + 10) % 12].toLowerCase());
 
     const nomeTurno = { GERAL: 'Todos os turnos', AM: 'Turno AM', PM: 'Turno PM' }[slFiltroTurno];
-    const mapaRef = turnoMapAll[refMes] || {};
+    const infoMapa = mapaTurnoMes(refMes); const mapaRef = infoMapa.mapa || {};
     const cont = { AM: 0, PM: 0, SEM: 0 }; Object.values(mapaRef).forEach(t => { cont[t] = (cont[t] || 0) + 1; });
     const aviso = document.getElementById('sl-aviso-turno');
     if (aviso) {
-        if (!Object.keys(mapaRef).length) {
+        if (!infoMapa.mapa) {
             aviso.className = 'sl-aviso bad';
             aviso.innerHTML = `<i class="fas fa-exclamation-triangle"></i> A planilha de ${SL_MESES[rM - 1]} ainda não foi importada, então o sistema ainda não sabe quem é do turno AM e quem é do PM. Vá em <b>Presença Mensal</b> e clique em <b>Atualizar pelo Link</b> ou <b>Importar Planilha</b>.`;
         } else {
             aviso.className = 'sl-aviso';
-            aviso.innerHTML = `<i class="fas fa-users"></i> Planilha de ${SL_MESES[rM - 1]}: <b class="am">${cont.AM} no turno AM</b> • <b class="pm">${cont.PM} no turno PM</b>${cont.SEM ? ` • <b class="sem">${cont.SEM} sem turno</b> (só entram no Geral)` : ''}`;
+            const deOutroMes = infoMapa.origem && infoMapa.origem !== refMes ? ` (usando a planilha de ${SL_MESES[+infoMapa.origem.slice(5) - 1]}, a de ${SL_MESES[rM - 1]} ainda não foi importada)` : '';
+            aviso.innerHTML = `<i class="fas fa-users"></i> Turnos${deOutroMes}: <b class="am">${cont.AM} no turno AM</b> • <b class="pm">${cont.PM} no turno PM</b>${cont.SEM ? ` • <b class="sem">${cont.SEM} sem turno</b> (só entram no Geral)` : ''}`;
         }
     }
     slSet('sl-sub', `${nomeTurno} • Semana ${ddmm(semana[0])} (dom) a ${ddmm(semana[6])} (sáb) • Mês de referência: ${SL_MESES[rM - 1]}/${rA} • Atualizado ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`);
@@ -270,7 +271,7 @@ async function renderSiteliderDashboard() {
             return mapa;
         };
         const cards = ['AM', 'PM'].map((t, idx) => {
-            const filtroT = (mes, nome) => ((turnoMapAll[mes] || {})[nome] || extrasMap[nome] || 'SEM') === t;
+            const filtroT = (mes, nome) => turnoDaPessoa(mes, nome) === t;
             const st = dt => {
                 const m = slMesDe(dt), d = dt.getDate(), r = { p: 0, f: 0, at: 0, base: 0, data: dt };
                 Object.entries(pres[m] || {}).forEach(([nome, op]) => {
@@ -329,7 +330,7 @@ async function renderSiteliderDashboard() {
                 v = String(v || '').toUpperCase();
                 if (v === 'F' || v === 'AT') { dias[+d] = v; ult = Math.max(ult, +d); if (v === 'F') f++; else at++; }
             });
-            if (f + at) pessoas.push({ nome, f, at, total: f + at, ult, dias, turno: ((turnoMapAll[refMes] || {})[nome] || extrasMap[nome] || '').replace('SEM', '') });
+            if (f + at) pessoas.push({ nome, f, at, total: f + at, ult, dias, turno: turnoDaPessoa(refMes, nome).replace('SEM', '') });
         });
         const ordem = { total: (a, b) => b.total - a.total || b.f - a.f, f: (a, b) => b.f - a.f || b.total - a.total, at: (a, b) => b.at - a.at || b.total - a.total };
         pessoas.sort(ordem[slTopOrdem] || ordem.total);
@@ -873,14 +874,14 @@ function getAbsenteesForDay(diaId, isDc = false) {
     const day = m ? parseInt(m[1]) : 0;
     if (mes) garantirPresencaMes(mes);
     const pres = mes ? (presCache[mes] || {}) : {};
-    const mapaTurno = mes ? turnoMapAll[mes] : null;
+    const mapaTurno = mapaTurnoMes(mes).mapa;
 
     let absentees = [];
     operadoresList.forEach(op => {
         const extra = extrasMap[op];
         if (mapaTurno) {
             const t = mapaTurno[op];
-            if (t) { if (t !== currentTurno && t !== 'SEM') { absentees.push(op); return; } }
+            if (t) { if (t !== currentTurno) { absentees.push(op); return; } }
             else if (extra) { if (extra !== currentTurno) { absentees.push(op); return; } }
             else { absentees.push(op); return; }               // não está na planilha deste mês
         } else if (extra && extra !== currentTurno) { absentees.push(op); return; }
@@ -1039,6 +1040,7 @@ function renderEscalaSemana() {
     });
 
     if (!isAdm && !renderedAny) container.innerHTML = '<div style="text-align:center; padding: 50px; color: var(--text-muted); font-size: 1.2rem; font-weight: bold;"><i class="fas fa-eye-slash" style="font-size: 2rem; margin-bottom: 15px; display: block;"></i>A Escala da Semana ainda não foi publicada.</div>';
+    if (isAdm) container.insertAdjacentHTML('afterbegin', bannerTurnoEscala(liveEscalaSemana));
     if(isAdm) { escDiasConf.forEach(d => updateDropdownsAvailability(d.id)); updateSidebar(); }
 }
 
@@ -1282,6 +1284,7 @@ function renderEscalaDcSemana() {
     });
 
     if (!isAdm && !renderedAny) container.innerHTML = '<div style="text-align:center; padding: 50px; color: var(--text-muted); font-size: 1.2rem; font-weight: bold;"><i class="fas fa-eye-slash" style="font-size: 2rem; margin-bottom: 15px; display: block;"></i>A Escala Doblecheck ainda não foi publicada.</div>';
+    if (isAdm) container.insertAdjacentHTML('afterbegin', bannerTurnoEscala(liveEscalaDcSemana));
     if(isAdm) { escDiasConf.forEach(d => updateDropdownsAvailabilityDc(d.id)); updateSidebarDc(); }
 }
 
@@ -1437,7 +1440,7 @@ function renderHistEscala(tipo) {
         let sortedOps = Array.from(workedOps).sort();
         // Separa os nomes pelo líder da planilha (Felipe = AM, Malane = PM) nos meses daquela semana
         const mesesSemana = [...new Set(escDiasConf.map(d => mesDoDataDia(semanaData[d.id]?.dataDia)).filter(Boolean))];
-        const grupoDe = op => { for (const m of mesesSemana) { const t = (turnoMapAll[m] || {})[op]; if (t) return t; } return extrasMap[op] || 'SEM'; };
+        const grupoDe = op => { for (const m of (mesesSemana.length ? mesesSemana : [null])) { const t = (mapaTurnoMes(m).mapa || {})[op]; if (t) return t; } return extrasMap[op] || 'SEM'; };
         const grupos = { AM: [], PM: [], SEM: [] };
         sortedOps.forEach(op => (grupos[grupoDe(op)] || grupos.SEM).push(op));
         const rotuloGrupo = { AM: '<i class="fas fa-sun"></i> TURNO AM', PM: '<i class="fas fa-moon"></i> TURNO PM', SEM: '<i class="fas fa-question-circle"></i> SEM TURNO NA PLANILHA' };
@@ -1526,14 +1529,15 @@ function renderPresencaGrid() {
     let isAdm = currentUser && currentUser.r === 'admin';
     const filtro = document.getElementById('pres-turno-filter') ? document.getElementById('pres-turno-filter').value : 'TODOS';
     const mapa = turnoMapAll[currentPresMes] || null;
+    const mapaT = mapaTurnoMes(currentPresMes).mapa || {};
     const [ano, mes] = currentPresMes.split('-').map(Number);
     const letras = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
 
     // Mês importado da planilha: mostra quem está nela (+ extras). Senão: lista de colaboradores.
     let nomes = mapa ? [...new Set([...Object.keys(mapa), ...Object.keys(extrasMap)])] : [...operadoresList];
     Object.keys(livePresenca || {}).forEach(n => { if (!nomes.includes(n) && (!mapa || mapa[n])) nomes.push(n); });
-    const turnoDe = n => (mapa && mapa[n]) || extrasMap[n] || '';
-    if (filtro !== 'TODOS') nomes = nomes.filter(n => turnoDe(n) === filtro || turnoDe(n) === 'SEM');
+    const turnoDe = n => mapaT[n] || extrasMap[n] || '';
+    if (filtro !== 'TODOS') nomes = nomes.filter(n => turnoDe(n) === filtro);
     nomes.sort((a, b) => a.localeCompare(b, 'pt-BR'));
 
     let html = `<tr><th>COLABORADOR</th>`;
@@ -1597,8 +1601,24 @@ document.addEventListener('click', function(e) {
 // PLANILHA DE CONTROLE (PRESENÇA) + TURNOS + DISPONIBILIDADE
 // =========================================================
 
-// Turno de cada pessoa vem da coluna "Líder" da planilha
-const LIDER_TURNO = { FELIPE: 'AM', MALANE: 'PM' };
+// Turno de cada pessoa vem da coluna "Líder" da planilha (o nome do líder não aparece na tela)
+// Aceita variações de grafia: FELIPE..., MALANE / MALANI / MALANY...
+const LIDER_TURNO = { FELIP: 'AM', MALAN: 'PM' };
+function turnoDoLider(lider) {
+    const l = normTxt(lider).replace(/[^A-Z ]/g, '');
+    for (const k in LIDER_TURNO) if (l.includes(k)) return LIDER_TURNO[k];
+    return 'SEM';
+}
+// Turno das pessoas para um mês. Se a planilha daquele mês ainda não foi importada,
+// usa a última planilha importada antes dele (e avisa na tela).
+function mapaTurnoMes(mes) {
+    if (mes && turnoMapAll[mes] && Object.keys(turnoMapAll[mes]).length) return { mapa: turnoMapAll[mes], origem: mes };
+    const ks = Object.keys(turnoMapAll).filter(k => Object.keys(turnoMapAll[k] || {}).length).sort();
+    if (!ks.length) return { mapa: null, origem: null };
+    const k = (mes ? ks.filter(x => x <= mes).pop() : null) || ks[ks.length - 1];
+    return { mapa: turnoMapAll[k], origem: k };
+}
+function turnoDaPessoa(mes, nome) { return (mapaTurnoMes(mes).mapa || {})[nome] || extrasMap[nome] || 'SEM'; }
 // Códigos da planilha -> códigos do painel (o que não estiver aqui é gravado como veio: FE, AF, NC, DV, TD...)
 const MAPA_PLANILHA = { P: 'P', S2: 'P', F: 'F', FJ: 'F', AM: 'AT', FO: 'FG', DSR: 'FG', FC: 'FG' };
 const DESCRICAO_CODIGO = {
@@ -1792,15 +1812,15 @@ function lerAbaControle(rows, mesRef, permitirPosicional) {
         for (let d = 1; d <= nd; d++) colDia[ini + d - 1] = d;
     }
 
-    const pessoas = {}; const semLider = [];
+    const pessoas = {}; const semLider = []; const lideres = {};
     rows.slice(hi + 1).forEach(l => {
         if (!l) return;
         let nome = String(l[cNome] == null ? '' : l[cNome]).toUpperCase().replace(/\s+/g, ' ').trim();
         nome = nome.replace(/\s+[A-Z]+\d+$/, '').replace(/[.#$\[\]\/]/g, '').trim();   // tira a matrícula do fim
         if (nome.length < 3) return;
-        let turno = 'SEM';
         const lider = cLider >= 0 ? normTxt(l[cLider]) : '';
-        for (const k in LIDER_TURNO) if (lider.includes(k)) turno = LIDER_TURNO[k];
+        const turno = turnoDoLider(lider);
+        lideres[lider || '(vazio)'] = turno;
         if (turno === 'SEM') semLider.push(nome);
         const dias = {};
         Object.entries(colDia).forEach(([col, d]) => {
@@ -1809,7 +1829,7 @@ function lerAbaControle(rows, mesRef, permitirPosicional) {
         });
         pessoas[nome] = { turno, dias };
     });
-    return Object.keys(pessoas).length ? { pessoas, semLider } : null;
+    return Object.keys(pessoas).length ? { pessoas, semLider, lideres } : null;
 }
 
 let turnoImportacao = 'AMBOS';
@@ -1880,9 +1900,10 @@ async function importarPlanilhaPresenca(input) {
         await dbFirebase.ref('shopee_colaboradores').update(upColab);
         await dbFirebase.ref('shopee_presenca_import/' + mesRef).set({ em: new Date().toISOString(), por: currentUser.u, aba, turno: desc });
 
-        let msg = `Planilha importada!\n\nAba: ${aba}\nTurno: ${desc}\nColaboradores: ${qtd}`;
+        const cT = { AM: 0, PM: 0, SEM: 0 }; Object.values(upTurno).forEach(t => cT[t]++);
+        let msg = `Planilha importada!\n\nAba: ${aba}\nColaboradores: ${qtd}  (AM: ${cT.AM} • PM: ${cT.PM}${cT.SEM ? ' • sem turno: ' + cT.SEM : ''})\n\nLíderes encontrados na planilha:\n${Object.entries(res.lideres).map(([l, t]) => `- ${l} → ${t === 'SEM' ? 'SEM TURNO' : t}`).join('\n')}`;
         const sem = res.semLider.filter(n => n in upTurno);
-        if (sem.length) msg += `\n\n${sem.length} sem turno definido na planilha (aparecem só no Geral e nos dois turnos da escala):\n- ${sem.slice(0, 8).join('\n- ')}${sem.length > 8 ? '\n- ...' : ''}`;
+        if (sem.length) msg += `\n\n${sem.length} sem turno definido na planilha (não entram nas escalas, só no Geral do dashboard):\n- ${sem.slice(0, 8).join('\n- ')}${sem.length > 8 ? '\n- ...' : ''}`;
         alert(msg);
     } catch (e) {
         console.error('[Importar planilha]', e);
@@ -1937,15 +1958,8 @@ async function atualizarPeloLink(silencioso = false) {
             fonte = 'link';
             if (!planilhaConfig.link) { if (!silencioso) configurarLinkPlanilha(); return; }
             const id = (planilhaConfig.link.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/) || [])[1];
-            const linha = parseInt(planilhaConfig.linhaCabecalho || 1);
-            const url = `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&headers=1&sheet=${encodeURIComponent(nomeAba)}${linha > 1 ? `&range=A${linha}:AZ1000` : ''}`;
-            let resp;
-            try { resp = await fetch(url, { cache: 'no-store' }); }
-            catch (e) { throw new Error('Não consegui acessar a planilha. Ela precisa estar como "Qualquer pessoa com o link -> Leitor".'); }
-            if (!resp.ok) throw new Error(`O Google respondeu com erro ${resp.status}. Confira se existe a aba "${nomeAba}".`);
-            const txt = await resp.text();
-            if (txt.trim().startsWith('<')) throw new Error('A planilha não está compartilhada como "Qualquer pessoa com o link -> Leitor".');
-            rows = lerCSV(txt);
+            if (id === '1zE6yZcKDIxBo2_MeYdNHkvNAo19zVd8Cy9ZOJtj3mkA') throw new Error('O link salvo na engrenagem ⚙ é o da planilha REGIONAL, que é privada.\n\nCole o link da planilha ESPELHO (a nova que você criou com a fórmula IMPORTRANGE).');
+            rows = await lerPlanilhaPublica(id, nomeAba, parseInt(planilhaConfig.linhaCabecalho || 1));
         }
         const res = lerAbaControle(rows, mesRef, true);
         if (!res) throw new Error(`A aba "${nomeAba}" não foi encontrada ou está em outro formato (precisa do cabeçalho "Nome do colaborador", "Lider" e as datas).`);
@@ -1975,4 +1989,59 @@ function autoAtualizarPlanilha() {
     if (Date.now() - ultimaAutoLeitura < 10 * 60 * 1000) return;
     ultimaAutoLeitura = Date.now();
     atualizarPeloLink(true);
+}
+
+// Faixa no topo da escala (admin): quantas pessoas do turno vieram da planilha
+function bannerTurnoEscala(obj) {
+    const dataDia = obj && obj.quarta && obj.quarta.dataDia ? obj.quarta.dataDia : '';
+    const mes = mesDoDataDia(dataDia);
+    const info = mapaTurnoMes(mes);
+    const nomeMes = m => ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'][+m.slice(5) - 1];
+    if (!info.mapa) {
+        return `<div class="esc-banner bad"><i class="fas fa-exclamation-triangle"></i> A planilha ainda não foi importada: o sistema não consegue separar AM e PM e mostra todos os nomes. Vá em <b>Presença Mensal</b> e clique em <b>Atualizar pelo Link</b> ou <b>Importar Planilha</b>.</div>`;
+    }
+    const cont = { AM: 0, PM: 0, SEM: 0 };
+    Object.values(info.mapa).forEach(t => { cont[t] = (cont[t] || 0) + 1; });
+    const extras = Object.values(extrasMap).filter(t => t === currentTurno).length;
+    const outro = info.origem && mes && info.origem !== mes ? ` <span class="esc-banner-alerta">usando a planilha de ${nomeMes(info.origem)} (a de ${nomeMes(mes)} ainda não foi importada)</span>` : '';
+    const semData = !mes ? ' <span class="esc-banner-alerta">preencha a semana (datas) para o sistema tirar quem está de folga/falta/atestado</span>' : '';
+    return `<div class="esc-banner"><i class="fas fa-users"></i> Turno <b>${currentTurno}</b>: ${cont[currentTurno] || 0} funcionário(s) da planilha${extras ? ` + ${extras} extra(s)` : ''}. O turno ${currentTurno === 'AM' ? 'PM' : 'AM'} (${cont[currentTurno === 'AM' ? 'PM' : 'AM'] || 0}) não aparece aqui.${cont.SEM ? ` ${cont.SEM} sem turno na planilha ficam fora.` : ''}${outro}${semData}</div>`;
+}
+
+// Lê uma planilha compartilhada "Qualquer pessoa com o link". 1º tenta CSV (fetch); se o navegador
+// bloquear, tenta pelo modo JSONP do Google (não depende de CORS). Devolve as linhas da aba.
+async function lerPlanilhaPublica(id, nomeAba, linhaCab) {
+    const base = `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?headers=1&sheet=${encodeURIComponent(nomeAba)}${linhaCab > 1 ? `&range=A${linhaCab}:AZ1000` : ''}`;
+    let motivo = '';
+    try {
+        const resp = await fetch(base + '&tqx=out:csv', { cache: 'no-store' });
+        if (resp.ok) {
+            const txt = await resp.text();
+            if (!txt.trim().startsWith('<')) return lerCSV(txt);
+            motivo = 'o Google pediu login (planilha não está pública)';
+        } else motivo = 'o Google respondeu com erro ' + resp.status;
+    } catch (e) { motivo = 'o navegador bloqueou a leitura direta'; }
+
+    // Plano B: JSONP
+    const dados = await new Promise(resolve => {
+        const cb = '__planilhaCb' + Date.now();
+        const tag = document.createElement('script');
+        const fim = v => { clearTimeout(t); delete window[cb]; tag.remove(); resolve(v); };
+        const t = setTimeout(() => fim(null), 12000);
+        window[cb] = r => fim(r);
+        tag.onerror = () => fim(null);
+        tag.src = base + `&tqx=out:json;responseHandler:${cb}`;
+        document.head.appendChild(tag);
+    });
+    if (dados && dados.status === 'error') {
+        const det = (dados.errors || []).map(e => e.detailed_message || e.message).join(' ');
+        throw new Error(`O Google não encontrou a aba "${nomeAba}" na planilha do link.\n\nConfira se a aba da planilha espelho se chama exatamente "${nomeAba}".\n\n(${det})`);
+    }
+    if (dados && dados.table) {
+        const cols = dados.table.cols || [];
+        const linhas = [cols.map(c => c.label || '')];
+        (dados.table.rows || []).forEach(r => linhas.push((r.c || []).map(x => (x ? (x.f != null ? x.f : (x.v != null ? x.v : '')) : ''))));
+        return linhas;
+    }
+    throw new Error(`Não consegui ler a planilha do link (${motivo}).\n\nConfira na planilha ESPELHO: Compartilhar → Acesso geral → "Qualquer pessoa com o link" → Leitor.\n\nTeste: abra este endereço numa aba anônima do navegador. Se pedir login, a planilha não está pública:\n${base}&tqx=out:csv`);
 }
