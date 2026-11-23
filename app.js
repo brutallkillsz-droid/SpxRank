@@ -1674,8 +1674,8 @@ dbFirebase.ref('shopee_config/planilha').on('value', snap => { planilhaConfig = 
 function atualizarInfoLink() {
     const el = document.getElementById('info-link-planilha');
     if (!el) return;
-    el.innerHTML = planilhaConfig.link
-        ? `<i class="fas fa-link"></i> Planilha vinculada${planilhaConfig.ultimaLeitura ? ' • lida em ' + new Date(planilhaConfig.ultimaLeitura).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''}`
+    el.innerHTML = (planilhaConfig.link || planilhaConfig.fonte === 'direto')
+        ? `<i class="fas fa-link"></i> ${planilhaConfig.fonte === 'direto' ? 'Lendo direto da planilha regional' : 'Planilha vinculada'}${planilhaConfig.ultimaLeitura ? ' • lida em ' + new Date(planilhaConfig.ultimaLeitura).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''}`
         : '<i class="fas fa-unlink"></i> Nenhuma planilha vinculada';
 }
 
@@ -1688,23 +1688,41 @@ function configurarLinkPlanilha() {
     dbFirebase.ref('shopee_config/planilha/link').set(limpo || null).then(() => showToast(limpo ? 'Planilha vinculada!' : 'Planilha desvinculada.'));
 }
 
+// 1º tenta a leitura direta (função /api/planilha na Vercel, planilha privada compartilhada com a conta de serviço).
+// Se ela não estiver instalada, usa o link da planilha espelho.
+async function lerViaApi(nomeAba) {
+    let r;
+    try { r = await fetch('/api/planilha?aba=' + encodeURIComponent(nomeAba), { cache: 'no-store' }); } catch (e) { return null; }
+    const tipo = r.headers.get('content-type') || '';
+    if (r.status === 404 && !tipo.includes('json')) return null;
+    if (!tipo.includes('json')) return null;
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.erro || ('Erro ' + r.status));
+    return j.values || [];
+}
+
 async function atualizarPeloLink(silencioso = false) {
     if (!currentUser || currentUser.r !== 'admin') return;
-    if (!planilhaConfig.link) { if (!silencioso) configurarLinkPlanilha(); return; }
     const mesRef = currentPresMes;
     const nomeAba = 'Controle-' + ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'][+mesRef.slice(5) - 1];
-    const id = (planilhaConfig.link.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/) || [])[1];
-    const linha = parseInt(planilhaConfig.linhaCabecalho || 1);
-    const url = `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&headers=1&sheet=${encodeURIComponent(nomeAba)}${linha > 1 ? `&range=A${linha}:AZ1000` : ''}`;
     try {
-        if (!silencioso) showToast('Lendo a planilha pelo link...');
-        let resp;
-        try { resp = await fetch(url, { cache: 'no-store' }); }
-        catch (e) { throw new Error('Não consegui acessar a planilha. Ela precisa estar como "Qualquer pessoa com o link -> Leitor".'); }
-        if (!resp.ok) throw new Error(`O Google respondeu com erro ${resp.status}. Confira se existe a aba "${nomeAba}".`);
-        const txt = await resp.text();
-        if (txt.trim().startsWith('<')) throw new Error('A planilha não está compartilhada como "Qualquer pessoa com o link -> Leitor".');
-        const res = lerAbaControle(lerCSV(txt), mesRef, true);
+        if (!silencioso) showToast('Lendo a planilha...');
+        let rows = await lerViaApi(nomeAba), fonte = 'direto';
+        if (rows === null) {
+            fonte = 'link';
+            if (!planilhaConfig.link) { if (!silencioso) configurarLinkPlanilha(); return; }
+            const id = (planilhaConfig.link.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/) || [])[1];
+            const linha = parseInt(planilhaConfig.linhaCabecalho || 1);
+            const url = `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&headers=1&sheet=${encodeURIComponent(nomeAba)}${linha > 1 ? `&range=A${linha}:AZ1000` : ''}`;
+            let resp;
+            try { resp = await fetch(url, { cache: 'no-store' }); }
+            catch (e) { throw new Error('Não consegui acessar a planilha. Ela precisa estar como "Qualquer pessoa com o link -> Leitor".'); }
+            if (!resp.ok) throw new Error(`O Google respondeu com erro ${resp.status}. Confira se existe a aba "${nomeAba}".`);
+            const txt = await resp.text();
+            if (txt.trim().startsWith('<')) throw new Error('A planilha não está compartilhada como "Qualquer pessoa com o link -> Leitor".');
+            rows = lerCSV(txt);
+        }
+        const res = lerAbaControle(rows, mesRef, true);
         if (!res) throw new Error(`A aba "${nomeAba}" não foi encontrada ou está em outro formato (precisa do cabeçalho "Nome do colaborador", "Lider" e as datas).`);
 
         const upPres = {}, upTurno = {}, upColab = {};
@@ -1715,12 +1733,12 @@ async function atualizarPeloLink(silencioso = false) {
         await dbFirebase.ref('shopee_presenca_live/' + mesRef).update(upPres);
         await dbFirebase.ref('shopee_colab_turno/' + mesRef).update(upTurno);
         await dbFirebase.ref('shopee_colaboradores').update(upColab);
-        await dbFirebase.ref('shopee_config/planilha/ultimaLeitura').set(new Date().toISOString());
-        await dbFirebase.ref('shopee_presenca_import/' + mesRef).set({ em: new Date().toISOString(), por: currentUser.u, aba: nomeAba, turno: 'AM + PM (link)' });
+        await dbFirebase.ref('shopee_config/planilha').update({ ultimaLeitura: new Date().toISOString(), fonte });
+        await dbFirebase.ref('shopee_presenca_import/' + mesRef).set({ em: new Date().toISOString(), por: currentUser.u, aba: nomeAba, turno: 'AM + PM (' + fonte + ')' });
         if (!silencioso) showToast(`Planilha atualizada: ${Object.keys(upPres).length} colaboradores (${nomeAba}).`);
     } catch (e) {
-        console.error('[Link planilha]', e);
-        if (!silencioso) alert('Erro ao ler pelo link:\n\n' + e.message);
+        console.error('[Planilha]', e);
+        if (!silencioso) alert('Erro ao ler a planilha:\n\n' + e.message);
         else showToast('Não consegui atualizar pela planilha: ' + e.message);
     }
 }
@@ -1728,7 +1746,7 @@ async function atualizarPeloLink(silencioso = false) {
 // Atualiza sozinho quando o admin abre a Presença ou as Escalas (no máximo a cada 10 minutos)
 let ultimaAutoLeitura = 0;
 function autoAtualizarPlanilha() {
-    if (!currentUser || currentUser.r !== 'admin' || !planilhaConfig.link) return;
+    if (!currentUser || currentUser.r !== 'admin') return;
     if (Date.now() - ultimaAutoLeitura < 10 * 60 * 1000) return;
     ultimaAutoLeitura = Date.now();
     atualizarPeloLink(true);
