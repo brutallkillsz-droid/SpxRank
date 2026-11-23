@@ -332,3 +332,6 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
     .login-card { width: calc(100% - 30px); padding: 35px 22px; }
     .turno-toggle { margin: 0; }
 }
+.btn-link-planilha { border-color: #3b82f6 !important; color: #3b82f6 !important; }
+.info-link { font-size: .72rem; color: var(--text-muted); margin-top: 6px; }
+.info-link i { color: var(--primary); margin-right: 4px; }
