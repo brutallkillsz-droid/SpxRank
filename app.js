@@ -129,12 +129,14 @@ function switchTab(id) {
 async function renderSiteliderDashboard() {
     const weekInput = document.getElementById('sl-week-select');
     if (!weekInput) return;
-    if (!weekInput.value) weekInput.value = slSemanaISO(new Date());
+    // Semana do dashboard: DOMINGO a SÁBADO (a segunda-feira da semana ISO menos 1 dia)
+    if (!weekInput.value) { const amanha = new Date(); amanha.setDate(amanha.getDate() + 1); weekInput.value = slSemanaISO(amanha); }
     const [ano, sem] = weekInput.value.split('-W').map(Number);
     const seg = getDateOfISOWeek(sem, ano);
-    const segAnt = new Date(seg.getTime()); segAnt.setDate(segAnt.getDate() - 7);
-    const semana = slDatasEscala(seg), semanaAnt = slDatasEscala(segAnt);
-    const refMes = slMesDe(semana[2]);
+    const dom = new Date(seg.getTime()); dom.setDate(dom.getDate() - 1);
+    const domAnt = new Date(dom.getTime()); domAnt.setDate(domAnt.getDate() - 7);
+    const semana = slDatasSemana(dom), semanaAnt = slDatasSemana(domAnt);
+    const refMes = slMesDe(semana[3]);
     const [rA, rM] = refMes.split('-').map(Number);
     const mesAnt = slMesDe(new Date(rA, rM - 2, 1));
     const hojeISO = new Date(); hojeISO.setHours(23, 59, 59, 999);
@@ -178,30 +180,32 @@ async function renderSiteliderDashboard() {
         return { hist: h.val() || {}, live: l.val() || {} };
     }));
     const ddmm = dt => String(dt.getDate()).padStart(2, '0') + '/' + String(dt.getMonth() + 1).padStart(2, '0');
-    const dadosSemana = (f, segunda) => {
-        const chave = slSemanaISO(segunda);
-        if (f.hist[chave]) return f.hist[chave];
-        const q = slDatasEscala(segunda)[0];
-        if (f.live && f.live.quarta && String(f.live.quarta.dataDia || '').startsWith(ddmm(q))) return f.live;
-        return null;
-    };
-    const phdSemana = segunda => escDiasConf.map(dc => {
-        const vals = [], caps = [];
-        fontes.forEach(f => { const w = dadosSemana(f, segunda); const d = w && w[dc.id]; if (!d) return; const p = parseFloat(String(d.phd || '').replace(',', '.')); const c = parseFloat(String(d.capphd || '').replace(',', '.')); if (p > 0) { vals.push(p); if (c > 0) caps.push(c); } });
-        return { phd: vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0, cap: caps.length ? caps.reduce((a, b) => a + b, 0) / caps.length : 0 };
+    const isoD = dt => slMesDe(dt) + '-' + String(dt.getDate()).padStart(2, '0');
+    // Junta o PHD de cada data a partir das escalas (histórico + escala atual), pela data escrita em cada dia
+    const porData = {};
+    fontes.forEach(f => {
+        const vistos = {};
+        const lerSemana = w => escDiasConf.forEach(dc => {
+            const d = w && w[dc.id]; if (!d) return;
+            const m = String(d.dataDia || '').match(/(\d{1,2})\/(\d{1,2})/); if (!m) return;
+            const mes = mesDoDataDia(d.dataDia); if (!mes) return;
+            const chave = mes + '-' + m[1].padStart(2, '0');
+            if (vistos[chave]) return;
+            const p = parseFloat(String(d.phd || '').replace(',', '.')), c = parseFloat(String(d.capphd || '').replace(',', '.'));
+            if (!(p > 0)) return;
+            vistos[chave] = true;
+            (porData[chave] = porData[chave] || { v: [], c: [] }).v.push(p);
+            if (c > 0) porData[chave].c.push(c);
+        });
+        Object.values(f.hist).forEach(lerSemana);
+        lerSemana(f.live);
     });
-    const phdS = phdSemana(seg), phdAntS = phdSemana(segAnt);
-    const media = l => { const v = l.filter(x => x.phd > 0); return v.length ? { phd: v.reduce((a, x) => a + x.phd, 0) / v.length, cap: (v.filter(x => x.cap).reduce((a, x) => a + x.cap, 0) / (v.filter(x => x.cap).length || 1)) || 0 } : { phd: 0, cap: 0 }; };
-    const phdMes = m => {
-        const [y, mm] = m.split('-').map(Number);
-        const lista = [];
-        for (let d = new Date(y, mm - 1, 1); d.getMonth() === mm - 1; d.setDate(d.getDate() + 7)) {
-            const s = getDateOfISOWeek(+slSemanaISO(d).split('-W')[1], +slSemanaISO(d).split('-W')[0]);
-            phdSemana(s).forEach((x, i) => { if (slDatasEscala(s)[i].getMonth() === mm - 1) lista.push(x); });
-        }
-        return media(lista);
-    };
-    const pDia = [...phdS].map((x, i) => ({ ...x, data: semana[i] })).filter(x => x.phd > 0).pop();
+    const med = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0;
+    const phdDe = dt => { const x = porData[isoD(dt)]; return x ? { phd: med(x.v), cap: med(x.c), data: dt } : { phd: 0, cap: 0, data: dt }; };
+    const media = l => { const v = l.filter(x => x.phd > 0); const vc = v.filter(x => x.cap > 0); return { phd: med(v.map(x => x.phd)), cap: med(vc.map(x => x.cap)) }; };
+    const phdS = semana.map(phdDe), phdAntS = semanaAnt.map(phdDe);
+    const phdMes = m => media(diasMes(m).map(phdDe));
+    const pDia = phdS.filter(x => x.phd > 0).pop();
     const pSem = media(phdS), pSemAnt = media(phdAntS), pMes = phdMes(refMes), pMesAnt = phdMes(mesAnt);
 
     // ---------- KPIs ----------
@@ -225,19 +229,19 @@ async function renderSiteliderDashboard() {
         if (bar) { const pc = x && x.cap ? x.phd / x.cap * 100 : 0; bar.style.width = Math.min(100, pc) + '%'; bar.className = 'sl-bar-fill ' + (!pc ? '' : pc >= 100 ? 'ok' : pc >= 85 ? 'warn' : 'bad'); }
     };
     kpiAbs('sl-abs-dia', ultimoDia, diaAnterior, ultimoDia ? 'Dia ' + ddmm(ultimoDia.data) : '', 'dia anterior');
-    kpiAbs('sl-abs-sem', soma(comDado(semS)), soma(comDado(semAntS)), `${ddmm(semana[0])} a ${ddmm(semana[5])}`, 'semana anterior');
+    kpiAbs('sl-abs-sem', soma(comDado(semS)), soma(comDado(semAntS)), `${ddmm(semana[0])} a ${ddmm(semana[6])}`, 'semana anterior');
     kpiAbs('sl-abs-mes', soma(comDado(mesS)), soma(comDado(mesAntS)), SL_MESES[rM - 1], SL_MESES[(rM + 10) % 12].toLowerCase());
     kpiPhd('sl-phd-dia', pDia, null, pDia ? 'Dia ' + ddmm(pDia.data) : '', '');
-    kpiPhd('sl-phd-sem', pSem, pSemAnt, `${ddmm(semana[0])} a ${ddmm(semana[5])}`, 'semana anterior');
+    kpiPhd('sl-phd-sem', pSem, pSemAnt, `${ddmm(semana[0])} a ${ddmm(semana[6])}`, 'semana anterior');
     kpiPhd('sl-phd-mes', pMes, pMesAnt, SL_MESES[rM - 1], SL_MESES[(rM + 10) % 12].toLowerCase());
 
     const nomeTurno = { GERAL: 'Todos os turnos', AM: 'Turno AM • Felipe', PM: 'Turno PM • Malane' }[slFiltroTurno];
-    slSet('sl-sub', `${nomeTurno} • Semana ${ddmm(semana[0])} a ${ddmm(semana[5])} • Mês de referência: ${SL_MESES[rM - 1]}/${rA} • Atualizado ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`);
+    slSet('sl-sub', `${nomeTurno} • Semana ${ddmm(semana[0])} (dom) a ${ddmm(semana[6])} (sáb) • Mês de referência: ${SL_MESES[rM - 1]}/${rA} • Atualizado ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`);
 
     // ---------- Quadro da semana ----------
     const qs = document.getElementById('sl-semana-quadro');
     if (qs) {
-        const nomesDia = ['QUA', 'QUI', 'SEX', 'SÁB', 'DOM', 'SEG'];
+        const nomesDia = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
         const linha = (rot, fn, cls = '') => `<tr><th>${rot}</th>${semS.map((x, i) => `<td class="${cls}">${fn(x, i)}</td>`).join('')}</tr>`;
         qs.innerHTML = `<table class="sl-tabela"><thead><tr><th></th>${semS.map((x, i) => `<th>${nomesDia[i]}<span>${ddmm(x.data)}</span></th>`).join('')}</tr></thead><tbody>
             ${linha('Presentes', x => x.base ? x.p : '·', 'c-p')}
@@ -290,7 +294,7 @@ async function renderSiteliderDashboard() {
     if (window.slChartPHDInstance) window.slChartPHDInstance.destroy();
     window.slChartPHDInstance = new Chart(document.getElementById('slChartPHD').getContext('2d'), {
         data: {
-            labels: ['QUA', 'QUI', 'SEX', 'SÁB', 'DOM', 'SEG'].map((d, i) => `${d} ${ddmm(semana[i])}`),
+            labels: ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'].map((d, i) => `${d} ${ddmm(semana[i])}`),
             datasets: [
                 { type: 'bar', label: 'PHD semana anterior', data: phdAntS.map(x => x.phd || null), backgroundColor: 'rgba(148,163,184,.25)', borderRadius: 4, order: 3 },
                 { type: 'bar', label: 'PHD atingido', data: phdS.map(x => x.phd || null), backgroundColor: phdS.map(x => !x.cap ? 'rgba(59,130,246,.8)' : x.phd >= x.cap ? 'rgba(16,185,129,.8)' : 'rgba(59,130,246,.8)'), borderRadius: 4, order: 2 },
@@ -310,6 +314,7 @@ dbFirebase.ref('shopee_config/metas').on('value', s => {
     if (!document.getElementById('view-sitelider').classList.contains('hidden')) renderSiteliderDashboard();
 });
 function slMesDe(dt) { return dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0'); }
+function slDatasSemana(domingo) { return [0, 1, 2, 3, 4, 5, 6].map(o => { const d = new Date(domingo.getTime()); d.setDate(d.getDate() + o); return d; }); }
 function slDatasEscala(segunda) { return [2, 3, 4, 5, 6, 7].map(o => { const d = new Date(segunda.getTime()); d.setDate(d.getDate() + o); return d; }); }
 function slSemanaISO(dt) {
     const d = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
