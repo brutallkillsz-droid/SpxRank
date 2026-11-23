@@ -29,6 +29,23 @@ let extrasMap = {};          // adicionados à mão: { NOME: 'AM' }
 let absStamp = 0, absMemo = {};
 const CODIGOS_LIBERA = ['P', 'S2', 'IN'];            // pode ser escalado (vazio também pode)
 const CODIGOS_DESLIG = ['DF', 'DP', 'DV', 'TR'];      // a partir desse dia não entra mais
+// Variáveis do código novo ficam todas aqui no topo (o Firebase pode responder antes do arquivo terminar de carregar)
+let renderPendente = {};
+let atualizarEscalasTimer = null;
+let turnoImportacao = 'AMBOS';
+let planilhaConfig = {};
+let ultimaAutoLeitura = 0;
+let slFiltroTurno = localStorage.getItem('spxSlTurno') || 'GERAL';
+let slTopOrdem = 'total', slTopTodos = false;
+let slMetas = { abs: 5 };
+const SL_MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+const LIDER_TURNO = { FELIP: 'AM', MALAN: 'PM' };
+const MAPA_PLANILHA = { P: 'P', S2: 'P', F: 'F', FJ: 'F', AM: 'AT', FO: 'FG', DSR: 'FG', FC: 'FG' };
+const DESCRICAO_CODIGO = {
+    P: 'Presente', F: 'Falta', FG: 'Folga / DSR', AT: 'Atestado', AF: 'Afastamento', AL: 'Afastamento longo', BH: 'Banco de horas',
+    DF: 'Desligamento forçado', DP: 'Desligamento programado', DV: 'Desligamento voluntário', FE: 'Férias', NC: 'Não contratado',
+    NS: 'No-show', PR: 'Promoção', S1: 'Sinergia enviada', TR: 'Transferência', TD: 'Treinamento', SU: 'Suspensão', IN: 'Internalização'
+};
 
 
 const escDiasConf = [
@@ -108,6 +125,7 @@ function switchTab(id) {
     const btn = document.getElementById('btn-'+id);
     if(btn) btn.classList.add('active');
     
+    try {
     if(id==='dia') renderDaily(); 
     if(id==='ctrl') renderControl(); 
     if(id==='rankprod') renderRankProd(); 
@@ -121,6 +139,7 @@ function switchTab(id) {
 
     if(id==='bi') renderBIChart(); 
     if(id==='sitelider') renderSiteliderDashboard(); 
+    } catch (e) { console.error(e); mostrarErroTela(e); }
 }
 
 // =========================================================
@@ -406,11 +425,7 @@ async function renderSiteliderDashboard() {
     });
 }
 
-const SL_MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
-let slFiltroTurno = localStorage.getItem('spxSlTurno') || 'GERAL';
-let slTopOrdem = 'total', slTopTodos = false;
 function slTopOrdenar(k) { slTopOrdem = k; renderSiteliderDashboard(); }
-let slMetas = { abs: 5 };
 dbFirebase.ref('shopee_config/metas').on('value', s => {
     slMetas = Object.assign({ abs: 5 }, s.val() || {});
     if (!document.getElementById('view-sitelider').classList.contains('hidden')) renderSiteliderDashboard();
@@ -552,7 +567,8 @@ function checkSession() {
         document.getElementById('login-screen').style.display = 'none'; document.getElementById('app-shell').style.display = 'flex';
         document.getElementById('display-user').innerText = found.u.toUpperCase();
         if(found.r === 'admin') { document.body.classList.add('is-admin'); }
-        initProdGrid(); document.getElementById('pres-month-select').value = currentPresMes; prepararExtras(); switchTab('escala'); 
+        try { initProdGrid(); document.getElementById('pres-month-select').value = currentPresMes; prepararExtras(); switchTab('escala'); }
+        catch (e) { console.error(e); mostrarErroTela(e); }
     }
 }
 
@@ -564,7 +580,8 @@ function login() {
         document.getElementById('login-screen').style.display = 'none'; document.getElementById('app-shell').style.display = 'flex';
         document.getElementById('display-user').innerText = u.toUpperCase();
         if(found.r === 'admin') { document.body.classList.add('is-admin'); }
-        initProdGrid(); document.getElementById('pres-month-select').value = currentPresMes; prepararExtras(); switchTab('escala');
+        try { initProdGrid(); document.getElementById('pres-month-select').value = currentPresMes; prepararExtras(); switchTab('escala'); }
+        catch (e) { console.error(e); mostrarErroTela(e); }
     } else { document.getElementById('login-err').style.display = 'block'; }
 }
 
@@ -978,7 +995,7 @@ function autoDistributeOperators(diaId, autoSave = true) {
 }
 
 function renderEscalaSemana() {
-    const container = document.getElementById('escala-semanal-container'); if(!container) return; container.innerHTML = '';
+    const container = document.getElementById('escala-semanal-container'); if(!container) return; let saida = '';
     const isAdm = currentUser && currentUser.r === 'admin'; const editAttr = isAdm ? 'contenteditable="true"' : ''; const editClass = isAdm ? 'editable-cell' : '';
     let renderedAny = false;
 
@@ -1036,9 +1053,10 @@ function renderEscalaSemana() {
             });
             html += `</tr>`;
         });
-        html += `</table></div>`; container.innerHTML += html;
+        html += `</table></div>`; saida += html;
     });
 
+    container.innerHTML = saida;
     if (!isAdm && !renderedAny) container.innerHTML = '<div style="text-align:center; padding: 50px; color: var(--text-muted); font-size: 1.2rem; font-weight: bold;"><i class="fas fa-eye-slash" style="font-size: 2rem; margin-bottom: 15px; display: block;"></i>A Escala da Semana ainda não foi publicada.</div>';
     if (isAdm) container.insertAdjacentHTML('afterbegin', bannerTurnoEscala(liveEscalaSemana));
     if(isAdm) { escDiasConf.forEach(d => updateDropdownsAvailability(d.id)); updateSidebar(); }
@@ -1222,7 +1240,7 @@ function autoDistributeDc(diaId, autoSave = true) {
 }
 
 function renderEscalaDcSemana() {
-    const container = document.getElementById('escala-dc-container'); if(!container) return; container.innerHTML = '';
+    const container = document.getElementById('escala-dc-container'); if(!container) return; let saida = '';
     const isAdm = currentUser && currentUser.r === 'admin'; 
 
     let renderedAny = false;
@@ -1280,9 +1298,10 @@ function renderEscalaDcSemana() {
                 html += `</tr>`;
             }
         });
-        html += `</table></div>`; container.innerHTML += html;
+        html += `</table></div>`; saida += html;
     });
 
+    container.innerHTML = saida;
     if (!isAdm && !renderedAny) container.innerHTML = '<div style="text-align:center; padding: 50px; color: var(--text-muted); font-size: 1.2rem; font-weight: bold;"><i class="fas fa-eye-slash" style="font-size: 2rem; margin-bottom: 15px; display: block;"></i>A Escala Doblecheck ainda não foi publicada.</div>';
     if (isAdm) container.insertAdjacentHTML('afterbegin', bannerTurnoEscala(liveEscalaDcSemana));
     if(isAdm) { escDiasConf.forEach(d => updateDropdownsAvailabilityDc(d.id)); updateSidebarDc(); }
@@ -1603,7 +1622,6 @@ document.addEventListener('click', function(e) {
 
 // Turno de cada pessoa vem da coluna "Líder" da planilha (o nome do líder não aparece na tela)
 // Aceita variações de grafia: FELIPE..., MALANE / MALANI / MALANY...
-const LIDER_TURNO = { FELIP: 'AM', MALAN: 'PM' };
 function turnoDoLider(lider) {
     const l = normTxt(lider).replace(/[^A-Z ]/g, '');
     for (const k in LIDER_TURNO) if (l.includes(k)) return LIDER_TURNO[k];
@@ -1620,12 +1638,6 @@ function mapaTurnoMes(mes) {
 }
 function turnoDaPessoa(mes, nome) { return (mapaTurnoMes(mes).mapa || {})[nome] || extrasMap[nome] || 'SEM'; }
 // Códigos da planilha -> códigos do painel (o que não estiver aqui é gravado como veio: FE, AF, NC, DV, TD...)
-const MAPA_PLANILHA = { P: 'P', S2: 'P', F: 'F', FJ: 'F', AM: 'AT', FO: 'FG', DSR: 'FG', FC: 'FG' };
-const DESCRICAO_CODIGO = {
-    P: 'Presente', F: 'Falta', FG: 'Folga / DSR', AT: 'Atestado', AF: 'Afastamento', AL: 'Afastamento longo', BH: 'Banco de horas',
-    DF: 'Desligamento forçado', DP: 'Desligamento programado', DV: 'Desligamento voluntário', FE: 'Férias', NC: 'Não contratado',
-    NS: 'No-show', PR: 'Promoção', S1: 'Sinergia enviada', TR: 'Transferência', TD: 'Treinamento', SU: 'Suspensão', IN: 'Internalização'
-};
 
 dbFirebase.ref('shopee_colab_turno').on('value', snap => {
     turnoMapAll = snap.val() || {}; absStamp++;
@@ -1639,12 +1651,14 @@ dbFirebase.ref('shopee_colab_extra').on('value', snap => {
 });
 
 function atualizarTelasDeEscala() {
-    if(!document.getElementById('view-escala').classList.contains('hidden')) renderSeguro('escala-semanal-container', renderEscalaSemana);
-    if(!document.getElementById('view-escala-dc').classList.contains('hidden')) renderSeguro('escala-dc-container', renderEscalaDcSemana);
+    clearTimeout(atualizarEscalasTimer);
+    atualizarEscalasTimer = setTimeout(() => {
+        if(!document.getElementById('view-escala').classList.contains('hidden')) renderSeguro('escala-semanal-container', renderEscalaSemana);
+        if(!document.getElementById('view-escala-dc').classList.contains('hidden')) renderSeguro('escala-dc-container', renderEscalaDcSemana);
+    }, 30);
 }
 
 // Não redesenha a escala enquanto o admin está com um campo aberto (evita fechar o select no meio da escolha)
-let renderPendente = {};
 function renderSeguro(containerId, fn) {
     const c = document.getElementById(containerId);
     const ativo = document.activeElement;
@@ -1680,7 +1694,7 @@ function garantirPresencaMes(mes) {
         presCache[mes] = snap.val() || {};
         if (mes === currentPresMes) livePresenca = presCache[mes];
         absStamp++;
-        atualizarTelasDeEscala();
+        setTimeout(atualizarTelasDeEscala, 0);
     });
 }
 
@@ -1832,7 +1846,6 @@ function lerAbaControle(rows, mesRef, permitirPosicional) {
     return Object.keys(pessoas).length ? { pessoas, semLider, lideres } : null;
 }
 
-let turnoImportacao = 'AMBOS';
 function abrirImportPlanilha() {
     if (!currentUser || currentUser.r !== 'admin') return;
     let ov = document.getElementById('import-turno-overlay');
@@ -1914,7 +1927,6 @@ async function importarPlanilhaPresenca(input) {
 // ---------- Leitura automática pelo LINK (planilha espelho) ----------
 // O link fica salvo no Firebase (todos os PCs usam o mesmo). A planilha do link precisa
 // estar como "Qualquer pessoa com o link -> Leitor". Nada é escrito na planilha.
-let planilhaConfig = {};
 dbFirebase.ref('shopee_config/planilha').on('value', snap => { planilhaConfig = snap.val() || {}; atualizarInfoLink(); });
 
 function atualizarInfoLink() {
@@ -1983,7 +1995,6 @@ async function atualizarPeloLink(silencioso = false) {
 }
 
 // Atualiza sozinho quando o admin abre a Presença ou as Escalas (no máximo a cada 10 minutos)
-let ultimaAutoLeitura = 0;
 function autoAtualizarPlanilha() {
     if (!currentUser || currentUser.r !== 'admin') return;
     if (Date.now() - ultimaAutoLeitura < 10 * 60 * 1000) return;
@@ -2045,3 +2056,36 @@ async function lerPlanilhaPublica(id, nomeAba, linhaCab) {
     }
     throw new Error(`Não consegui ler a planilha do link (${motivo}).\n\nConfira na planilha ESPELHO: Compartilhar → Acesso geral → "Qualquer pessoa com o link" → Leitor.\n\nTeste: abra este endereço numa aba anônima do navegador. Se pedir login, a planilha não está pública:\n${base}&tqx=out:csv`);
 }
+
+// ---------- Rank Produtividade (a função não existia no arquivo original) ----------
+function renderRankProd() {
+    const cont = document.getElementById('rankprod-list'); if (!cont) return;
+    const lista = Object.entries(globalProdData || {}).map(([nome, horas]) => {
+        const vals = Object.entries(horas || {}).map(([h, v]) => [h, parseFloat(v) || 0]).filter(([, v]) => v > 0);
+        const total = vals.reduce((a, [, v]) => a + v, 0);
+        const pico = vals.reduce((a, x) => (x[1] > a[1] ? x : a), ['-', 0]);
+        return { nome, total, horas: vals.length, media: vals.length ? total / vals.length : 0, pico };
+    }).filter(x => x.total > 0).sort((a, b) => b.total - a.total);
+    if (!lista.length) { cont.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:40px">Sem dados de produtividade. O admin importa em "Produtividade (H/H)".</div>'; return; }
+    const fmt = n => Math.round(n).toLocaleString('pt-BR');
+    cont.innerHTML = lista.map((d, i) => {
+        const pos = i + 1, icon = pos === 1 ? '🥇' : pos === 2 ? '🥈' : pos === 3 ? '🥉' : '';
+        const css = pos === 1 ? 'rank-1' : pos === 2 ? 'rank-2' : pos === 3 ? 'rank-3' : '';
+        return `<div class="stat-card m-row ${css}" style="padding:15px 30px;">
+            <div class="m-idx">#${pos}</div>
+            <div style="font-weight:700; display:flex; gap:10px; align-items:center; color:#fff; font-size:.8rem;">${icon} ${d.nome}</div>
+            <div class="m-stat"><div class="ms-l">Total</div><div class="ms-v">${fmt(d.total)}</div></div>
+            <div class="m-stat"><div class="ms-l">Média / hora</div><div class="ms-v">${fmt(d.media)}</div></div>
+            <div class="m-stat"><div class="ms-l">Horas ativas</div><div class="ms-v">${d.horas}</div></div>
+            <div class="m-stat"><div class="ms-l">Melhor hora</div><div class="ms-v">${d.pico[0]}</div></div>
+            <div class="m-stat"><div class="ms-l">Pico</div><div class="ms-v">${fmt(d.pico[1])}</div></div>
+        </div>`;
+    }).join('');
+}
+
+// ---------- Erros aparecem na tela (em vez de travar em silêncio) ----------
+function mostrarErroTela(e) {
+    const msg = (e && (e.message || (e.reason && e.reason.message))) || String(e);
+    try { showToast('Erro: ' + msg); } catch (x) { /* ignora */ }
+}
+window.addEventListener('error', ev => { if (ev && ev.message && !/Script error/i.test(ev.message)) mostrarErroTela(ev.error || ev.message); });
