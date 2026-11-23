@@ -137,78 +137,86 @@
         <main class="main-content">
             
             <section id="view-sitelider" class="hidden">
-                <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+                <div class="sl-head">
                     <div>
-                        <h2 style="font-weight: 800; letter-spacing: -1px; margin-bottom: 5px;">Dashboard Gestão Executiva</h2>
-                        <div style="font-size: 0.85rem; color: var(--text-muted);">Acompanhamento de PHD e Absenteísmo (Mês Vigente / Semana)</div>
+                        <h2 style="font-weight: 800; letter-spacing: -1px; margin-bottom: 4px;"><span class="sl-live"></span>Dashboard Gestão Executiva</h2>
+                        <div class="sl-sub" id="sl-sub">PHD e Absenteísmo • dia, semana e mês</div>
                     </div>
-                    <div class="admin-only flex-container" style="display:flex; align-items: center; gap: 10px;">
-                        <label style="color: var(--text-muted); font-size: 0.8rem; font-weight: 700;">SEMANA REFERÊNCIA:</label>
-                        <input type="week" id="sl-week-select" class="btn-ghost" style="background: rgba(255,255,255,0.05); color: #fff; border-color: var(--primary);" onchange="renderSiteliderDashboard()">
-                        <button class="btn-ghost" onclick="renderSiteliderDashboard()"><i class="fas fa-sync"></i> Atualizar Dados</button>
-                    </div>
-                </div>
-                
-                <h3 style="font-size: 1rem; color: #fff; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px;">Análise de PHD</h3>
-                <div class="bento-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 30px;">
-                    <div class="stat-card sl-phd">
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-                            <div class="sc-name">PHD Diário</div>
-                            <div class="sc-rank"><i class="fas fa-bolt" style="color:var(--primary);"></i></div>
+                    <div class="sl-controls">
+                        <div class="sl-seg">
+                            <button type="button" data-sl-turno="GERAL" onclick="slTrocarTurno('GERAL')">Geral</button>
+                            <button type="button" data-sl-turno="AM" onclick="slTrocarTurno('AM')"><i class="fas fa-sun"></i> AM</button>
+                            <button type="button" data-sl-turno="PM" onclick="slTrocarTurno('PM')"><i class="fas fa-moon"></i> PM</button>
                         </div>
-                        <div class="sc-hero"><div class="sc-val" id="sl-phd-dia">0</div><div class="sc-lbl">ÚLTIMO REGISTRADO NA SEMANA</div></div>
-                    </div>
-                    <div class="stat-card sl-phd">
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-                            <div class="sc-name">PHD Semanal</div>
-                            <div class="sc-rank"><i class="fas fa-calendar-week" style="color:var(--primary);"></i></div>
+                        <div class="sl-seg">
+                            <button type="button" onclick="slMudarSemana(-1)" title="Semana anterior"><i class="fas fa-chevron-left"></i></button>
+                            <input type="week" id="sl-week-select" onchange="renderSiteliderDashboard()">
+                            <button type="button" onclick="slMudarSemana(1)" title="Próxima semana"><i class="fas fa-chevron-right"></i></button>
                         </div>
-                        <div class="sc-hero"><div class="sc-val" id="sl-phd-sem">0</div><div class="sc-lbl">MÉDIA DA SEMANA SELECIONADA</div></div>
-                    </div>
-                    <div class="stat-card sl-phd">
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-                            <div class="sc-name">PHD Mensal</div>
-                            <div class="sc-rank"><i class="fas fa-chart-area" style="color:var(--primary);"></i></div>
-                        </div>
-                        <div class="sc-hero"><div class="sc-val" id="sl-phd-mes">0</div><div class="sc-lbl">MÉDIA DO MÊS DE REFERÊNCIA</div></div>
+                        <button type="button" class="sl-meta-btn" onclick="slEditarMeta()" title="Alterar meta de ABS"><i class="fas fa-bullseye"></i> Meta ABS <b id="sl-meta-abs">5%</b></button>
+                        <button type="button" class="sl-icon-btn" onclick="renderSiteliderDashboard()" title="Atualizar"><i class="fas fa-sync"></i></button>
                     </div>
                 </div>
 
-                <h3 style="font-size: 1rem; color: #fff; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px;">Análise de Absenteísmo</h3>
-                <div class="bento-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 30px;">
-                    <div class="stat-card sl-abs">
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-                            <div class="sc-name">ABS Diário</div>
-                            <div class="sc-rank"><i class="fas fa-user-clock" style="color:var(--danger);"></i></div>
-                        </div>
-                        <div class="sc-hero"><div class="sc-val" id="sl-abs-dia">0%</div><div class="sc-lbl">TAXA DE FALTAS/AT DA SEXTA</div></div>
+                <div class="sl-kpis">
+                    <div class="sl-kpi abs">
+                        <div class="sl-kpi-top"><span class="sl-kpi-tit"><i class="fas fa-user-clock"></i> ABS DIÁRIO</span><span class="sl-delta" id="sl-abs-dia-delta"></span></div>
+                        <div class="sl-kpi-val" id="sl-abs-dia">—</div>
+                        <div class="sl-kpi-sub" id="sl-abs-dia-sub">&nbsp;</div>
+                        <div class="sl-bar"><div class="sl-bar-fill" id="sl-abs-dia-bar"></div></div>
                     </div>
-                    <div class="stat-card sl-abs">
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-                            <div class="sc-name">ABS Semanal</div>
-                            <div class="sc-rank"><i class="fas fa-users-slash" style="color:var(--danger);"></i></div>
-                        </div>
-                        <div class="sc-hero"><div class="sc-val" id="sl-abs-sem">0%</div><div class="sc-lbl">TAXA DA SEMANA SELECIONADA</div></div>
+                    <div class="sl-kpi abs">
+                        <div class="sl-kpi-top"><span class="sl-kpi-tit"><i class="fas fa-users-slash"></i> ABS SEMANAL</span><span class="sl-delta" id="sl-abs-sem-delta"></span></div>
+                        <div class="sl-kpi-val" id="sl-abs-sem">—</div>
+                        <div class="sl-kpi-sub" id="sl-abs-sem-sub">&nbsp;</div>
+                        <div class="sl-bar"><div class="sl-bar-fill" id="sl-abs-sem-bar"></div></div>
                     </div>
-                    <div class="stat-card sl-abs">
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-                            <div class="sc-name">ABS Mensal</div>
-                            <div class="sc-rank"><i class="fas fa-chart-pie" style="color:var(--danger);"></i></div>
-                        </div>
-                        <div class="sc-hero"><div class="sc-val" id="sl-abs-mes">0%</div><div class="sc-lbl">TAXA DO MÊS DE REFERÊNCIA</div></div>
+                    <div class="sl-kpi abs">
+                        <div class="sl-kpi-top"><span class="sl-kpi-tit"><i class="fas fa-chart-pie"></i> ABS MENSAL</span><span class="sl-delta" id="sl-abs-mes-delta"></span></div>
+                        <div class="sl-kpi-val" id="sl-abs-mes">—</div>
+                        <div class="sl-kpi-sub" id="sl-abs-mes-sub">&nbsp;</div>
+                        <div class="sl-bar"><div class="sl-bar-fill" id="sl-abs-mes-bar"></div></div>
+                    </div>
+                    <div class="sl-kpi phd">
+                        <div class="sl-kpi-top"><span class="sl-kpi-tit"><i class="fas fa-bolt"></i> PHD DIÁRIO</span><span class="sl-delta" id="sl-phd-dia-delta"></span></div>
+                        <div class="sl-kpi-val" id="sl-phd-dia">—</div>
+                        <div class="sl-kpi-sub" id="sl-phd-dia-sub">&nbsp;</div>
+                        <div class="sl-bar"><div class="sl-bar-fill" id="sl-phd-dia-bar"></div></div>
+                    </div>
+                    <div class="sl-kpi phd">
+                        <div class="sl-kpi-top"><span class="sl-kpi-tit"><i class="fas fa-calendar-week"></i> PHD SEMANAL</span><span class="sl-delta" id="sl-phd-sem-delta"></span></div>
+                        <div class="sl-kpi-val" id="sl-phd-sem">—</div>
+                        <div class="sl-kpi-sub" id="sl-phd-sem-sub">&nbsp;</div>
+                        <div class="sl-bar"><div class="sl-bar-fill" id="sl-phd-sem-bar"></div></div>
+                    </div>
+                    <div class="sl-kpi phd">
+                        <div class="sl-kpi-top"><span class="sl-kpi-tit"><i class="fas fa-chart-area"></i> PHD MENSAL</span><span class="sl-delta" id="sl-phd-mes-delta"></span></div>
+                        <div class="sl-kpi-val" id="sl-phd-mes">—</div>
+                        <div class="sl-kpi-sub" id="sl-phd-mes-sub">&nbsp;</div>
+                        <div class="sl-bar"><div class="sl-bar-fill" id="sl-phd-mes-bar"></div></div>
                     </div>
                 </div>
 
-                <div class="bento-grid" style="grid-template-columns: 1fr 1fr;">
-                    <div class="stat-card" style="padding: 20px; height: 350px;">
-                        <canvas id="slChartPHD"></canvas>
+                <div class="sl-grid">
+                    <div class="sl-panel sl-span2">
+                        <div class="sl-panel-tit"><i class="fas fa-chart-bar"></i> Absenteísmo diário do mês <small>verde = dentro da meta • amarelo = atenção • vermelho = acima</small></div>
+                        <div class="sl-chart"><canvas id="slChartABS"></canvas></div>
                     </div>
-                    <div class="stat-card" style="padding: 20px; height: 350px;">
-                        <canvas id="slChartABS"></canvas>
+                    <div class="sl-panel">
+                        <div class="sl-panel-tit"><i class="fas fa-bolt"></i> PHD da semana x CAP</div>
+                        <div class="sl-chart"><canvas id="slChartPHD"></canvas></div>
+                    </div>
+                    <div class="sl-panel sl-span2">
+                        <div class="sl-panel-tit"><i class="fas fa-table"></i> Quadro da semana</div>
+                        <div id="sl-semana-quadro"></div>
+                    </div>
+                    <div class="sl-panel">
+                        <div class="sl-panel-tit"><i class="fas fa-exclamation-triangle"></i> Maiores ausências do mês</div>
+                        <div id="sl-top-ausencias" class="sl-rank"></div>
                     </div>
                 </div>
             </section>
-            
+
             <section id="view-dia" class="hidden">
                 <div class="upload-compact">
                     <div class="mini-drop">
