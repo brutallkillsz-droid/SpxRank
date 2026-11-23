@@ -520,3 +520,24 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .slt-item b.ok { color: #34d399; } .slt-item b.warn { color: #fbbf24; } .slt-item b.bad { color: #f87171; } .slt-item b.phd { color: #93c5fd; }
 @media (max-width: 1250px) { .sl-turnos { grid-template-columns: 1fr; } }
 @media (max-width: 1600px) and (min-width: 901px) { .sl-turnos { gap: 10px; margin-bottom: 10px; } .slt-item b { font-size: .85rem; } }
+
+
+/* Aviso de turnos no dashboard */
+.sl-aviso { font-size: .72rem; color: var(--text-muted); background: rgba(255,255,255,.03); border: 1px solid var(--glass-border); border-radius: 12px; padding: 8px 12px; margin-bottom: 12px; }
+.sl-aviso:empty { display: none; }
+.sl-aviso i { color: var(--primary); margin-right: 6px; }
+.sl-aviso b.am { color: #fbbf24; } .sl-aviso b.pm { color: #cbd5e1; } .sl-aviso b.sem { color: #f87171; }
+.sl-aviso.bad { color: #fecaca; background: rgba(239,68,68,.1); border-color: rgba(239,68,68,.35); }
+.sl-aviso.bad i { color: #f87171; }
+
+/* Histórico de escalas separado por líder */
+.hist-chip { display: inline-block; vertical-align: middle; font-size: .6rem; font-weight: 800; letter-spacing: .4px; border-radius: 6px; padding: 2px 7px; margin-left: 6px; background: rgba(255,255,255,.06); color: var(--text-muted); }
+.hist-chip.am { background: rgba(251,191,36,.15); color: #fbbf24; }
+.hist-chip.pm { background: rgba(148,163,184,.18); color: #e2e8f0; }
+.hist-chip.sem { background: rgba(239,68,68,.15); color: #f87171; }
+.hist-chip.esc { background: rgba(99,102,241,.18); color: #a5b4fc; }
+.hist-grupo td { text-align: left !important; font-size: .7rem !important; font-weight: 800; letter-spacing: .8px; padding: 9px 12px !important; background: rgba(255,255,255,.04); }
+.hist-grupo.am td { color: #fbbf24 !important; border-left: 3px solid #fbbf24 !important; }
+.hist-grupo.pm td { color: #e2e8f0 !important; border-left: 3px solid #94a3b8 !important; }
+.hist-grupo.sem td { color: #f87171 !important; border-left: 3px solid #ef4444 !important; }
+.hist-grupo td span { color: var(--text-muted); font-weight: 600; }
