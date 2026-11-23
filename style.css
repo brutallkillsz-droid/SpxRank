@@ -461,3 +461,62 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 }
 @media (max-width: 1250px) { .sl-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 900px) { .sl-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .sl-grid { grid-template-columns: 1fr; } }
+
+/* Painel "Maiores ausências do mês" */
+.aus-resumo { display: flex; align-items: center; gap: 14px; padding: 8px 10px; margin-bottom: 10px; background: rgba(255,255,255,.03); border: 1px solid var(--glass-border); border-radius: 12px; }
+.aus-resumo > div:not(.aus-tabs) { display: flex; flex-direction: column; line-height: 1.1; }
+.aus-resumo b { font-size: 1.05rem; color: #fff; }
+.aus-resumo span { font-size: .58rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: .6px; font-weight: 700; }
+.aus-resumo .f b { color: #f87171; } .aus-resumo .at b { color: #60a5fa; }
+.aus-tabs { margin-left: auto; display: flex; background: rgba(0,0,0,.25); border-radius: 9px; padding: 2px; }
+.aus-tabs button { background: transparent; border: none; color: var(--text-muted); font-family: var(--font-main); font-size: .62rem; font-weight: 700; padding: 5px 8px; border-radius: 7px; cursor: pointer; }
+.aus-tabs button.ativo { background: var(--primary); color: #fff; }
+#sl-top-ausencias { display: flex; flex-direction: column; gap: 6px; }
+.aus-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 12px; background: rgba(255,255,255,.02); border: 1px solid transparent; border-left: 3px solid rgba(148,163,184,.35); transition: .2s; }
+.aus-item:hover { background: rgba(255,255,255,.05); border-color: var(--glass-border); }
+.aus-item.atencao { border-left-color: #fbbf24; }
+.aus-item.critico { border-left-color: #ef4444; background: linear-gradient(90deg, rgba(239,68,68,.08), rgba(255,255,255,.02) 60%); }
+.aus-avatar { width: 32px; height: 32px; border-radius: 10px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: .7rem; font-weight: 800; color: #fff; background: linear-gradient(135deg, #475569, #334155); }
+.aus-item.atencao .aus-avatar { background: linear-gradient(135deg, #d97706, #92400e); }
+.aus-item.critico .aus-avatar { background: linear-gradient(135deg, #ef4444, #991b1b); box-shadow: 0 0 14px rgba(239,68,68,.35); }
+.aus-info { flex: 1; min-width: 0; }
+.aus-nome { font-size: .74rem; font-weight: 800; color: #f1f5f9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 6px; }
+.aus-turno { font-size: .55rem; font-weight: 800; color: var(--text-muted); border: 1px solid var(--glass-border); border-radius: 5px; padding: 0 4px; }
+.aus-tag { font-size: .55rem; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; border-radius: 5px; padding: 1px 5px; }
+.aus-tag.critico { background: rgba(239,68,68,.18); color: #f87171; }
+.aus-tag.atencao { background: rgba(251,191,36,.15); color: #fbbf24; }
+.aus-cal { display: flex; gap: 2px; margin: 5px 0 4px; }
+.aus-cal i { flex: 1; max-width: 7px; height: 7px; border-radius: 2px; background: rgba(255,255,255,.09); }
+.aus-cal i.dom { opacity: .55; }
+.aus-cal i.fut { background: rgba(255,255,255,.03); }
+.aus-cal i.f { background: #ef4444; box-shadow: 0 0 5px rgba(239,68,68,.7); opacity: 1; }
+.aus-cal i.at { background: #3b82f6; box-shadow: 0 0 5px rgba(59,130,246,.7); opacity: 1; }
+.aus-det { display: flex; gap: 8px; font-size: .6rem; font-weight: 700; }
+.aus-det .f { color: #f87171; } .aus-det .at { color: #60a5fa; } .aus-det .ult { color: var(--text-muted); font-weight: 500; margin-left: auto; }
+.aus-total { text-align: center; flex-shrink: 0; min-width: 34px; }
+.aus-total b { display: block; font-size: 1.25rem; line-height: 1; color: #fff; }
+.aus-total span { font-size: .55rem; color: var(--text-muted); text-transform: uppercase; }
+.aus-mais { margin-top: 4px; background: transparent; border: 1px dashed var(--glass-border); color: var(--text-muted); border-radius: 10px; padding: 7px; font-family: var(--font-main); font-size: .7rem; font-weight: 700; cursor: pointer; }
+.aus-mais:hover { color: #fff; border-color: var(--primary); }
+.aus-resumo { flex-wrap: wrap; gap: 10px 14px; }
+.aus-tabs button { padding: 5px 7px; }
+.aus-nome { overflow: visible; }
+.aus-nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.aus-turno, .aus-tag { flex-shrink: 0; }
+
+/* Comparativo AM x PM */
+.sl-turnos { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px; }
+.slt-card { background: linear-gradient(160deg, rgba(22,22,30,.85), rgba(10,10,16,.85)); border: 1px solid var(--glass-border); border-radius: 16px; padding: 10px 14px 12px; position: relative; overflow: hidden; }
+.slt-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; }
+.slt-card.am::before { background: #fbbf24; } .slt-card.pm::before { background: #94a3b8; }
+.slt-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; }
+.slt-head span { font-size: .8rem; font-weight: 800; color: #fff; }
+.slt-card.am .slt-head i { color: #fbbf24; } .slt-card.pm .slt-head i { color: #94a3b8; }
+.slt-head small { font-size: .65rem; color: var(--text-muted); }
+.slt-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+.slt-item { background: rgba(255,255,255,.03); border-radius: 10px; padding: 6px 8px; display: flex; flex-direction: column; gap: 2px; }
+.slt-item span { font-size: .56rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; white-space: nowrap; }
+.slt-item b { font-size: .95rem; color: #fff; }
+.slt-item b.ok { color: #34d399; } .slt-item b.warn { color: #fbbf24; } .slt-item b.bad { color: #f87171; } .slt-item b.phd { color: #93c5fd; }
+@media (max-width: 1250px) { .sl-turnos { grid-template-columns: 1fr; } }
+@media (max-width: 1600px) and (min-width: 901px) { .sl-turnos { gap: 10px; margin-bottom: 10px; } .slt-item b { font-size: .85rem; } }
