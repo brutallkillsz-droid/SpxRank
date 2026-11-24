@@ -83,7 +83,8 @@ const escColNome = id => {
 
 const dcLayout = [
     { id: 'dc', title: 'DOBLE CHECK', rows: 2, cols: 7, mesas: true, especiais: { 6: 'TRATATIVAS' } },   // 14 mesas (dc_0 = Mesa 1 ... dc_13 = Mesa 14); a Mesa 7 é a de tratativas
-    { id: 'alim', title: 'ALIMENTAR MESAS (MOVIMENTAR GAIOLAS)', rows: 1, cols: 4 }
+    { id: 'alim', title: 'ALIMENTAR MESAS (MOVIMENTAR GAIOLAS)', rows: 1, cols: 4 },
+    { id: 'pctn', title: 'PACOTINHO', rows: 1, cols: 4 }
 ];
 
 let operadoresList = []; 
