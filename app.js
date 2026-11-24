@@ -63,7 +63,7 @@ const escRows = ['ABASTECEDOR', 'BIPADOR', 'ETIQUETADOR', 'SORTING MESA', 'SORTI
 const escColunas = [
     { id: 0, nome: 'Mesa1' }, { id: 1, nome: 'Mesa2' }, { id: 2, nome: 'Mesa3' }, { id: 3, nome: 'Mesa4' },
     { id: 4, nome: 'Mesa5' }, { id: 5, nome: 'Mesa6' }, { id: 6, nome: 'Mesa7' }, { id: 7, nome: 'Mesa8' },
-    { id: 8, nome: 'Mesa9' }, { id: 12, nome: 'Mesa10' }, { id: 9, nome: 'HANDOVER' }, { id: 10, nome: 'Gaioleiro 1 pct' }, { id: 11, nome: 'XPT' }
+    { id: 8, nome: 'Mesa9' }, { id: 12, nome: 'Mesa10' }, { id: 9, nome: 'HANDOVER' }, { id: 10, nome: 'Gaioleiro' }, { id: 11, nome: 'XPT' }
 ];
 const escCols = escColunas.map(c => c.nome);
 // Nas linhas ABASTECEDOR e SORTING MESA, as mesas são em dupla (1-2, 3-4, 5-6, 7-8, 9-10)
