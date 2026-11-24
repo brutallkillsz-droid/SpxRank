@@ -61,16 +61,25 @@ module.exports = async (req, res) => {
         if (!/^Controle-[A-Za-zÀ-ú]+$/.test(aba)) { res.statusCode = 400; return res.end(JSON.stringify({ erro: 'Aba inválida.' })); }
         if (!process.env.GOOGLE_SERVICE_ACCOUNT) { res.statusCode = 500; return res.end(JSON.stringify({ erro: 'GOOGLE_SERVICE_ACCOUNT não configurada na Vercel.' })); }
         const conta = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT);
+        // SHEET_ID aceita só o ID ou o link inteiro da planilha (com ou sem espaços/aspas)
+        const bruto = String(process.env.SHEET_ID || SHEET_ID_PADRAO).trim().replace(/^["'\s]+|["'\s]+$/g, '');
+        const achado = bruto.match(/\/d\/([a-zA-Z0-9-_]+)/);
+        const sheetId = achado ? achado[1] : bruto.split(/[\/#?\s]/)[0].replace(/[^a-zA-Z0-9-_]/g, '');
+        const idCurto = sheetId.slice(0, 6) + '...' + sheetId.slice(-4);
         const token = await obterToken(conta);
         const range = encodeURIComponent(`'${aba}'!A1:AZ600`);
-        const r = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${process.env.SHEET_ID || SHEET_ID_PADRAO}/values/${range}?valueRenderOption=FORMATTED_VALUE`, {
+        const r = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}?valueRenderOption=FORMATTED_VALUE`, {
             headers: { Authorization: 'Bearer ' + token }
         });
         const j = await r.json();
         if (!r.ok) {
             const msg = j.error && j.error.message ? j.error.message : 'erro ' + r.status;
             res.statusCode = r.status === 403 ? 403 : (r.status === 400 ? 404 : 502);
-            const dica = r.status === 403 ? ` Compartilhe a planilha (Leitor) com ${conta.client_email}.` : '';
+            let dica = '';
+            if (r.status === 403) dica = ` Compartilhe a planilha (Leitor) com ${conta.client_email}.`;
+            if (r.status === 404) dica = ` A planilha com o ID ${idCurto} não foi encontrada: confira o SHEET_ID na Vercel (pode colar o link inteiro da planilha).`;
+            if (/not supported for this document/i.test(msg)) dica = ' A planilha é um arquivo Excel (.xlsx). Abra-a e use Arquivo > Salvar como Planilhas Google, e use o link da nova.';
+            if (/Unable to parse range/i.test(msg)) dica = ` A aba "${aba}" não existe na planilha ${idCurto}.`;
             return res.end(JSON.stringify({ erro: `Google: ${msg}.${dica}` }));
         }
         res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=60');
