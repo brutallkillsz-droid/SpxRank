@@ -152,6 +152,7 @@
                             <button type="button" onclick="slMudarSemana(-1)" title="Semana anterior"><i class="fas fa-chevron-left"></i></button>
                             <input type="week" id="sl-week-select" onchange="slAnimar = true; renderSiteliderDashboard()">
                             <button type="button" onclick="slMudarSemana(1)" title="Próxima semana"><i class="fas fa-chevron-right"></i></button>
+                            <button type="button" class="sem-atual" onclick="slSemanaAtual()" title="Voltar para a semana de hoje">Hoje</button>
                         </div>
                         <button type="button" class="sl-meta-btn" onclick="slEditarMeta()" title="Alterar meta de ABS"><i class="fas fa-bullseye"></i> Meta ABS <b id="sl-meta-abs">5%</b></button>
                         <button type="button" class="sl-icon-btn" onclick="renderSiteliderDashboard()" title="Atualizar"><i class="fas fa-sync"></i></button>
@@ -370,11 +371,15 @@
                     <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                         <h2 style="font-weight: 800; letter-spacing: -1px;">Escala de Lugares Semanal (Quarta a Segunda)</h2>
                         <div class="admin-only flex-container" style="display:flex; gap: 10px;">
-                            <button class="btn-ghost" style="border-color: #3b82f6; color: #3b82f6;" onclick="replicateWednesday()" title="Copia a escala de Quarta para todos os dias"><i class="fas fa-copy"></i> Replicar Quarta</button>
-                            <button class="btn-ghost" style="border-color: var(--accent); color: var(--accent);" onclick="autoDistributeAllLugares()">Sortear Semana Toda</button>
-                            <button class="btn-ghost" style="border-color: var(--danger); color: var(--danger);" onclick="clearEscalaSemana()"><i class="fas fa-trash"></i> Limpar Semana</button>
-                            <input type="week" id="hist-date-input" class="btn-ghost" style="background: rgba(255,255,255,0.05); color: #fff; border-color: var(--glass-border);" onchange="updateDatesFromWeek('hist-date-input', 'lugares')">
-                            <button class="btn-primary" style="width:auto; padding: 10px 30px;" onclick="archiveEscalaSemanal()">Salvar Histórico Semanal</button>
+                            <button class="btn-ghost esc-acao" style="border-color: #3b82f6; color: #3b82f6;" onclick="replicateWednesday()" title="Copia a escala de Quarta para todos os dias"><i class="fas fa-copy"></i> Replicar Quarta</button>
+                            <button class="btn-ghost esc-acao" style="border-color: var(--accent); color: var(--accent);" onclick="autoDistributeAllLugares()">Sortear Semana Toda</button>
+                            <button class="btn-ghost esc-acao" style="border-color: var(--danger); color: var(--danger);" onclick="clearEscalaSemana()"><i class="fas fa-trash"></i> Limpar Semana</button>
+                            <div class="sl-seg semana-nav">
+                                <button type="button" onclick="escMudarSemana('lugares', -1)" title="Semana anterior"><i class="fas fa-chevron-left"></i></button>
+                                <input type="week" id="hist-date-input" onchange="escTrocarSemana('lugares')">
+                                <button type="button" onclick="escMudarSemana('lugares', 1)" title="Próxima semana"><i class="fas fa-chevron-right"></i></button>
+                            </div>
+                            <button class="btn-primary esc-acao" style="width:auto; padding: 10px 30px;" onclick="archiveEscalaSemanal()">Salvar Histórico Semanal</button>
                         </div>
                     </div>
                     <div class="esc-board" id="escala-semanal-container"></div>
@@ -406,10 +411,14 @@
                     <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                         <h2 style="font-weight: 800; letter-spacing: -1px;">Escala Doblecheck (Alternada)</h2>
                         <div class="admin-only flex-container" style="display:flex; gap: 10px;">
-                            <button class="btn-ghost" style="border-color: var(--accent); color: var(--accent);" onclick="autoDistributeAllDc()">Sortear Semana Toda</button>
-                            <button class="btn-ghost" style="border-color: var(--danger); color: var(--danger);" onclick="clearEscalaDc()"><i class="fas fa-trash"></i> Limpar Semana</button>
-                            <input type="week" id="hist-date-input-dc" class="btn-ghost" style="background: rgba(255,255,255,0.05); color: #fff; border-color: var(--glass-border);" onchange="updateDatesFromWeek('hist-date-input-dc', 'dc')">
-                            <button class="btn-primary" style="width:auto; padding: 10px 30px;" onclick="archiveEscalaDc()">Salvar Histórico Semanal</button>
+                            <button class="btn-ghost esc-acao" style="border-color: var(--accent); color: var(--accent);" onclick="autoDistributeAllDc()">Sortear Semana Toda</button>
+                            <button class="btn-ghost esc-acao" style="border-color: var(--danger); color: var(--danger);" onclick="clearEscalaDc()"><i class="fas fa-trash"></i> Limpar Semana</button>
+                            <div class="sl-seg semana-nav">
+                                <button type="button" onclick="escMudarSemana('dc', -1)" title="Semana anterior"><i class="fas fa-chevron-left"></i></button>
+                                <input type="week" id="hist-date-input-dc" onchange="escTrocarSemana('dc')">
+                                <button type="button" onclick="escMudarSemana('dc', 1)" title="Próxima semana"><i class="fas fa-chevron-right"></i></button>
+                            </div>
+                            <button class="btn-primary esc-acao" style="width:auto; padding: 10px 30px;" onclick="archiveEscalaDc()">Salvar Histórico Semanal</button>
                         </div>
                     </div>
                     <div class="esc-board" id="escala-dc-container"></div>
@@ -439,7 +448,15 @@
             <section id="view-hist-escala" class="hidden">
                 <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
                     <h2 style="font-weight: 800; letter-spacing: -1px;">Histórico de Escalas Semanais (Lugares)</h2>
+<div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                        <div class="sl-seg semana-nav">
+                            <button type="button" onclick="histMudarSemana('lugares', -1)" title="Semana anterior"><i class="fas fa-chevron-left"></i></button>
+                            <input type="week" id="hist-sel-lugares" onchange="histTodas['lugares'] = false; renderHistEscala('lugares')">
+                            <button type="button" onclick="histMudarSemana('lugares', 1)" title="Próxima semana"><i class="fas fa-chevron-right"></i></button>
+                        </div>
+                        <div class="sl-seg"><button type="button" id="hist-todas-lugares" onclick="histTodas['lugares'] = !histTodas['lugares']; renderHistEscala('lugares')"><i class="fas fa-list"></i> Todas as semanas</button></div>
                     <button class="btn-ghost admin-only block-container" style="color:var(--danger); border-color:rgba(239, 68, 68, 0.2);" onclick="clearEscalaHistory('lugares')"><i class="fas fa-trash"></i> Limpar Todo o Histórico</button>
+                    </div>
                 </div>
                 <div id="hist-escala-list" class="m-list"></div>
             </section>
@@ -447,7 +464,15 @@
             <section id="view-hist-escala-dc" class="hidden">
                 <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
                     <h2 style="font-weight: 800; letter-spacing: -1px;">Histórico de Escalas Semanais (Doblecheck)</h2>
+<div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                        <div class="sl-seg semana-nav">
+                            <button type="button" onclick="histMudarSemana('dc', -1)" title="Semana anterior"><i class="fas fa-chevron-left"></i></button>
+                            <input type="week" id="hist-sel-dc" onchange="histTodas['dc'] = false; renderHistEscala('dc')">
+                            <button type="button" onclick="histMudarSemana('dc', 1)" title="Próxima semana"><i class="fas fa-chevron-right"></i></button>
+                        </div>
+                        <div class="sl-seg"><button type="button" id="hist-todas-dc" onclick="histTodas['dc'] = !histTodas['dc']; renderHistEscala('dc')"><i class="fas fa-list"></i> Todas as semanas</button></div>
                     <button class="btn-ghost admin-only block-container" style="color:var(--danger); border-color:rgba(239, 68, 68, 0.2);" onclick="clearEscalaHistory('dc')"><i class="fas fa-trash"></i> Limpar Todo o Histórico</button>
+                    </div>
                 </div>
                 <div id="hist-escala-dc-list" class="m-list"></div>
             </section>
