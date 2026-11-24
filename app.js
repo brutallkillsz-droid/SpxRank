@@ -73,14 +73,16 @@ const ESC_LINHAS_DUPLA = [0, 3];
 const ESC_LINHA_RUAS = 4;
 // Sorting Ruas: uma vaga por rua, de A até I (salvas na linha 4 com as chaves rA ... rI)
 const ESC_RUAS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'].map(l => ({ id: 'r' + l, letra: l, nome: 'Rua ' + l }));
+const ESC_VAGAS_RUA = 5;   // funcionários por rua (vagas salvas como rA1 ... rA5)
 const escColNome = id => {
-    const rua = ESC_RUAS.find(r => r.id === String(id)); if (rua) return rua.nome;
+    const t = String(id);
+    const rua = ESC_RUAS.find(r => r.id === t || (t.startsWith(r.id) && /^\d+$/.test(t.slice(r.id.length))));
+    if (rua) return t === rua.id ? rua.nome : `${rua.nome} (vaga ${t.slice(rua.id.length)})`;
     return (escColunas.find(c => String(c.id) === String(id)) || {}).nome || ('Coluna ' + id);
 };
 
 const dcLayout = [
     { id: 'dc', title: 'DOBLE CHECK', rows: 2, cols: 7, mesas: true, especiais: { 6: 'TRATATIVAS' } },   // 14 mesas (dc_0 = Mesa 1 ... dc_13 = Mesa 14); a Mesa 7 é a de tratativas
-    { id: 'trat', title: 'TRATATIVAS DE ETIQUETAGEM', rows: 1, cols: 4 },
     { id: 'alim', title: 'ALIMENTAR MESAS (MOVIMENTAR GAIOLAS)', rows: 1, cols: 4 }
 ];
 
@@ -1011,11 +1013,13 @@ function autoDistributeOperators(diaId, autoSave = true) {
         if(pool.length === 0) break;
     }
     // Sorting Ruas (A até I), pulando as ruas fechadas
-    for (const rua of ESC_RUAS) {
-        if (pool.length === 0) break;
-        if (celulaFechada(liveEscalaSemana, ESC_LINHA_RUAS, rua.id)) continue;
-        let foundIdx = pool.findIndex(op => lastRoles[op] !== ESC_LINHA_RUAS); if (foundIdx === -1) foundIdx = 0;
-        liveEscalaSemana[diaId].grid[ESC_LINHA_RUAS][rua.id] = pool.splice(foundIdx, 1)[0];
+    for (let v = 1; v <= ESC_VAGAS_RUA; v++) {
+        for (const rua of ESC_RUAS) {
+            if (pool.length === 0) break;
+            if (celulaFechada(liveEscalaSemana, ESC_LINHA_RUAS, rua.id)) continue;
+            let foundIdx = pool.findIndex(op => lastRoles[op] !== ESC_LINHA_RUAS); if (foundIdx === -1) foundIdx = 0;
+            liveEscalaSemana[diaId].grid[ESC_LINHA_RUAS][rua.id + v] = pool.splice(foundIdx, 1)[0];
+        }
     }
 
     if(autoSave) dbFirebase.ref(refEsc()).set(liveEscalaSemana).then(() => { showToast("Sorteio feito para " + diaId.toUpperCase() + "!"); }).catch(e => console.error(e));
@@ -2056,6 +2060,7 @@ function marcarConflitosDia(diaId, isDc) {
 function celulaFechada(obj, rIdx, cIdx) {
     const f = (obj && obj.mesasFechadas) || {};
     if (/^\d+$/.test(String(cIdx))) cIdx = Number(cIdx);
+    else if (/^r[A-Z]\d+$/.test(String(cIdx))) return !!f[String(cIdx).slice(0, 2)];   // vaga de rua: fecha com a rua
     if (ESC_LINHAS_DUPLA.includes(rIdx) && ESC_PAR[cIdx] !== undefined) return !!(f[cIdx] && f[ESC_PAR[cIdx]]);   // dupla: só fecha se as duas fecharem
     return !!f[cIdx];
 }
@@ -2064,8 +2069,8 @@ function htmlGradeLugares(diaConf, escDia, isAdm, info) {
     const f = liveEscalaSemana.mesasFechadas || {};
     const cab = (comBotao) => `<tr class="esc-gray-light"><th style="width:8%">OPERADOR</th>${escColunas.map(c => {
         const fechada = !!f[c.id];
-        const btn = isAdm && comBotao ? `<button type="button" class="mesa-lock ${fechada ? 'fechada' : ''}" onclick="toggleMesa('lugares', ${c.id})" title="${fechada ? 'Reabrir' : 'Fechar'} ${c.nome} na semana inteira"><i class="fas ${fechada ? 'fa-lock' : 'fa-lock-open'}"></i></button>` : '';
-        return `<th class="${fechada ? 'mesa-fechada-th' : ''}">${c.nome.toUpperCase()}${fechada ? '<span class="mesa-tag">FECHADA</span>' : ''}${btn}</th>`;
+        const btn = isAdm && comBotao ? botaoMesa('lugares', c.id, fechada, c.nome) : '';
+        return `<th class="${fechada ? 'mesa-fechada-th' : ''}"><div class="mesa-th">${c.nome.toUpperCase()}${btn}</div>${fechada ? '<span class="mesa-tag">FECHADA</span>' : ''}</th>`;
     }).join('')}</tr>`;
     const celula = (rIdx, cIdx, colspan) => {
         const span = colspan ? 'colspan="2"' : '';
@@ -2086,12 +2091,13 @@ function htmlGradeLugares(diaConf, escDia, isAdm, info) {
     let h = `<table class="esc-table">${cab(true)}`;
     escRows.forEach((_, rIdx) => { if (rIdx !== ESC_LINHA_RUAS) h += linha(rIdx); });
     h += `</table>`;
-    // SORTING RUAS: grade separada, uma vaga por rua (A até I)
-    h += `<div class="esc-ruas-tit">SORTING RUAS</div><table class="esc-table esc-ruas"><tr class="esc-gray-light">${ESC_RUAS.map(r => {
+    // SORTING RUAS: grade separada, ruas A até I com 5 vagas cada
+    let ruas = `<div class="esc-ruas-tit">SORTING RUAS</div><table class="esc-table esc-ruas"><tr class="esc-gray-light">${ESC_RUAS.map(r => {
         const fechada = !!f[r.id];
-        const btn = isAdm ? `<button type="button" class="mesa-lock ${fechada ? 'fechada' : ''}" onclick="toggleMesa('lugares', '${r.id}')" title="${fechada ? 'Reabrir' : 'Fechar'} a ${r.nome} na semana inteira"><i class="fas ${fechada ? 'fa-lock' : 'fa-lock-open'}"></i></button>` : '';
-        return `<th class="${fechada ? 'mesa-fechada-th' : ''}" style="width:${(100 / ESC_RUAS.length).toFixed(2)}%;">${r.letra}${fechada ? '<span class="mesa-tag">FECHADA</span>' : ''}${btn}</th>`;
-    }).join('')}</tr><tr>${ESC_RUAS.map(r => celula(ESC_LINHA_RUAS, r.id, false)).join('')}</tr></table>`;
+        return `<th class="${fechada ? 'mesa-fechada-th' : ''}" style="width:${(100 / ESC_RUAS.length).toFixed(2)}%;"><div class="mesa-th">${r.letra}${isAdm ? botaoMesa('lugares', r.id, fechada, r.nome) : ''}</div>${fechada ? '<span class="mesa-tag">FECHADA</span>' : ''}</th>`;
+    }).join('')}</tr>`;
+    for (let v = 1; v <= ESC_VAGAS_RUA; v++) ruas += `<tr>${ESC_RUAS.map(r => celula(ESC_LINHA_RUAS, r.id + v, false)).join('')}</tr>`;
+    h += ruas + '</table>';
     return h;
 }
 
@@ -2109,7 +2115,7 @@ function htmlGradeDc(diaConf, escDia, isAdm, info) {
                 const fechada = sec.mesas && !!f[n];
                 let rot = '';
                 if (sec.mesas) {
-                    const btn = isAdm ? `<button type="button" class="mesa-lock ${fechada ? 'fechada' : ''}" onclick="toggleMesa('dc', ${n})" title="${fechada ? 'Reabrir' : 'Fechar'} a Mesa ${n + 1} na semana inteira"><i class="fas ${fechada ? 'fa-lock' : 'fa-lock-open'}"></i></button>` : '';
+                    const btn = isAdm ? botaoMesa('dc', n, fechada, `Mesa ${n + 1}`) : '';
                     const esp = (sec.especiais || {})[n];
                     rot = `<div class="dc-mesa-lbl ${fechada ? 'fechada' : ''} ${esp ? 'especial' : ''}">MESA ${n + 1}${esp ? `<span class="dc-esp">${esp}</span>` : ''}${btn}</div>`;
                 }
@@ -2131,27 +2137,38 @@ async function toggleMesa(tipo, chave) {
     const ref = tipo === 'dc' ? refEscDc() : refEsc();
     const f = Object.assign({}, obj.mesasFechadas || {});
     const fechar = !f[chave];
-    const nome = tipo === 'dc' ? `a Mesa ${chave + 1} do Doblecheck` : `a ${escColNome(chave)}`;   // ex.: a Mesa3, a Rua B
+    const nome = tipo === 'dc' ? `Mesa ${chave + 1} do Doblecheck` : escColNome(chave);
     const up = {};
+    let liberadas = 0;
     if (fechar) {
         f[chave] = true;
-        const liberar = [];
         escDiasConf.forEach(d => {
             const g = (obj[d.id] && obj[d.id].grid) || {};
-            if (tipo === 'dc') { if (g[`dc_${chave}`]) liberar.push(`${d.id}/grid/dc_${chave}`); }
-            else escRows.forEach((_, r) => {
+            if (tipo === 'dc') { if (g[`dc_${chave}`]) { up[`${d.id}/grid/dc_${chave}`] = ''; liberadas++; } return; }
+            if (String(chave).startsWith('r')) {                       // rua: libera as 5 vagas
+                for (let v = 1; v <= ESC_VAGAS_RUA; v++) if (g[ESC_LINHA_RUAS] && g[ESC_LINHA_RUAS][chave + v]) { up[`${d.id}/grid/${ESC_LINHA_RUAS}/${chave + v}`] = ''; liberadas++; }
+                return;
+            }
+            escRows.forEach((_, r) => {
+                if (r === ESC_LINHA_RUAS) return;
                 const alvo = ESC_LINHAS_DUPLA.includes(r) && ESC_PAR_SEGUNDA.has(chave) ? Number(Object.keys(ESC_PAR).find(k => ESC_PAR[k] === chave)) : chave;
-                if (g[r] && g[r][alvo] && celulaFechada({ mesasFechadas: f }, r, alvo)) liberar.push(`${d.id}/grid/${r}/${alvo}`);
+                if (g[r] && g[r][alvo] && celulaFechada({ mesasFechadas: f }, r, alvo)) { up[`${d.id}/grid/${r}/${alvo}`] = ''; liberadas++; }
             });
         });
-        if (!confirm(`Fechar ${nome} na semana inteira?\n\nO sorteio não vai colocar ninguém nela.${liberar.length ? `\n${liberar.length} posição(ões) que já tinham pessoas nessa mesa serão liberadas.` : ''}`)) return;
-        liberar.forEach(c => { up[c] = ''; });
         up[`mesasFechadas/${chave}`] = true;
     } else {
         up[`mesasFechadas/${chave}`] = null;
     }
+    // atualiza na hora na tela (o Firebase confirma em seguida)
+    obj.mesasFechadas = f; if (!fechar) delete obj.mesasFechadas[chave];
     try {
         await dbFirebase.ref(ref).update(up);
-        showToast(fechar ? `${nome.charAt(2).toUpperCase() + nome.slice(3)} fechada na semana.` : `${nome.charAt(2).toUpperCase() + nome.slice(3)} reaberta.`);
+        showToast(fechar ? `${nome} fechada na semana${liberadas ? ` • ${liberadas} vaga(s) liberada(s)` : ''}` : `${nome} reaberta`);
     } catch (e) { console.error(e); showToast('Erro ao salvar. Verifique a internet.'); }
+}
+
+// Interruptor bonito de abrir/fechar mesa (verde = aberta, vermelho = fechada)
+function botaoMesa(tipo, chave, fechada, nome) {
+    const arg = typeof chave === 'string' ? `'${chave}'` : chave;
+    return `<button type="button" class="mesa-sw ${fechada ? 'off' : ''}" onclick="toggleMesa('${tipo}', ${arg})" title="${fechada ? 'Reabrir' : 'Fechar'} ${nome} na semana inteira" aria-label="${fechada ? 'Reabrir' : 'Fechar'} ${nome}"><span></span></button>`;
 }
