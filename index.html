@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Painel Liderança | HUB LMG-48</title>
     
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
@@ -150,7 +150,7 @@
                         </div>
                         <div class="sl-seg">
                             <button type="button" onclick="slMudarSemana(-1)" title="Semana anterior"><i class="fas fa-chevron-left"></i></button>
-                            <input type="week" id="sl-week-select" onchange="renderSiteliderDashboard()">
+                            <input type="week" id="sl-week-select" onchange="slAnimar = true; renderSiteliderDashboard()">
                             <button type="button" onclick="slMudarSemana(1)" title="Próxima semana"><i class="fas fa-chevron-right"></i></button>
                         </div>
                         <button type="button" class="sl-meta-btn" onclick="slEditarMeta()" title="Alterar meta de ABS"><i class="fas fa-bullseye"></i> Meta ABS <b id="sl-meta-abs">5%</b></button>
