@@ -58,10 +58,28 @@ const escDiasConf = [
 ];
 
 const escRows = ['ABASTECEDOR', 'BIPADOR', 'ETIQUETADOR', 'SORTING MESA', 'SORTING RUAS'];
-const escCols = ['Mesa1', 'Mesa2', 'Mesa3', 'Mesa4', 'Mesa5', 'Mesa6', 'Mesa7', 'Mesa8', 'Mesa9 VOLUMOSO', 'HANDOVER', 'Gaioleiro 1 pct', 'MESA XPT'];
+// Colunas da escala de lugares. O "id" é o que fica salvo no Firebase (não mude os ids existentes);
+// a ordem do array é a ordem na tela. Mesa10 ganhou o id 12 para não bagunçar escalas antigas.
+const escColunas = [
+    { id: 0, nome: 'Mesa1' }, { id: 1, nome: 'Mesa2' }, { id: 2, nome: 'Mesa3' }, { id: 3, nome: 'Mesa4' },
+    { id: 4, nome: 'Mesa5' }, { id: 5, nome: 'Mesa6' }, { id: 6, nome: 'Mesa7' }, { id: 7, nome: 'Mesa8' },
+    { id: 8, nome: 'Mesa9' }, { id: 12, nome: 'Mesa10' }, { id: 9, nome: 'HANDOVER' }, { id: 10, nome: 'Gaioleiro 1 pct' }, { id: 11, nome: 'XPT' }
+];
+const escCols = escColunas.map(c => c.nome);
+// Nas linhas ABASTECEDOR e SORTING MESA, as mesas são em dupla (1-2, 3-4, 5-6, 7-8, 9-10)
+const ESC_PAR = { 0: 1, 2: 3, 4: 5, 6: 7, 8: 12 };
+const ESC_PAR_SEGUNDA = new Set([1, 3, 5, 7, 12]);
+const ESC_LINHAS_DUPLA = [0, 3];
+const ESC_LINHA_RUAS = 4;
+// Sorting Ruas: uma vaga por rua, de A até I (salvas na linha 4 com as chaves rA ... rI)
+const ESC_RUAS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'].map(l => ({ id: 'r' + l, letra: l, nome: 'Rua ' + l }));
+const escColNome = id => {
+    const rua = ESC_RUAS.find(r => r.id === String(id)); if (rua) return rua.nome;
+    return (escColunas.find(c => String(c.id) === String(id)) || {}).nome || ('Coluna ' + id);
+};
 
 const dcLayout = [
-    { id: 'dc', title: 'DOBLE CHECK', rows: 3, cols: 4 },
+    { id: 'dc', title: 'DOBLE CHECK', rows: 2, cols: 7, mesas: true, especiais: { 6: 'TRATATIVAS' } },   // 14 mesas (dc_0 = Mesa 1 ... dc_13 = Mesa 14); a Mesa 7 é a de tratativas
     { id: 'trat', title: 'TRATATIVAS DE ETIQUETAGEM', rows: 1, cols: 4 },
     { id: 'alim', title: 'ALIMENTAR MESAS (MOVIMENTAR GAIOLAS)', rows: 1, cols: 4 }
 ];
@@ -922,7 +940,7 @@ function getAbsenteesForDay(diaId, isDc = false) {
 // ==========================================
 function clearEscalaSemana() {
     if(confirm("Tem certeza que deseja limpar TODA a escala de Lugares?")) {
-        let oldData = {...liveEscalaSemana}; liveEscalaSemana = {};
+        let oldData = {...liveEscalaSemana}; liveEscalaSemana = {}; if (oldData.mesasFechadas) liveEscalaSemana.mesasFechadas = oldData.mesasFechadas;
         escDiasConf.forEach(d => { let prevData = oldData[d.id] ? oldData[d.id].dataDia : '(inserir data)'; let prevVis = oldData[d.id] && oldData[d.id].visible !== undefined ? oldData[d.id].visible : false; liveEscalaSemana[d.id] = { hc: '16', pct: '0', cap: '16980', dw: '0', phd: '0', capphd: '630', dataDia: prevData, visible: prevVis, grid: {} }; });
         dbFirebase.ref(refEsc()).set(liveEscalaSemana).then(() => { showToast("Escala limpa com sucesso!"); }).catch(e => console.error(e));
     }
@@ -979,16 +997,25 @@ function autoDistributeOperators(diaId, autoSave = true) {
     let pool = operadoresList.filter(op => !absentees.includes(op));
     pool.sort(() => Math.random() - 0.5); 
 
-    for (let cIdx = 0; cIdx < escCols.length; cIdx++) {
+    for (const col of escColunas) {
+        const cIdx = col.id;
         for (let rIdx = 0; rIdx < escRows.length; rIdx++) {
             if (pool.length === 0) break;
-            const isMergedRow = (rIdx === 0 || rIdx === 3); const isSkipCol = (isMergedRow && (cIdx === 1 || cIdx === 3 || cIdx === 5 || cIdx === 7));
-            if (isSkipCol) continue;
-            let foundIdx = pool.findIndex(op => lastRoles[op] !== rIdx); if (foundIdx === -1) foundIdx = 0; 
+            if (rIdx === ESC_LINHA_RUAS) continue;                                          // ruas são sorteadas depois
+            if (ESC_LINHAS_DUPLA.includes(rIdx) && ESC_PAR_SEGUNDA.has(cIdx)) continue;   // célula unida com a mesa da dupla
+            if (celulaFechada(liveEscalaSemana, rIdx, cIdx)) continue;                     // mesa fechada na semana
+            let foundIdx = pool.findIndex(op => lastRoles[op] !== rIdx); if (foundIdx === -1) foundIdx = 0;
             let chosenOp = pool.splice(foundIdx, 1)[0];
             liveEscalaSemana[diaId].grid[rIdx][cIdx] = chosenOp;
         }
         if(pool.length === 0) break;
+    }
+    // Sorting Ruas (A até I), pulando as ruas fechadas
+    for (const rua of ESC_RUAS) {
+        if (pool.length === 0) break;
+        if (celulaFechada(liveEscalaSemana, ESC_LINHA_RUAS, rua.id)) continue;
+        let foundIdx = pool.findIndex(op => lastRoles[op] !== ESC_LINHA_RUAS); if (foundIdx === -1) foundIdx = 0;
+        liveEscalaSemana[diaId].grid[ESC_LINHA_RUAS][rua.id] = pool.splice(foundIdx, 1)[0];
     }
 
     if(autoSave) dbFirebase.ref(refEsc()).set(liveEscalaSemana).then(() => { showToast("Sorteio feito para " + diaId.toUpperCase() + "!"); }).catch(e => console.error(e));
@@ -1002,6 +1029,7 @@ function renderEscalaSemana() {
     escDiasConf.forEach((diaConf, index) => {
         let escDia = liveEscalaSemana[diaConf.id] || {hc:'0', pct:'0', cap:'0', dw:'0', phd:'0', capphd:'0', dataDia: '(inserir data)', visible: false, grid:{}};
         if (!isAdm && escDia.visible !== true) return; 
+        const infoDiaLug = isAdm ? livresDoDia(diaConf.id, false) : null;
         renderedAny = true;
         
         let btnSortear = isAdm ? `<button class="esc-day-btn" onclick="autoDistributeOperators('${diaConf.id}')" title="Sortear Vagas"><i class="fas fa-random"></i> Sortear</button>` : '';
@@ -1023,49 +1051,22 @@ function renderEscalaSemana() {
                     <td class="esc-gray-light esc-red-txt">PHD Atingido</td><td class="esc-red-txt ${editClass}" ${editAttr} id="esc-phd-${diaConf.id}" onblur="saveEscalaField('${diaConf.id}', this)">${escDia.phd}</td>
                     <td class="esc-gray-light">CAP PHD</td><td class="esc-cyan esc-red-txt ${editClass}" ${editAttr} id="esc-capphd-${diaConf.id}" onblur="saveEscalaField('${diaConf.id}', this)">${escDia.capphd}</td>
                 </tr>
-            </table>
-            <table class="esc-table"><tr class="esc-gray-light"><th style="width:8%">OPERADOR</th>`;
-        escCols.forEach(col => { html += `<th>${col.toUpperCase()}</th>`; }); html += `</tr>`;
+            </table>`;
+        html += htmlGradeLugares(diaConf, escDia, isAdm, infoDiaLug);
         
-        escRows.forEach((cargo, rIdx) => {
-            html += `<tr><td class="esc-gray-dark" style="text-align:left; padding-left:5px; font-size: 10px;">${cargo}</td>`;
-            escCols.forEach((col, cIdx) => {
-                const isMergedRow = (rIdx === 0 || rIdx === 3); const isMesaGroupCol = (cIdx === 0 || cIdx === 2 || cIdx === 4 || cIdx === 6); const isSkipCol = (cIdx === 1 || cIdx === 3 || cIdx === 5 || cIdx === 7);
-                if (isMergedRow && isSkipCol) return; 
-                let cellVal = ''; if(escDia.grid && escDia.grid[rIdx] && escDia.grid[rIdx][cIdx]) { cellVal = escDia.grid[rIdx][cIdx]; }
-                let colspanAttr = (isMergedRow && isMesaGroupCol) ? 'colspan="2"' : '';
-                
-                if (isAdm) {
-                    let selectHtml = `<select class="esc-select" id="esc-cell-${diaConf.id}-${rIdx}-${cIdx}" onchange="handleEscalaSelect('${diaConf.id}', this)"><option value="">--</option>`;
-                    operadoresList.forEach(op => { 
-                        let short = formatShortName(op); let selected = (cellVal === op) ? 'selected' : ''; 
-                        let alreadyUsedInDay = false;
-                        if(escDia.grid) { for(let gR in escDia.grid) { for(let gC in escDia.grid[gR]) { if(escDia.grid[gR][gC] === op && op !== cellVal) alreadyUsedInDay = true; } } }
-                        let isAbsent = getAbsenteesForDay(diaConf.id, false).includes(op);
-
-                        if(alreadyUsedInDay || isAbsent) {
-                            let absText = isAbsent ? " (OFF)" : "";
-                            selectHtml += `<option value="${op}" disabled hidden style="display:none;" ${selected}>${short}${absText}</option>`; 
-                        } else { selectHtml += `<option value="${op}" ${selected}>${short}</option>`; }
-                    });
-                    selectHtml += `</select>`; html += `<td ${colspanAttr} style="padding:0;">${selectHtml}</td>`;
-                } else { html += `<td ${colspanAttr} class="esc-gray-light" style="color:#000; font-size: 9px; font-weight: 800; letter-spacing: -0.2px;">${formatShortName(cellVal)}</td>`; }
-            });
-            html += `</tr>`;
-        });
-        html += `</table></div>`; saida += html;
+        html += `</div>`; saida += html;
     });
 
     container.innerHTML = saida;
     if (!isAdm && !renderedAny) container.innerHTML = '<div style="text-align:center; padding: 50px; color: var(--text-muted); font-size: 1.2rem; font-weight: bold;"><i class="fas fa-eye-slash" style="font-size: 2rem; margin-bottom: 15px; display: block;"></i>A Escala da Semana ainda não foi publicada.</div>';
     if (isAdm) container.insertAdjacentHTML('afterbegin', bannerTurnoEscala(liveEscalaSemana));
-    if(isAdm) { escDiasConf.forEach(d => updateDropdownsAvailability(d.id)); updateSidebar(); }
+    if(isAdm) { escDiasConf.forEach(d => marcarConflitosDia(d.id, false)); updateSidebar(); }
 }
 
 function handleEscalaSelect(diaId, el) {
     document.getElementById('sidebar-day-select').value = diaId; currentSidebarDay = diaId;
     if (el && currentUser && currentUser.r === 'admin') {
-        const m = el.id.match(/^esc-cell-[a-z]+-(\d+)-(\d+)$/);
+        const m = el.id.match(/^esc-cell-[a-z]+-(\d+)-([a-zA-Z0-9]+)$/);
         if (m) {
             if (!liveEscalaSemana[diaId]) liveEscalaSemana[diaId] = { hc: '16', pct: '0', cap: '16980', dw: '0', phd: '0', capphd: '630', dataDia: '(inserir data)', visible: false, grid: {} };
             if (!liveEscalaSemana[diaId].grid) liveEscalaSemana[diaId].grid = {};
@@ -1093,26 +1094,7 @@ function saveEscalaField(diaId, el) {
 
 function updateDropdownsAvailability(diaId) {
     if (!currentUser || currentUser.r !== 'admin') return;
-    let selectedValues = []; let absentees = getAbsenteesForDay(diaId, false);
-    escRows.forEach((cargo, rIdx) => { escCols.forEach((col, cIdx) => { let el = document.getElementById(`esc-cell-${diaId}-${rIdx}-${cIdx}`); if (el && el.value) selectedValues.push(el.value); }); });
-    escRows.forEach((cargo, rIdx) => { escCols.forEach((col, cIdx) => {
-            let el = document.getElementById(`esc-cell-${diaId}-${rIdx}-${cIdx}`);
-            if (el) { 
-                Array.from(el.options).forEach(opt => { 
-                    if (opt.value === "") return; 
-                    let isUsedElsewhere = (selectedValues.includes(opt.value) && opt.value !== el.value);
-                    let isAbsent = absentees.includes(opt.value);
-                    if (isUsedElsewhere || isAbsent) { 
-                        opt.disabled = true; opt.hidden = true; opt.style.display = 'none';      
-                        if(isAbsent) opt.text = formatShortName(opt.value) + " (OFF)"; else opt.text = formatShortName(opt.value);
-                    } else { 
-                        opt.disabled = false; opt.hidden = false; opt.style.display = ''; opt.text = formatShortName(opt.value);
-                    } 
-                }); 
-                marcarConflito(el, absentees);
-            }
-        });
-    });
+    atualizarSelectsDia(diaId, false);
 }
 
 function changeSidebarDay(tipo) { 
@@ -1125,7 +1107,7 @@ function updateSidebar() {
     let container = document.getElementById('sidebar-names-list'); if (!container) return;
     let selectedValues = []; let absentees = getAbsenteesForDay(currentSidebarDay, false);
 
-    escRows.forEach((cargo, rIdx) => { escCols.forEach((col, cIdx) => { let el = document.getElementById(`esc-cell-${currentSidebarDay}-${rIdx}-${cIdx}`); if (el && el.value) selectedValues.push(el.value); }); });
+    selectsDoDia(currentSidebarDay, false).forEach(el => { if (el.value) selectedValues.push(el.value); });
 
     let html = ''; let availableCount = 0;
     operadoresList.forEach(op => { 
@@ -1157,8 +1139,8 @@ function saveEscalaSemanaToCloud() {
 
         escRows.forEach((cargo, rIdx) => {
             if(!liveEscalaSemana[id].grid[rIdx]) liveEscalaSemana[id].grid[rIdx] = {};
-            escCols.forEach((col, cIdx) => {
-                const isMergedRow = (rIdx === 0 || rIdx === 3); const isSkipCol = (cIdx === 1 || cIdx === 3 || cIdx === 5 || cIdx === 7); if (isMergedRow && isSkipCol) return; 
+            escColunas.forEach(({ id: cIdx }) => {
+                if (ESC_LINHAS_DUPLA.includes(rIdx) && ESC_PAR_SEGUNDA.has(cIdx)) return;
                 const cell = document.getElementById(`esc-cell-${id}-${rIdx}-${cIdx}`); if(cell) { liveEscalaSemana[id].grid[rIdx][cIdx] = cell.value || ""; }
             });
         });
@@ -1176,7 +1158,7 @@ async function archiveEscalaSemanal() {
 // LÓGICA: ESCALA DOBLECHECK (ALTERNADA)
 // ==========================================
 function initEmptyEscalaSemana() {
-    let oldData = {...liveEscalaSemana}; liveEscalaSemana = {};
+    let oldData = {...liveEscalaSemana}; liveEscalaSemana = {}; if (oldData.mesasFechadas) liveEscalaSemana.mesasFechadas = oldData.mesasFechadas;
     escDiasConf.forEach(d => {
         let prevData = oldData[d.id] ? oldData[d.id].dataDia : '(inserir data)'; let prevVis = oldData[d.id] && oldData[d.id].visible !== undefined ? oldData[d.id].visible : false;
         liveEscalaSemana[d.id] = { hc: '16', pct: '0', cap: '16980', dw: '0', phd: '0', capphd: '630', dataDia: prevData, visible: prevVis, grid: {} };
@@ -1184,7 +1166,7 @@ function initEmptyEscalaSemana() {
 }
 
 function initEmptyEscalaDcSemana() {
-    let oldData = {...liveEscalaDcSemana}; liveEscalaDcSemana = {};
+    let oldData = {...liveEscalaDcSemana}; liveEscalaDcSemana = {}; if (oldData.mesasFechadas) liveEscalaDcSemana.mesasFechadas = oldData.mesasFechadas;
     escDiasConf.forEach(d => { 
         let prevData = oldData[d.id] ? oldData[d.id].dataDia : '(inserir data)'; let prevVis = oldData[d.id] && oldData[d.id].visible !== undefined ? oldData[d.id].visible : false; liveEscalaDcSemana[d.id] = { dataDia: prevData, visible: prevVis, grid: {} }; 
     });
@@ -1231,6 +1213,7 @@ function autoDistributeDc(diaId, autoSave = true) {
         let slots = sec.rows * sec.cols;
         for(let i=0; i<slots; i++) {
             let cellId = `${sec.id}_${i}`;
+            if (sec.mesas && ((liveEscalaDcSemana.mesasFechadas || {})[i])) { liveEscalaDcSemana[diaId].grid[cellId] = ''; continue; }   // mesa fechada
             let chosenOp = pool.length > 0 ? pool.shift() : "";
             liveEscalaDcSemana[diaId].grid[cellId] = chosenOp;
         }
@@ -1248,6 +1231,7 @@ function renderEscalaDcSemana() {
     escDiasConf.forEach((diaConf, index) => {
         let escDia = liveEscalaDcSemana[diaConf.id] || { dataDia: '(inserir data)', visible: false, grid:{}};
         if (!isAdm && escDia.visible !== true) return; 
+        const infoDiaDc = isAdm ? livresDoDia(diaConf.id, true) : null;
         renderedAny = true;
         
         let btnSortear = isAdm ? `<button class="esc-day-btn" onclick="autoDistributeDc('${diaConf.id}')" title="Sortear Vagas DC"><i class="fas fa-random"></i> Sortear</button>` : '';
@@ -1259,52 +1243,15 @@ function renderEscalaDcSemana() {
                 <tr><td style="background-color: ${diaConf.bg} !important; color: ${diaConf.cor} !important; padding: 0;"><div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 15px;"><span style="font-size: 14px; font-weight: 800;">${diaConf.nome}</span>${headerControls}</div></td></tr>
                 <tr><td class="esc-gray-light" id="esc-dc-datadia-${diaConf.id}" style="text-align: left; padding-left: 10px; font-weight: bold; font-size: 11px; color: #002f6c;">${escDia.dataDia || '(inserir data)'}</td></tr>
             </table>
-            <table class="esc-table">`;
-        
-        dcLayout.forEach(sec => {
-            html += `<tr class="spx-navy"><td colspan="${sec.cols}" style="color:#fff; font-size:10px;">${sec.title}</td></tr>`;
-            let cellCounter = 0;
-            for(let r=0; r<sec.rows; r++) {
-                html += `<tr>`;
-                for(let c=0; c<sec.cols; c++) {
-                    let cellId = `${sec.id}_${cellCounter}`;
-                    let cellVal = escDia.grid ? escDia.grid[cellId] : '';
-                    
-                    if (isAdm) {
-                        let selectHtml = `<select class="esc-select" id="esc-dc-cell-${diaConf.id}-${cellId}" onchange="handleEscalaDcSelect('${diaConf.id}', this)"><option value="">--</option>`;
-                        operadoresList.forEach(op => { 
-                            let short = formatShortName(op); let selected = (cellVal === op) ? 'selected' : ''; 
-                            
-                            let alreadyUsedInDay = false;
-                            if(escDia.grid) { for(let key in escDia.grid) { if(escDia.grid[key] === op && op !== cellVal) alreadyUsedInDay = true; } }
-
-                            let usedYesterday = false;
-                            if(index > 0) {
-                                let prevDiaId = escDiasConf[index - 1].id; let prevGrid = liveEscalaDcSemana[prevDiaId]?.grid;
-                                if (prevGrid && Object.values(prevGrid).includes(op)) usedYesterday = true;
-                            }
-
-                            let isAbsent = getAbsenteesForDay(diaConf.id, true).includes(op);
-
-                            if(alreadyUsedInDay || isAbsent || usedYesterday) {
-                                let reasonText = isAbsent ? " (OFF)" : (usedYesterday ? " (FEZ ONTEM)" : "");
-                                selectHtml += `<option value="${op}" disabled hidden style="display:none;" ${selected}>${short}${reasonText}</option>`; 
-                            } else { selectHtml += `<option value="${op}" ${selected}>${short}</option>`; }
-                        });
-                        selectHtml += `</select>`; html += `<td style="padding:0; width: 25%;">${selectHtml}</td>`;
-                    } else { html += `<td class="esc-gray-light" style="color:#000; font-size: 9px; font-weight: 800; letter-spacing: -0.2px; width: 25%;">${formatShortName(cellVal)}</td>`; }
-                    cellCounter++;
-                }
-                html += `</tr>`;
-            }
-        });
-        html += `</table></div>`; saida += html;
+`;
+        html += htmlGradeDc(diaConf, escDia, isAdm, infoDiaDc);
+        html += `</div>`; saida += html;
     });
 
     container.innerHTML = saida;
     if (!isAdm && !renderedAny) container.innerHTML = '<div style="text-align:center; padding: 50px; color: var(--text-muted); font-size: 1.2rem; font-weight: bold;"><i class="fas fa-eye-slash" style="font-size: 2rem; margin-bottom: 15px; display: block;"></i>A Escala Doblecheck ainda não foi publicada.</div>';
     if (isAdm) container.insertAdjacentHTML('afterbegin', bannerTurnoEscala(liveEscalaDcSemana));
-    if(isAdm) { escDiasConf.forEach(d => updateDropdownsAvailabilityDc(d.id)); updateSidebarDc(); }
+    if(isAdm) { escDiasConf.forEach(d => marcarConflitosDia(d.id, true)); updateSidebarDc(); }
 }
 
 function handleEscalaDcSelect(diaId, el) {
@@ -1321,42 +1268,10 @@ function handleEscalaDcSelect(diaId, el) {
 
 function updateDropdownsAvailabilityDc(diaId) {
     if (!currentUser || currentUser.r !== 'admin') return;
-    let selectedValues = []; let absentees = getAbsenteesForDay(diaId, true);
-    let prevAllocated = [];
-    let currentIdx = escDiasConf.findIndex(d => d.id === diaId);
-    if (currentIdx > 0) {
-        let prevDiaId = escDiasConf[currentIdx - 1].id; let prevGrid = liveEscalaDcSemana[prevDiaId]?.grid;
-        if (prevGrid) Object.values(prevGrid).forEach(op => { if(op) prevAllocated.push(op); });
-    }
-
-    dcLayout.forEach(sec => {
-        let slots = sec.rows * sec.cols;
-        for(let i=0; i<slots; i++) { let el = document.getElementById(`esc-dc-cell-${diaId}-${sec.id}_${i}`); if (el && el.value) selectedValues.push(el.value); }
-    });
-    
-    dcLayout.forEach(sec => {
-        let slots = sec.rows * sec.cols;
-        for(let i=0; i<slots; i++) {
-            let el = document.getElementById(`esc-dc-cell-${diaId}-${sec.id}_${i}`);
-            if (el) { 
-                Array.from(el.options).forEach(opt => { 
-                    if (opt.value === "") return; 
-                    let isUsedElsewhere = (selectedValues.includes(opt.value) && opt.value !== el.value);
-                    let isAbsent = absentees.includes(opt.value);
-                    let usedYesterday = prevAllocated.includes(opt.value);
-
-                    if (isUsedElsewhere || isAbsent || usedYesterday) { 
-                        opt.disabled = true; opt.hidden = true; opt.style.display = 'none';      
-                        let rText = isAbsent ? " (OFF)" : (usedYesterday ? " (ONTEM)" : "");
-                        opt.text = formatShortName(opt.value) + rText;
-                    } else { 
-                        opt.disabled = false; opt.hidden = false; opt.style.display = ''; opt.text = formatShortName(opt.value);
-                    } 
-                }); 
-                marcarConflito(el, absentees);
-            }
-        }
-    });
+    atualizarSelectsDia(diaId, true);
+    // no Doblecheck, quem fez hoje não pode amanhã: atualiza o dia seguinte também
+    const i = escDiasConf.findIndex(d => d.id === diaId);
+    if (i >= 0 && i < escDiasConf.length - 1) atualizarSelectsDia(escDiasConf[i + 1].id, true);
 }
 
 function updateSidebarDc() {
@@ -1478,11 +1393,11 @@ function renderHistEscala(tipo) {
                     let roleStr = "-";
                     if(grid) {
                         if(tipo === 'lugares') {
-                            for(let r=0; r<escRows.length; r++) { if(grid[r]) { for(let c=0; c<escCols.length; c++) { if(grid[r][c] === op) { roleStr = `<span style="color:var(--primary); font-weight:800;">${escRows[r]}</span><br><span style="font-size:9px; color:var(--text-muted)">${escCols[c]}</span>`; } } } }
+                            for(let r=0; r<escRows.length; r++) { if(grid[r]) { for(const c in grid[r]) { if(grid[r][c] === op) { roleStr = `<span style="color:var(--primary); font-weight:800;">${escRows[r]}</span><br><span style="font-size:9px; color:var(--text-muted)">${escColNome(c)}</span>`; } } } }
                         } else {
                             dcLayout.forEach(sec => {
                                 let slots = sec.rows * sec.cols;
-                                for(let i=0; i<slots; i++) { if(grid[`${sec.id}_${i}`] === op) { roleStr = `<span style="color:var(--primary); font-weight:800;">${sec.title}</span><br><span style="font-size:9px; color:var(--text-muted)">Vaga ${i+1}</span>`; } }
+                                for(let i=0; i<slots; i++) { if(grid[`${sec.id}_${i}`] === op) { roleStr = `<span style="color:var(--primary); font-weight:800;">${sec.title}</span><br><span style="font-size:9px; color:var(--text-muted)">${sec.mesas ? 'Mesa ' + (i + 1) + ((sec.especiais || {})[i] ? ' (' + sec.especiais[i].toLowerCase() + ')' : '') : 'Vaga ' + (i + 1)}</span>`; } }
                             });
                         }
                     }
@@ -2089,3 +2004,154 @@ function mostrarErroTela(e) {
     try { showToast('Erro: ' + msg); } catch (x) { /* ignora */ }
 }
 window.addEventListener('error', ev => { if (ev && ev.message && !/Script error/i.test(ev.message)) mostrarErroTela(ev.error || ev.message); });
+
+// ---------- Escalas rápidas: cada campo só traz quem pode ser escolhido ----------
+// (antes cada campo carregava todos os funcionários escondidos: dezenas de milhares de opções)
+function escAttr(t) { return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
+function livresDoDia(diaId, isDc) {
+    const obj = isDc ? liveEscalaDcSemana : liveEscalaSemana;
+    const grid = (obj[diaId] && obj[diaId].grid) || {};
+    const usados = new Set();
+    if (isDc) Object.values(grid).forEach(v => { if (v) usados.add(v); });
+    else Object.entries(grid).forEach(([r, linha]) => Object.entries(linha || {}).forEach(([c, v]) => {
+        if (v && (Number(r) !== ESC_LINHA_RUAS || String(c).startsWith('r'))) usados.add(v);
+    }));
+    const abs = new Set(getAbsenteesForDay(diaId, isDc));
+    const ontem = new Set();
+    if (isDc) {
+        const i = escDiasConf.findIndex(d => d.id === diaId);
+        if (i > 0) Object.values((liveEscalaDcSemana[escDiasConf[i - 1].id] || {}).grid || {}).forEach(v => { if (v) ontem.add(v); });
+    }
+    const livres = operadoresList.filter(op => !usados.has(op) && !abs.has(op) && !ontem.has(op));
+    return { abs, ontem, opts: livres.map(op => `<option value="${escAttr(op)}">${formatShortName(op)}</option>`).join('') };
+}
+function opcoesCelula(info, valor) {
+    let h = '<option value="">--</option>';
+    if (valor) {
+        const tag = info.abs.has(valor) ? ' (OFF)' : info.ontem.has(valor) ? ' (FEZ ONTEM)' : '';
+        h += `<option value="${escAttr(valor)}" selected>${formatShortName(valor)}${tag}</option>`;
+    }
+    return h + info.opts;
+}
+function selectsDoDia(diaId, isDc) {
+    return document.querySelectorAll(isDc ? `select[id^="esc-dc-cell-${diaId}-"]` : `select[id^="esc-cell-${diaId}-"]`);
+}
+function atualizarSelectsDia(diaId, isDc) {
+    const info = livresDoDia(diaId, isDc);
+    const abs = getAbsenteesForDay(diaId, isDc);
+    selectsDoDia(diaId, isDc).forEach(el => {
+        const v = el.value;
+        el.innerHTML = opcoesCelula(info, v);
+        el.value = v;
+        marcarConflito(el, abs);
+    });
+}
+function marcarConflitosDia(diaId, isDc) {
+    const abs = getAbsenteesForDay(diaId, isDc);
+    selectsDoDia(diaId, isDc).forEach(el => marcarConflito(el, abs));
+}
+
+// ---------- Mesas fechadas na semana + grades das escalas ----------
+// Fechar uma mesa vale para a semana inteira (todos os dias) e o sorteio não usa a mesa fechada.
+function celulaFechada(obj, rIdx, cIdx) {
+    const f = (obj && obj.mesasFechadas) || {};
+    if (/^\d+$/.test(String(cIdx))) cIdx = Number(cIdx);
+    if (ESC_LINHAS_DUPLA.includes(rIdx) && ESC_PAR[cIdx] !== undefined) return !!(f[cIdx] && f[ESC_PAR[cIdx]]);   // dupla: só fecha se as duas fecharem
+    return !!f[cIdx];
+}
+
+function htmlGradeLugares(diaConf, escDia, isAdm, info) {
+    const f = liveEscalaSemana.mesasFechadas || {};
+    const cab = (comBotao) => `<tr class="esc-gray-light"><th style="width:8%">OPERADOR</th>${escColunas.map(c => {
+        const fechada = !!f[c.id];
+        const btn = isAdm && comBotao ? `<button type="button" class="mesa-lock ${fechada ? 'fechada' : ''}" onclick="toggleMesa('lugares', ${c.id})" title="${fechada ? 'Reabrir' : 'Fechar'} ${c.nome} na semana inteira"><i class="fas ${fechada ? 'fa-lock' : 'fa-lock-open'}"></i></button>` : '';
+        return `<th class="${fechada ? 'mesa-fechada-th' : ''}">${c.nome.toUpperCase()}${fechada ? '<span class="mesa-tag">FECHADA</span>' : ''}${btn}</th>`;
+    }).join('')}</tr>`;
+    const celula = (rIdx, cIdx, colspan) => {
+        const span = colspan ? 'colspan="2"' : '';
+        if (celulaFechada(liveEscalaSemana, rIdx, cIdx)) return `<td ${span} class="esc-gray-dark mesa-fechada-td">—</td>`;
+        const v = (escDia.grid && escDia.grid[rIdx] && escDia.grid[rIdx][cIdx]) || '';
+        if (isAdm) return `<td ${span} style="padding:0;"><select class="esc-select" id="esc-cell-${diaConf.id}-${rIdx}-${cIdx}" onchange="handleEscalaSelect('${diaConf.id}', this)">${opcoesCelula(info, v)}</select></td>`;
+        return `<td ${span} class="esc-gray-light" style="color:#000; font-size: 9px; font-weight: 800; letter-spacing: -0.2px;">${formatShortName(v)}</td>`;
+    };
+    const linha = rIdx => {
+        let h = `<tr><td class="esc-gray-dark" style="text-align:left; padding-left:5px; font-size: 10px;">${escRows[rIdx]}</td>`;
+        escColunas.forEach(({ id }) => {
+            const dupla = ESC_LINHAS_DUPLA.includes(rIdx);
+            if (dupla && ESC_PAR_SEGUNDA.has(id)) return;
+            h += celula(rIdx, id, dupla && ESC_PAR[id] !== undefined);
+        });
+        return h + '</tr>';
+    };
+    let h = `<table class="esc-table">${cab(true)}`;
+    escRows.forEach((_, rIdx) => { if (rIdx !== ESC_LINHA_RUAS) h += linha(rIdx); });
+    h += `</table>`;
+    // SORTING RUAS: grade separada, uma vaga por rua (A até I)
+    h += `<div class="esc-ruas-tit">SORTING RUAS</div><table class="esc-table esc-ruas"><tr class="esc-gray-light">${ESC_RUAS.map(r => {
+        const fechada = !!f[r.id];
+        const btn = isAdm ? `<button type="button" class="mesa-lock ${fechada ? 'fechada' : ''}" onclick="toggleMesa('lugares', '${r.id}')" title="${fechada ? 'Reabrir' : 'Fechar'} a ${r.nome} na semana inteira"><i class="fas ${fechada ? 'fa-lock' : 'fa-lock-open'}"></i></button>` : '';
+        return `<th class="${fechada ? 'mesa-fechada-th' : ''}" style="width:${(100 / ESC_RUAS.length).toFixed(2)}%;">${r.letra}${fechada ? '<span class="mesa-tag">FECHADA</span>' : ''}${btn}</th>`;
+    }).join('')}</tr><tr>${ESC_RUAS.map(r => celula(ESC_LINHA_RUAS, r.id, false)).join('')}</tr></table>`;
+    return h;
+}
+
+function htmlGradeDc(diaConf, escDia, isAdm, info) {
+    const f = liveEscalaDcSemana.mesasFechadas || {};
+    let h = '';
+    dcLayout.forEach(sec => {
+        h += `<table class="esc-table" style="margin-top:6px;"><tr class="spx-navy"><td colspan="${sec.cols}" style="color:#fff; font-size:10px;">${sec.title}${sec.mesas ? ' — 1 pessoa por mesa' : ''}</td></tr>`;
+        let n = 0;
+        for (let r = 0; r < sec.rows; r++) {
+            h += '<tr>';
+            for (let c = 0; c < sec.cols; c++, n++) {
+                const cellId = `${sec.id}_${n}`;
+                const v = (escDia.grid && escDia.grid[cellId]) || '';
+                const fechada = sec.mesas && !!f[n];
+                let rot = '';
+                if (sec.mesas) {
+                    const btn = isAdm ? `<button type="button" class="mesa-lock ${fechada ? 'fechada' : ''}" onclick="toggleMesa('dc', ${n})" title="${fechada ? 'Reabrir' : 'Fechar'} a Mesa ${n + 1} na semana inteira"><i class="fas ${fechada ? 'fa-lock' : 'fa-lock-open'}"></i></button>` : '';
+                    const esp = (sec.especiais || {})[n];
+                    rot = `<div class="dc-mesa-lbl ${fechada ? 'fechada' : ''} ${esp ? 'especial' : ''}">MESA ${n + 1}${esp ? `<span class="dc-esp">${esp}</span>` : ''}${btn}</div>`;
+                }
+                const larg = `width:${(100 / sec.cols).toFixed(2)}%;`;
+                if (fechada) h += `<td class="esc-gray-dark mesa-fechada-td" style="padding:0; ${larg}">${rot}<div class="mesa-fechada-txt">FECHADA</div></td>`;
+                else if (isAdm) h += `<td style="padding:0; ${larg}">${rot}<select class="esc-select" id="esc-dc-cell-${diaConf.id}-${cellId}" onchange="handleEscalaDcSelect('${diaConf.id}', this)">${opcoesCelula(info, v)}</select></td>`;
+                else h += `<td class="esc-gray-light" style="padding:0; ${larg} color:#000; font-size: 9px; font-weight: 800;">${rot}<div style="padding:3px 2px;">${formatShortName(v) || '&nbsp;'}</div></td>`;
+            }
+            h += '</tr>';
+        }
+        h += '</table>';
+    });
+    return h;
+}
+
+async function toggleMesa(tipo, chave) {
+    if (!currentUser || currentUser.r !== 'admin') return;
+    const obj = tipo === 'dc' ? liveEscalaDcSemana : liveEscalaSemana;
+    const ref = tipo === 'dc' ? refEscDc() : refEsc();
+    const f = Object.assign({}, obj.mesasFechadas || {});
+    const fechar = !f[chave];
+    const nome = tipo === 'dc' ? `a Mesa ${chave + 1} do Doblecheck` : `a ${escColNome(chave)}`;   // ex.: a Mesa3, a Rua B
+    const up = {};
+    if (fechar) {
+        f[chave] = true;
+        const liberar = [];
+        escDiasConf.forEach(d => {
+            const g = (obj[d.id] && obj[d.id].grid) || {};
+            if (tipo === 'dc') { if (g[`dc_${chave}`]) liberar.push(`${d.id}/grid/dc_${chave}`); }
+            else escRows.forEach((_, r) => {
+                const alvo = ESC_LINHAS_DUPLA.includes(r) && ESC_PAR_SEGUNDA.has(chave) ? Number(Object.keys(ESC_PAR).find(k => ESC_PAR[k] === chave)) : chave;
+                if (g[r] && g[r][alvo] && celulaFechada({ mesasFechadas: f }, r, alvo)) liberar.push(`${d.id}/grid/${r}/${alvo}`);
+            });
+        });
+        if (!confirm(`Fechar ${nome} na semana inteira?\n\nO sorteio não vai colocar ninguém nela.${liberar.length ? `\n${liberar.length} posição(ões) que já tinham pessoas nessa mesa serão liberadas.` : ''}`)) return;
+        liberar.forEach(c => { up[c] = ''; });
+        up[`mesasFechadas/${chave}`] = true;
+    } else {
+        up[`mesasFechadas/${chave}`] = null;
+    }
+    try {
+        await dbFirebase.ref(ref).update(up);
+        showToast(fechar ? `${nome.charAt(2).toUpperCase() + nome.slice(3)} fechada na semana.` : `${nome.charAt(2).toUpperCase() + nome.slice(3)} reaberta.`);
+    } catch (e) { console.error(e); showToast('Erro ao salvar. Verifique a internet.'); }
+}
