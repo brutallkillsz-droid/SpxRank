@@ -31,6 +31,26 @@ const CODIGOS_LIBERA = ['P', 'S2', 'IN'];            // pode ser escalado (vazio
 const CODIGOS_DESLIG = ['DF', 'DP', 'DV', 'TR'];      // a partir desse dia não entra mais
 // Variáveis do código novo ficam todas aqui no topo (o Firebase pode responder antes do arquivo terminar de carregar)
 let renderPendente = {};
+// Junta vários pedidos de redesenho no mesmo quadro (evita desenhar a mesma tela 2-3x seguidas)
+const renderFila = {};
+// "Assinatura" do que está desenhado na escala: quando a nuvem devolve exatamente o que já está na tela
+// (o eco da própria alteração), não precisa redesenhar a semana inteira
+const escSig = { lug: '', dc: '' };
+function assinatura(v) {
+    if (v === null || v === undefined || v === '') return '';
+    if (typeof v !== 'object') return String(v);
+    const ks = Object.keys(v).filter(k => v[k] !== null && v[k] !== undefined && v[k] !== '').sort();
+    return '{' + ks.map(k => k + ':' + assinatura(v[k])).join(',') + '}';
+}
+const sigLug = () => currentTurno + '|' + assinatura(liveEscalaSemana);
+const sigDc = () => currentTurno + '|' + assinatura(liveEscalaDcSemana);
+let slAnimar = true;   // gráficos animam só quando o usuário abre/troca; atualização da nuvem redesenha sem animação
+function agendarRender(chave, fn) {
+    if (renderFila[chave]) return;
+    renderFila[chave] = requestAnimationFrame(() => { delete renderFila[chave]; try { fn(); } catch (e) { console.error(e); } });
+}
+const agPres = () => agendarRender('pres', renderPresencaGrid);
+const agSl = () => agendarRender('sl', renderSiteliderDashboard);
 let atualizarEscalasTimer = null;
 let turnoImportacao = 'AMBOS';
 let planilhaConfig = {};
@@ -159,7 +179,7 @@ function switchTab(id) {
     if(id==='escala' || id==='escala-dc') autoAtualizarPlanilha();
 
     if(id==='bi') renderBIChart(); 
-    if(id==='sitelider') renderSiteliderDashboard(); 
+    if(id==='sitelider') { slAnimar = true; renderSiteliderDashboard(); } 
     } catch (e) { console.error(e); mostrarErroTela(e); }
 }
 
@@ -415,6 +435,7 @@ async function renderSiteliderDashboard() {
 
     // ---------- Gráficos ----------
     if (typeof Chart === 'undefined') return;
+    const animacao = slAnimar ? {} : false; slAnimar = false;
     const corBarra = v => v == null ? 'rgba(148,163,184,.2)' : v <= meta ? 'rgba(16,185,129,.75)' : v <= meta * 1.5 ? 'rgba(251,191,36,.8)' : 'rgba(239,68,68,.85)';
     const absMes = mesS.map(x => x.data <= hojeISO && x.base ? +abs(x).toFixed(1) : null);
     const eixo = { ticks: { color: '#94a3b8', font: { family: 'Outfit', size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' } };
@@ -428,7 +449,7 @@ async function renderSiteliderDashboard() {
                 { type: 'line', label: `Meta ${String(meta).replace('.', ',')}%`, data: mesS.map(() => meta), borderColor: '#f87171', borderDash: [6, 4], borderWidth: 2, pointRadius: 0, order: 1 }
             ]
         },
-        options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: legenda, tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.parsed.y == null ? '-' : String(c.parsed.y).replace('.', ',') + '%'}` } } },
+        options: { animation: animacao, responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: legenda, tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.parsed.y == null ? '-' : String(c.parsed.y).replace('.', ',') + '%'}` } } },
             scales: { x: { ...eixo, grid: { display: false } }, y: { ...eixo, beginAtZero: true, ticks: { ...eixo.ticks, callback: v => v + '%' } } } }
     });
     if (window.slChartPHDInstance) window.slChartPHDInstance.destroy();
@@ -441,7 +462,7 @@ async function renderSiteliderDashboard() {
                 { type: 'line', label: 'CAP PHD', data: phdS.map(x => x.cap || null), borderColor: '#fbbf24', borderDash: [6, 4], borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#fbbf24', spanGaps: true, order: 1 }
             ]
         },
-        options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: legenda },
+        options: { animation: animacao, responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: legenda },
             scales: { x: { ...eixo, grid: { display: false } }, y: { ...eixo, beginAtZero: true } } }
     });
 }
@@ -449,7 +470,7 @@ async function renderSiteliderDashboard() {
 function slTopOrdenar(k) { slTopOrdem = k; renderSiteliderDashboard(); }
 dbFirebase.ref('shopee_config/metas').on('value', s => {
     slMetas = Object.assign({ abs: 5 }, s.val() || {});
-    if (!document.getElementById('view-sitelider').classList.contains('hidden')) renderSiteliderDashboard();
+    if (!document.getElementById('view-sitelider').classList.contains('hidden')) agSl();
 });
 function slMesDe(dt) { return dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0'); }
 function slDatasSemana(domingo) { return [0, 1, 2, 3, 4, 5, 6].map(o => { const d = new Date(domingo.getTime()); d.setDate(d.getDate() + o); return d; }); }
@@ -472,12 +493,12 @@ function slDelta(id, v, ant, maiorEhRuim, rotulo, suf) {
     const n = Math.abs(dif).toLocaleString('pt-BR', { maximumFractionDigits: suf ? 1 : 0 });
     el.innerHTML = `<i class="fas fa-caret-${dif > 0 ? 'up' : dif < 0 ? 'down' : 'right'}"></i> ${n}${suf ? ' p.p.' : ''} <span>vs ${rotulo}</span>`;
 }
-function slTrocarTurno(t) { slFiltroTurno = t; localStorage.setItem('spxSlTurno', t); renderSiteliderDashboard(); }
+function slTrocarTurno(t) { slAnimar = true; slFiltroTurno = t; localStorage.setItem('spxSlTurno', t); renderSiteliderDashboard(); }
 function slMudarSemana(n) {
     const inp = document.getElementById('sl-week-select');
     const [a, w] = (inp.value || slSemanaISO(new Date())).split('-W').map(Number);
     const seg = getDateOfISOWeek(w, a); seg.setDate(seg.getDate() + 7 * n);
-    inp.value = slSemanaISO(seg); renderSiteliderDashboard();
+    inp.value = slSemanaISO(seg); slAnimar = true; renderSiteliderDashboard();
 }
 function slEditarMeta() {
     if (!currentUser || currentUser.r !== 'admin') return;
@@ -495,9 +516,8 @@ function slEditarMeta() {
 dbFirebase.ref('shopee_colaboradores').on('value', snap => {
     if(snap.exists()) { operadoresList = Object.values(snap.val()).sort(); } 
     else { let initialDb = {}; defaultOperadores.forEach(op => initialDb[op] = op); dbFirebase.ref('shopee_colaboradores').set(initialDb); operadoresList = [...defaultOperadores].sort(); }
-    if(!document.getElementById('view-escala').classList.contains('hidden')) renderEscalaSemana(); 
-    if(!document.getElementById('view-escala-dc').classList.contains('hidden')) renderEscalaDcSemana(); 
-    if(!document.getElementById('view-presenca').classList.contains('hidden')) renderPresencaGrid(); 
+    atualizarTelasDeEscala();
+    if(!document.getElementById('view-presenca').classList.contains('hidden')) agPres(); 
 });
 
 dbFirebase.ref('shopee_daily_live').on('value', (snapshot) => { 
@@ -537,23 +557,23 @@ function assinarTurno() {
     turnoRefsAtivas = [rH, rHD, rE, rED];
     rH.on('value', snap => {
         historyDataCache = snap.val() || {};
-        if(!document.getElementById('view-hist-escala').classList.contains('hidden')) renderHistEscala('lugares');
-        if(!document.getElementById('view-sitelider').classList.contains('hidden')) renderSiteliderDashboard();
+        if(!document.getElementById('view-hist-escala').classList.contains('hidden')) agendarRender('hist', () => renderHistEscala('lugares'));
+        if(!document.getElementById('view-sitelider').classList.contains('hidden')) agSl();
     });
     rHD.on('value', snap => {
         historyDcDataCache = snap.val() || {};
-        if(!document.getElementById('view-hist-escala-dc').classList.contains('hidden')) renderHistEscala('dc');
+        if(!document.getElementById('view-hist-escala-dc').classList.contains('hidden')) agendarRender('histdc', () => renderHistEscala('dc'));
     });
     rE.on('value', (snapshot) => {
         let data = snapshot.val(); if (data) liveEscalaSemana = data; else initEmptyEscalaSemana();
         absStamp++;
-        if(!document.getElementById('view-escala').classList.contains('hidden')) renderSeguro('escala-semanal-container', renderEscalaSemana);
-        if(!document.getElementById('view-sitelider').classList.contains('hidden')) renderSiteliderDashboard();
+        if(!document.getElementById('view-escala').classList.contains('hidden') && sigLug() !== escSig.lug) renderSeguro('escala-semanal-container', renderEscalaSemana);
+        if(!document.getElementById('view-sitelider').classList.contains('hidden')) agSl();
     });
     rED.on('value', (snapshot) => {
         let data = snapshot.val(); if (data) liveEscalaDcSemana = data; else initEmptyEscalaDcSemana();
         absStamp++;
-        if(!document.getElementById('view-escala-dc').classList.contains('hidden')) renderSeguro('escala-dc-container', renderEscalaDcSemana);
+        if(!document.getElementById('view-escala-dc').classList.contains('hidden') && sigDc() !== escSig.dc) renderSeguro('escala-dc-container', renderEscalaDcSemana);
     });
 }
 assinarTurno();
@@ -563,10 +583,9 @@ currentPresMes = dateObj.getFullYear() + '-' + String(dateObj.getMonth() + 1).pa
 
 presencaListener = dbFirebase.ref('shopee_presenca_live/' + currentPresMes).on('value', snap => {
     livePresenca = snap.val() || {}; presCache[currentPresMes] = livePresenca; absStamp++;
-    if(!document.getElementById('view-presenca').classList.contains('hidden')) renderPresencaGrid(); 
-    if(!document.getElementById('view-escala').classList.contains('hidden')) { if(currentUser && currentUser.r === 'admin') { escDiasConf.forEach(d => updateDropdownsAvailability(d.id)); updateSidebar(); } }
-    if(!document.getElementById('view-escala-dc').classList.contains('hidden')) { if(currentUser && currentUser.r === 'admin') { escDiasConf.forEach(d => updateDropdownsAvailabilityDc(d.id)); updateSidebarDc(); } }
-    if(!document.getElementById('view-sitelider').classList.contains('hidden')) renderSiteliderDashboard(); 
+    if(!document.getElementById('view-presenca').classList.contains('hidden')) agPres(); 
+    atualizarTelasDeEscala();
+    if(!document.getElementById('view-sitelider').classList.contains('hidden')) agSl(); 
 });
 
 function saveProdState() {
@@ -1062,7 +1081,7 @@ function renderEscalaSemana() {
         html += `</div>`; saida += html;
     });
 
-    container.innerHTML = saida;
+    container.innerHTML = saida; escSig.lug = sigLug();
     if (!isAdm && !renderedAny) container.innerHTML = '<div style="text-align:center; padding: 50px; color: var(--text-muted); font-size: 1.2rem; font-weight: bold;"><i class="fas fa-eye-slash" style="font-size: 2rem; margin-bottom: 15px; display: block;"></i>A Escala da Semana ainda não foi publicada.</div>';
     if (isAdm) container.insertAdjacentHTML('afterbegin', bannerTurnoEscala(liveEscalaSemana));
     if(isAdm) { escDiasConf.forEach(d => marcarConflitosDia(d.id, false)); updateSidebar(); }
@@ -1077,6 +1096,7 @@ function handleEscalaSelect(diaId, el) {
             if (!liveEscalaSemana[diaId].grid) liveEscalaSemana[diaId].grid = {};
             if (!liveEscalaSemana[diaId].grid[m[1]]) liveEscalaSemana[diaId].grid[m[1]] = {};
             liveEscalaSemana[diaId].grid[m[1]][m[2]] = el.value || '';
+            if (!renderPendente['escala-semanal-container'] && escSig.lug) escSig.lug = sigLug();
             // grava só a célula alterada: dois admins podem editar ao mesmo tempo sem apagar o trabalho do outro
             dbFirebase.ref(`${refEsc()}/${diaId}/grid/${m[1]}/${m[2]}`).set(el.value || '').catch(e => { console.error(e); showToast('Erro ao salvar. Verifique a internet.'); });
         }
@@ -1094,6 +1114,8 @@ function saveEscalaField(diaId, el) {
     if (!liveEscalaSemana[diaId]) liveEscalaSemana[diaId] = { grid: {} };
     if (liveEscalaSemana[diaId][campo] === valor) return;
     liveEscalaSemana[diaId][campo] = valor;
+    // a data muda quem está disponível no dia, então nesse caso deixa redesenhar
+    if (campo !== 'dataDia' && !renderPendente['escala-semanal-container'] && escSig.lug) escSig.lug = sigLug();
     dbFirebase.ref(`${refEsc()}/${diaId}/${campo}`).set(valor).catch(e => { console.error(e); showToast('Erro ao salvar. Verifique a internet.'); });
 }
 
@@ -1253,7 +1275,7 @@ function renderEscalaDcSemana() {
         html += `</div>`; saida += html;
     });
 
-    container.innerHTML = saida;
+    container.innerHTML = saida; escSig.dc = sigDc();
     if (!isAdm && !renderedAny) container.innerHTML = '<div style="text-align:center; padding: 50px; color: var(--text-muted); font-size: 1.2rem; font-weight: bold;"><i class="fas fa-eye-slash" style="font-size: 2rem; margin-bottom: 15px; display: block;"></i>A Escala Doblecheck ainda não foi publicada.</div>';
     if (isAdm) container.insertAdjacentHTML('afterbegin', bannerTurnoEscala(liveEscalaDcSemana));
     if(isAdm) { escDiasConf.forEach(d => marcarConflitosDia(d.id, true)); updateSidebarDc(); }
@@ -1266,6 +1288,7 @@ function handleEscalaDcSelect(diaId, el) {
         if (!liveEscalaDcSemana[diaId]) liveEscalaDcSemana[diaId] = { dataDia: '(inserir data)', visible: false, grid: {} };
         if (!liveEscalaDcSemana[diaId].grid) liveEscalaDcSemana[diaId].grid = {};
         liveEscalaDcSemana[diaId].grid[cellId] = el.value || '';
+        if (!renderPendente['escala-dc-container'] && escSig.dc) escSig.dc = sigDc();
         dbFirebase.ref(`${refEscDc()}/${diaId}/grid/${cellId}`).set(el.value || '').catch(e => { console.error(e); showToast('Erro ao salvar. Verifique a internet.'); });
     }
     updateDropdownsAvailabilityDc(diaId); updateSidebarDc();
@@ -1447,10 +1470,9 @@ function changePresencaMonth() {
         currentPresMes = val;
         presencaListener = dbFirebase.ref('shopee_presenca_live/' + currentPresMes).on('value', snap => {
             livePresenca = snap.val() || {}; presCache[currentPresMes] = livePresenca; absStamp++;
-            if(!document.getElementById('view-presenca').classList.contains('hidden')) renderPresencaGrid(); 
-            if(!document.getElementById('view-escala').classList.contains('hidden')){ if(currentUser && currentUser.r === 'admin') { escDiasConf.forEach(d => updateDropdownsAvailability(d.id)); updateSidebar(); } }
-            if(!document.getElementById('view-escala-dc').classList.contains('hidden')){ if(currentUser && currentUser.r === 'admin') { escDiasConf.forEach(d => updateDropdownsAvailabilityDc(d.id)); updateSidebarDc(); } }
-            if(!document.getElementById('view-sitelider').classList.contains('hidden')) renderSiteliderDashboard(); 
+            if(!document.getElementById('view-presenca').classList.contains('hidden')) agPres(); 
+            atualizarTelasDeEscala();
+            if(!document.getElementById('view-sitelider').classList.contains('hidden')) agSl(); 
         });
     }
 }
@@ -1511,7 +1533,19 @@ function renderPresencaGrid() {
     } else {
         html += `<tr><td colspan="${daysCount + 5}" style="padding:40px; text-align:center; color:var(--text-muted);">Nenhum colaborador. Clique em <b>Importar Planilha</b>.</td></tr>`;
     }
-    tbody.innerHTML = html;
+    // Troca só as linhas que mudaram (redesenhar a tabela inteira a cada lançamento travava em PC mais fraco)
+    const linhas = html.split('</tr>').filter(x => x.trim()).map(x => x + '</tr>');
+    const ant = tbody.__linhas;
+    if (ant && ant.length === linhas.length && tbody.rows.length === linhas.length) {
+        let tpl = null;
+        for (let i = 0; i < linhas.length; i++) {
+            if (linhas[i] === ant[i]) continue;
+            tpl = tpl || document.createElement('tbody');
+            tpl.innerHTML = linhas[i];
+            const velha = tbody.rows[i]; velha.parentNode.replaceChild(tpl.firstElementChild, velha);
+        }
+    } else tbody.innerHTML = html;
+    tbody.__linhas = linhas;
 }
 
 function openPresPopup(colab, dia, event) {
@@ -1528,7 +1562,7 @@ function setPresenca(val) {
     // grava só o dia alterado (dois PCs podem lançar presença ao mesmo tempo)
     dbFirebase.ref(`shopee_presenca_live/${currentPresMes}/${activePresColab}/${activePresDia}`).set(val || null).catch(e => { console.error(e); showToast('Erro ao salvar presença.'); });
     document.getElementById('pres-popup').classList.add('hidden');
-    renderPresencaGrid();
+    agPres();
 }
 
 document.addEventListener('click', function(e) {
@@ -1562,12 +1596,12 @@ function turnoDaPessoa(mes, nome) { return (mapaTurnoMes(mes).mapa || {})[nome] 
 dbFirebase.ref('shopee_colab_turno').on('value', snap => {
     turnoMapAll = snap.val() || {}; absStamp++;
     atualizarTelasDeEscala();
-    if(!document.getElementById('view-presenca').classList.contains('hidden')) renderPresencaGrid();
+    if(!document.getElementById('view-presenca').classList.contains('hidden')) agPres();
 });
 dbFirebase.ref('shopee_colab_extra').on('value', snap => {
     extrasMap = snap.val() || {}; absStamp++;
     atualizarTelasDeEscala();
-    if(!document.getElementById('view-presenca').classList.contains('hidden')) renderPresencaGrid();
+    if(!document.getElementById('view-presenca').classList.contains('hidden')) agPres();
 });
 
 function atualizarTelasDeEscala() {
@@ -1896,17 +1930,32 @@ async function atualizarPeloLink(silencioso = false) {
         const res = lerAbaControle(rows, mesRef, true);
         if (!res) throw new Error(`A aba "${nomeAba}" não foi encontrada ou está em outro formato (precisa do cabeçalho "Nome do colaborador", "Lider" e as datas).`);
 
+        // Grava só o que mudou desde a última leitura (antes regravava o mês inteiro a cada 10 min
+        // e todas as telas abertas nos outros PCs redesenhavam sem necessidade)
+        const atualPres = presCache[mesRef] || (mesRef === currentPresMes ? livePresenca : null);
+        const atualTurno = turnoMapAll[mesRef] || {};
+        const mesmoDia = (a, b) => {
+            a = a || {}; b = b || {};
+            const ks = new Set([...Object.keys(a), ...Object.keys(b)]);
+            for (const k of ks) if (String(a[k] == null ? '' : a[k]) !== String(b[k] == null ? '' : b[k])) return false;
+            return true;
+        };
         const upPres = {}, upTurno = {}, upColab = {};
+        let total = 0;
         Object.entries(res.pessoas).forEach(([nome, p]) => {
-            upPres[nome] = Object.keys(p.dias).length ? p.dias : null;
-            upTurno[nome] = p.turno; upColab[nome] = nome;
+            total++;
+            const novo = Object.keys(p.dias).length ? p.dias : null;
+            if (!atualPres || !mesmoDia(atualPres[nome], novo)) upPres[nome] = novo;
+            if (atualTurno[nome] !== p.turno) upTurno[nome] = p.turno;
+            if (!operadoresList.includes(nome)) upColab[nome] = nome;
         });
-        await dbFirebase.ref('shopee_presenca_live/' + mesRef).update(upPres);
-        await dbFirebase.ref('shopee_colab_turno/' + mesRef).update(upTurno);
-        await dbFirebase.ref('shopee_colaboradores').update(upColab);
+        const mudou = Object.keys(upPres).length + Object.keys(upTurno).length + Object.keys(upColab).length;
+        if (Object.keys(upPres).length) await dbFirebase.ref('shopee_presenca_live/' + mesRef).update(upPres);
+        if (Object.keys(upTurno).length) await dbFirebase.ref('shopee_colab_turno/' + mesRef).update(upTurno);
+        if (Object.keys(upColab).length) await dbFirebase.ref('shopee_colaboradores').update(upColab);
         await dbFirebase.ref('shopee_config/planilha').update({ ultimaLeitura: new Date().toISOString(), fonte });
-        await dbFirebase.ref('shopee_presenca_import/' + mesRef).set({ em: new Date().toISOString(), por: currentUser.u, aba: nomeAba, turno: 'AM + PM (' + fonte + ')' });
-        if (!silencioso) showToast(`Planilha atualizada: ${Object.keys(upPres).length} colaboradores (${nomeAba}).`);
+        if (mudou || !silencioso) await dbFirebase.ref('shopee_presenca_import/' + mesRef).set({ em: new Date().toISOString(), por: currentUser.u, aba: nomeAba, turno: 'AM + PM (' + fonte + ')' });
+        if (!silencioso) showToast(`Planilha atualizada: ${total} colaboradores (${nomeAba})${mudou ? '' : ' — nada mudou'}.`);
     } catch (e) {
         console.error('[Planilha]', e);
         if (!silencioso) alert('Erro ao ler a planilha:\n\n' + e.message);
