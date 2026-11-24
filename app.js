@@ -33,6 +33,12 @@ const CODIGOS_DESLIG = ['DF', 'DP', 'DV', 'TR'];      // a partir desse dia não
 let renderPendente = {};
 // Junta vários pedidos de redesenho no mesmo quadro (evita desenhar a mesma tela 2-3x seguidas)
 const renderFila = {};
+// Semana nas escalas/históricos: semana em visualização (somente leitura), dados já carregados, avanço automático feito
+const escVisu = { lugares: null, dc: null };
+const escCarregado = { lugares: false, dc: false };
+const escAutoFeito = {};
+const histTodas = { lugares: false, dc: false };
+let renderandoVisu = false;
 // "Assinatura" do que está desenhado na escala: quando a nuvem devolve exatamente o que já está na tela
 // (o eco da própria alteração), não precisa redesenhar a semana inteira
 const escSig = { lug: '', dc: '' };
@@ -171,10 +177,13 @@ function switchTab(id) {
     if(id==='ctrl') renderControl(); 
     if(id==='rankprod') renderRankProd(); 
     if(id==='mes') renderMonthly(); 
-    if(id==='escala') renderEscalaSemana(); 
-    if(id==='escala-dc') renderEscalaDcSemana(); 
-    if(id==='hist-escala') renderHistEscala('lugares');
-    if(id==='hist-escala-dc') renderHistEscala('dc');
+    if(id==='escala') { escVisu.lugares = null; renderEscalaSemana(); escSemanaAuto('lugares'); }
+    if(id==='escala-dc') { escVisu.dc = null; renderEscalaDcSemana(); escSemanaAuto('dc'); }
+    if(id==='hist-escala' || id==='hist-escala-dc') {
+        const t = id === 'hist-escala' ? 'lugares' : 'dc';
+        const inp = document.getElementById('hist-sel-' + t); if (inp) inp.value = '';
+        histTodas[t] = false; renderHistEscala(t);
+    }
     if(id==='presenca') { loadPresencaData(); autoAtualizarPlanilha(); }
     if(id==='escala' || id==='escala-dc') autoAtualizarPlanilha();
 
@@ -555,24 +564,29 @@ function assinarTurno() {
     turnoRefsAtivas.forEach(r => r.off());
     const rH = dbFirebase.ref(refHist()), rHD = dbFirebase.ref(refHistDc()), rE = dbFirebase.ref(refEsc()), rED = dbFirebase.ref(refEscDc());
     turnoRefsAtivas = [rH, rHD, rE, rED];
+    escCarregado.lugares = false; escCarregado.dc = false; escVisu.lugares = null; escVisu.dc = null;
     rH.on('value', snap => {
         historyDataCache = snap.val() || {};
         if(!document.getElementById('view-hist-escala').classList.contains('hidden')) agendarRender('hist', () => renderHistEscala('lugares'));
+        if(escVisu.lugares && !document.getElementById('view-escala').classList.contains('hidden')) agendarRender('visuL', () => renderEscalaSemana());
         if(!document.getElementById('view-sitelider').classList.contains('hidden')) agSl();
     });
     rHD.on('value', snap => {
         historyDcDataCache = snap.val() || {};
         if(!document.getElementById('view-hist-escala-dc').classList.contains('hidden')) agendarRender('histdc', () => renderHistEscala('dc'));
+        if(escVisu.dc && !document.getElementById('view-escala-dc').classList.contains('hidden')) agendarRender('visuD', () => renderEscalaDcSemana());
     });
     rE.on('value', (snapshot) => {
         let data = snapshot.val(); if (data) liveEscalaSemana = data; else initEmptyEscalaSemana();
-        absStamp++;
+        absStamp++; escCarregado.lugares = true;
+        if(!document.getElementById('view-escala').classList.contains('hidden')) setTimeout(() => escSemanaAuto('lugares'), 0);
         if(!document.getElementById('view-escala').classList.contains('hidden') && sigLug() !== escSig.lug) renderSeguro('escala-semanal-container', renderEscalaSemana);
         if(!document.getElementById('view-sitelider').classList.contains('hidden')) agSl();
     });
     rED.on('value', (snapshot) => {
         let data = snapshot.val(); if (data) liveEscalaDcSemana = data; else initEmptyEscalaDcSemana();
-        absStamp++;
+        absStamp++; escCarregado.dc = true;
+        if(!document.getElementById('view-escala-dc').classList.contains('hidden')) setTimeout(() => escSemanaAuto('dc'), 0);
         if(!document.getElementById('view-escala-dc').classList.contains('hidden') && sigDc() !== escSig.dc) renderSeguro('escala-dc-container', renderEscalaDcSemana);
     });
 }
@@ -882,7 +896,11 @@ async function renderBIChart() {
 function updateDatesFromWeek(inputId, tipo) {
     if (!currentUser || currentUser.r !== 'admin') return;
     const weekVal = document.getElementById(inputId).value;
-    if (!weekVal) return;
+    return preencherDatasSemana(tipo, weekVal);
+}
+
+function preencherDatasSemana(tipo, weekVal, ocultar) {
+    if (!weekVal) return Promise.resolve();
 
     const parts = weekVal.split('-W');
     if (parts.length !== 2) return;
@@ -900,10 +918,118 @@ function updateDatesFromWeek(inputId, tipo) {
         let dayStr = String(d.getDate()).padStart(2, '0');
         let monthStr = String(d.getMonth() + 1).padStart(2, '0');
         objAlvo[diaId].dataDia = `${dayStr}/${monthStr}`;
+        if (ocultar) objAlvo[diaId].visible = false;   // semana nova só aparece para as mesas quando o admin publicar
     }
 
     let refDb = tipo === 'lugares' ? refEsc() : refEscDc();
-    dbFirebase.ref(refDb).set(objAlvo).then(() => { showToast("Datas preenchidas!"); });
+    return dbFirebase.ref(refDb).set(objAlvo).then(() => { if (!ocultar) showToast("Datas preenchidas!"); });
+}
+
+// ---------- Semana automática + navegação (escalas e históricos) ----------
+// Semana da escala (quarta a segunda) em que estamos: a do dia de ontem. Ex.: terça 24/11 -> semana da quarta 25/11;
+// segunda 30/11 ainda é a semana da quarta 25/11 (último dia dela).
+function semanaAtualEscala() { const d = new Date(); d.setDate(d.getDate() - 1); return slSemanaISO(d); }
+function semanaDoObjeto(obj) {
+    const dd = obj && obj.quarta && obj.quarta.dataDia;
+    const m = String(dd || '').match(/(\d{1,2})\/(\d{1,2})/); if (!m) return null;
+    const mes = mesDoDataDia(dd); if (!mes) return null;
+    const [y, mm] = mes.split('-').map(Number);
+    return slSemanaISO(new Date(y, mm - 1, +m[1]));
+}
+function rotuloSemana(k) {
+    const [a, w] = String(k).split('-W').map(Number); if (!a || !w) return k;
+    const seg = getDateOfISOWeek(w, a); const qua = new Date(seg); qua.setDate(seg.getDate() + 2); const fim = new Date(seg); fim.setDate(seg.getDate() + 7);
+    const f = d => String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0');
+    return `Semana ${w} (${f(qua)} a ${f(fim)})`;
+}
+const escObj = t => t === 'lugares' ? liveEscalaSemana : liveEscalaDcSemana;
+const escInputId = t => t === 'lugares' ? 'hist-date-input' : 'hist-date-input-dc';
+const escHistCache = t => t === 'lugares' ? historyDataCache : historyDcDataCache;
+const escRefHist = t => t === 'lugares' ? refHist() : refHistDc();
+const escRender = t => t === 'lugares' ? renderEscalaSemana() : renderEscalaDcSemana();
+function escTemNomes(obj) {
+    const vals = v => v && typeof v === 'object' ? Object.values(v).flatMap(vals) : [v];
+    return escDiasConf.some(d => vals(((obj || {})[d.id] || {}).grid || {}).some(x => typeof x === 'string' && x.trim()));
+}
+function escSincronizarInput(t) {
+    const inp = document.getElementById(escInputId(t)); if (!inp || document.activeElement === inp) return;
+    inp.value = escVisu[t] || semanaDoObjeto(escObj(t)) || '';
+}
+// Passa a escala para outra semana: guarda a semana atual no histórico (se tiver nomes) e troca as datas
+async function escAvancarPara(t, alvo, trab) {
+    const obj = escObj(t);
+    if (trab && trab !== alvo && escTemNomes(obj)) await dbFirebase.ref(escRefHist(t) + '/' + trab).set(JSON.parse(JSON.stringify(obj)));
+    await preencherDatasSemana(t, alvo, true);
+    lerMesesDasEscalas(true);
+}
+async function escTrocarSemana(t) {
+    if (!currentUser || currentUser.r !== 'admin') return;
+    const inp = document.getElementById(escInputId(t)); const alvo = inp && inp.value;
+    if (!alvo) { escSincronizarInput(t); return; }
+    const trab = semanaDoObjeto(escObj(t));
+    if (alvo === trab) { escVisu[t] = null; escRender(t); return; }
+    // semana que já passou (ou que está salva): só olhar, sem mexer na escala em andamento
+    if (escHistCache(t)[alvo] || (trab && alvo < trab)) { escVisu[t] = alvo; escRender(t); return; }
+    // semana nova (próxima): a atual vai para o histórico e a escala passa para a nova semana
+    if (trab && escTemNomes(escObj(t)) && !confirm(`Começar a escala da ${rotuloSemana(alvo)}?\n\nA ${rotuloSemana(trab)} será salva no histórico automaticamente. Os nomes continuam na tela (use Sortear ou Limpar) e os dias ficam ocultos para as mesas até você publicar.`)) { escSincronizarInput(t); return; }
+    escVisu[t] = null;
+    await escAvancarPara(t, alvo, trab);
+    showToast(`Escala na ${rotuloSemana(alvo)}` + (trab && escTemNomes(escObj(t)) ? ` • ${rotuloSemana(trab)} salva no histórico` : ''));
+}
+function escMudarSemana(t, n) {
+    const inp = document.getElementById(escInputId(t)); if (!inp) return;
+    const base = inp.value || semanaAtualEscala();
+    const [a, w] = base.split('-W').map(Number);
+    const seg = getDateOfISOWeek(w, a); seg.setDate(seg.getDate() + 7 * n);
+    inp.value = slSemanaISO(seg); escTrocarSemana(t);
+}
+function escVoltarAtual(t) { escVisu[t] = null; escRender(t); }
+// Ao abrir a escala: se ela ainda está numa semana que já passou, avança sozinha para a semana atual
+function escSemanaAuto(t) {
+    if (!currentUser || currentUser.r !== 'admin' || !escCarregado[t]) return;
+    const atual = semanaAtualEscala(), chave = t + currentTurno;
+    if (escAutoFeito[chave] === atual) return;
+    escAutoFeito[chave] = atual;
+    const trab = semanaDoObjeto(escObj(t));
+    if (trab && trab >= atual) return;
+    const tinha = trab && escTemNomes(escObj(t));
+    escAvancarPara(t, atual, trab).then(() => showToast(`Escala ${t === 'dc' ? 'Doblecheck' : 'de Lugares'} passou para a ${rotuloSemana(atual)}` + (tinha ? ` • ${rotuloSemana(trab)} salva no histórico` : '')));
+}
+// Mostra uma semana salva no histórico dentro da própria tela da escala (somente leitura)
+function renderEscVisu(t) {
+    const sem = escVisu[t], dados = escHistCache(t)[sem];
+    const cont = document.getElementById(t === 'lugares' ? 'escala-semanal-container' : 'escala-dc-container'); if (!cont) return;
+    const secao = document.getElementById(t === 'lugares' ? 'view-escala' : 'view-escala-dc');
+    const banner = `<div class="esc-banner visu"><i class="fas fa-history"></i> <span>Vendo a <b>${rotuloSemana(sem)}</b> — ${dados ? 'escala salva no histórico (somente leitura)' : 'essa semana não foi salva no histórico'}.</span><button type="button" onclick="escVoltarAtual('${t}')"><i class="fas fa-undo"></i> Voltar para a semana atual</button></div>`;
+    if (!dados) {
+        cont.innerHTML = banner + '<div style="text-align:center; padding:50px; color:#64748b; font-weight:700;"><i class="fas fa-folder-open" style="font-size:2rem; display:block; margin-bottom:12px;"></i>Nada salvo para essa semana.</div>';
+    } else {
+        const copia = JSON.parse(JSON.stringify(dados));
+        escDiasConf.forEach(d => { if (copia[d.id]) copia[d.id].visible = true; });
+        const u = currentUser, real = escObj(t);
+        renderandoVisu = true; currentUser = Object.assign({}, u, { r: 'leitura' });
+        if (t === 'lugares') liveEscalaSemana = copia; else liveEscalaDcSemana = copia;
+        try { escRender(t); }
+        finally { currentUser = u; if (t === 'lugares') liveEscalaSemana = real; else liveEscalaDcSemana = real; renderandoVisu = false; }
+        cont.insertAdjacentHTML('afterbegin', banner);
+    }
+    if (t === 'lugares') escSig.lug = ''; else escSig.dc = '';
+    if (secao) secao.classList.add('modo-visu');
+    escSincronizarInput(t);
+}
+
+// Histórico: navegação por semana (abre na semana atual; "Todas as semanas" mostra a lista inteira)
+function histMudarSemana(t, n) {
+    const inp = document.getElementById('hist-sel-' + t); if (!inp) return;
+    const base = inp.value || semanaAtualEscala();
+    const [a, w] = base.split('-W').map(Number);
+    const seg = getDateOfISOWeek(w, a); seg.setDate(seg.getDate() + 7 * n);
+    inp.value = slSemanaISO(seg); histTodas[t] = false; renderHistEscala(t);
+}
+function slSemanaAtual() {
+    const amanha = new Date(); amanha.setDate(amanha.getDate() + 1);
+    document.getElementById('sl-week-select').value = slSemanaISO(amanha);
+    slAnimar = true; renderSiteliderDashboard();
 }
 
 function getDateOfISOWeek(w, y) {
@@ -1046,6 +1172,8 @@ function autoDistributeOperators(diaId, autoSave = true) {
 }
 
 function renderEscalaSemana() {
+    if (escVisu.lugares && !renderandoVisu) return renderEscVisu('lugares');
+    if (!renderandoVisu) document.getElementById('view-escala')?.classList.remove('modo-visu');
     const container = document.getElementById('escala-semanal-container'); if(!container) return; let saida = '';
     const isAdm = currentUser && currentUser.r === 'admin'; const editAttr = isAdm ? 'contenteditable="true"' : ''; const editClass = isAdm ? 'editable-cell' : '';
     let renderedAny = false;
@@ -1084,7 +1212,7 @@ function renderEscalaSemana() {
     container.innerHTML = saida; escSig.lug = sigLug();
     if (!isAdm && !renderedAny) container.innerHTML = '<div style="text-align:center; padding: 50px; color: var(--text-muted); font-size: 1.2rem; font-weight: bold;"><i class="fas fa-eye-slash" style="font-size: 2rem; margin-bottom: 15px; display: block;"></i>A Escala da Semana ainda não foi publicada.</div>';
     if (isAdm) container.insertAdjacentHTML('afterbegin', bannerTurnoEscala(liveEscalaSemana));
-    if(isAdm) { escDiasConf.forEach(d => marcarConflitosDia(d.id, false)); updateSidebar(); }
+    if(isAdm) { escDiasConf.forEach(d => marcarConflitosDia(d.id, false)); updateSidebar(); escSincronizarInput('lugares'); }
 }
 
 function handleEscalaSelect(diaId, el) {
@@ -1250,6 +1378,8 @@ function autoDistributeDc(diaId, autoSave = true) {
 }
 
 function renderEscalaDcSemana() {
+    if (escVisu.dc && !renderandoVisu) return renderEscVisu('dc');
+    if (!renderandoVisu) document.getElementById('view-escala-dc')?.classList.remove('modo-visu');
     const container = document.getElementById('escala-dc-container'); if(!container) return; let saida = '';
     const isAdm = currentUser && currentUser.r === 'admin'; 
 
@@ -1278,7 +1408,7 @@ function renderEscalaDcSemana() {
     container.innerHTML = saida; escSig.dc = sigDc();
     if (!isAdm && !renderedAny) container.innerHTML = '<div style="text-align:center; padding: 50px; color: var(--text-muted); font-size: 1.2rem; font-weight: bold;"><i class="fas fa-eye-slash" style="font-size: 2rem; margin-bottom: 15px; display: block;"></i>A Escala Doblecheck ainda não foi publicada.</div>';
     if (isAdm) container.insertAdjacentHTML('afterbegin', bannerTurnoEscala(liveEscalaDcSemana));
-    if(isAdm) { escDiasConf.forEach(d => marcarConflitosDia(d.id, true)); updateSidebarDc(); }
+    if(isAdm) { escDiasConf.forEach(d => marcarConflitosDia(d.id, true)); updateSidebarDc(); escSincronizarInput('dc'); }
 }
 
 function handleEscalaDcSelect(diaId, el) {
@@ -1377,15 +1507,27 @@ function renderHistEscala(tipo) {
     const container = document.getElementById(containerId); if(!container) return;
     
     let keys = Object.keys(cacheSource).sort((a,b) => b.localeCompare(a)); 
+    const selEl = document.getElementById('hist-sel-' + tipo), btnTodas = document.getElementById('hist-todas-' + tipo);
+    if (btnTodas) btnTodas.classList.toggle('ativo', !!histTodas[tipo]);
+    if (selEl && !selEl.value) { const at = semanaAtualEscala(); selEl.value = cacheSource[at] ? at : (keys.find(k => k <= at) || keys[0] || at); }
     if(keys.length === 0) { container.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:40px">Nenhum histórico encontrado.</div>'; return; }
+    const umaSemana = !histTodas[tipo] && selEl && selEl.value;
+    if (umaSemana) {
+        const todas = keys;
+        keys = keys.filter(k => k === selEl.value);
+        if (!keys.length) {
+            container.innerHTML = `<div class="stat-card hist-vazio"><i class="fas fa-calendar-times" style="font-size:1.8rem; display:block; margin-bottom:10px;"></i>A <b>${rotuloSemana(selEl.value)}</b> não foi salva no histórico.<div style="margin-top:6px; font-size:.8rem;">Semanas salvas:</div><div class="hist-salvas">${todas.slice(0, 12).map(k => `<button type="button" onclick="document.getElementById('hist-sel-${tipo}').value='${k}'; histTodas['${tipo}']=false; renderHistEscala('${tipo}')">${rotuloSemana(k)}</button>`).join('')}</div></div>`;
+            return;
+        }
+    }
     container.innerHTML = '';
     
     keys.forEach((dateKey, index) => {
         const semanaData = cacheSource[dateKey];
         let displayWeek = dateKey;
-        if(dateKey.includes('-W')) { let pts = dateKey.split('-W'); displayWeek = "Semana " + pts[1] + " de " + pts[0]; }
+        if(dateKey.includes('-W')) { let pts = dateKey.split('-W'); displayWeek = rotuloSemana(dateKey) + " de " + pts[0]; }
 
-        let tableHtml = `<div class="hidden" id="hist-det-${tipo}-${index}" style="margin-top: 15px; border-top: 1px solid var(--glass-border); padding-top: 15px; overflow-x: auto;">
+        let tableHtml = `<div class="${umaSemana ? '' : 'hidden'}" id="hist-det-${tipo}-${index}" style="margin-top: 15px; border-top: 1px solid var(--glass-border); padding-top: 15px; overflow-x: auto;">
             <table class="hist-table"><tr><th>COLABORADOR</th>`;
         
         escDiasConf.forEach(diaConf => {
@@ -1913,9 +2055,10 @@ async function lerViaApi(nomeAba) {
     return j.values || [];
 }
 
-async function atualizarPeloLink(silencioso = false) {
+async function atualizarPeloLink(silencioso = false, mesRef = currentPresMes, quieto = false) {
     if (!currentUser || currentUser.r !== 'admin') return;
-    const mesRef = currentPresMes;
+    if (typeof silencioso !== 'boolean') silencioso = false;
+    if (!quieto && mesRef === currentPresMes) setTimeout(() => lerMesesDasEscalas(), 0);
     const nomeAba = 'Controle-' + ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'][+mesRef.slice(5) - 1];
     try {
         if (!silencioso) showToast('Lendo a planilha...');
@@ -1927,7 +2070,7 @@ async function atualizarPeloLink(silencioso = false) {
             if (id === '1zE6yZcKDIxBo2_MeYdNHkvNAo19zVd8Cy9ZOJtj3mkA') throw new Error('O link salvo na engrenagem ⚙ é o da planilha REGIONAL, que é privada.\n\nCole o link da planilha ESPELHO (a nova que você criou com a fórmula IMPORTRANGE).');
             rows = await lerPlanilhaPublica(id, nomeAba, parseInt(planilhaConfig.linhaCabecalho || 1));
         }
-        const res = lerAbaControle(rows, mesRef, true);
+        const res = lerAbaControle(rows, mesRef, !quieto);
         if (!res) throw new Error(`A aba "${nomeAba}" não foi encontrada ou está em outro formato (precisa do cabeçalho "Nome do colaborador", "Lider" e as datas).`);
 
         // Grava só o que mudou desde a última leitura (antes regravava o mês inteiro a cada 10 min
@@ -1958,12 +2101,32 @@ async function atualizarPeloLink(silencioso = false) {
         if (!silencioso) showToast(`Planilha atualizada: ${total} colaboradores (${nomeAba})${mudou ? '' : ' — nada mudou'}.`);
     } catch (e) {
         console.error('[Planilha]', e);
+        if (quieto) return;
         if (!silencioso) alert('Erro ao ler a planilha:\n\n' + e.message);
         else showToast('Não consegui atualizar pela planilha: ' + e.message);
     }
 }
 
 // Atualiza sozinho quando o admin abre a Presença ou as Escalas (no máximo a cada 10 minutos)
+// Semana da escala que cruza o mês (ex.: 30/12 a 04/01): lê também a aba do outro mês (Controle-Janeiro),
+// para o sorteio já tirar quem está de folga/DSR/férias nesses dias
+function mesesDasEscalas() {
+    const ms = new Set();
+    [liveEscalaSemana, liveEscalaDcSemana].forEach(o => escDiasConf.forEach(d => { const m = mesDoDataDia(o && o[d.id] && o[d.id].dataDia); if (m) ms.add(m); }));
+    ms.delete(currentPresMes);
+    return [...ms];
+}
+const mesesLidos = {};
+function lerMesesDasEscalas(forcar) {
+    if (!currentUser || currentUser.r !== 'admin') return;
+    mesesDasEscalas().forEach(m => {
+        if (!forcar && mesesLidos[m] && Date.now() - mesesLidos[m] < 10 * 60 * 1000) return;
+        mesesLidos[m] = Date.now();
+        garantirPresencaMes(m);
+        atualizarPeloLink(true, m, true);
+    });
+}
+
 function autoAtualizarPlanilha() {
     if (!currentUser || currentUser.r !== 'admin') return;
     if (Date.now() - ultimaAutoLeitura < 10 * 60 * 1000) return;
