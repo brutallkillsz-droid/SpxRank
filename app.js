@@ -16,7 +16,7 @@ const firebaseConfig = {
 if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
 const dbFirebase = firebase.database();
 
-const USERS = [ { u:'admin', p:'spxadminl', r:'admin' }, { u:'mesa1', p:'mesa1', r:'user' }, { u:'mesa2', p:'mesa2', r:'user' }, { u:'mesa3', p:'mesa3', r:'user' }, { u:'mesa4', p:'mesa4', r:'user' } ];
+const USERS = [ { u:'admin', p:'spxadminl', r:'admin' }, { u:'mesa', p:'mesa1234', r:'user' } ];
 let currentUser = null;
 let dailyData = [];
 let ctrlData = initCtrl();
