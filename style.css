@@ -607,3 +607,17 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .sl-live::after { content: ''; position: absolute; inset: 0; border-radius: 50%; background: rgba(16,185,129,.55); animation: slPulse2 2s ease-out infinite; will-change: transform, opacity; }
 @keyframes slPulse2 { 0% { transform: scale(1); opacity: .7; } 70% { transform: scale(2.6); opacity: 0; } 100% { transform: scale(2.6); opacity: 0; } }
 #pres-popup { backdrop-filter: none; }
+
+/* ===== Navegação por semana (escalas e históricos) ===== */
+.semana-nav input[type="week"] { color-scheme: dark; }
+.sl-seg button.sem-atual { font-size: .68rem; padding: 6px 9px; color: var(--primary); }
+.modo-visu .esc-acao { opacity: .35; pointer-events: none; filter: grayscale(.6); }
+.esc-banner.visu { background: #fff7ed; border-color: #fdba74; color: #9a3412; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.esc-banner.visu button { margin-left: auto; background: #ea580c; color: #fff; border: none; border-radius: 8px; padding: 6px 14px; font-weight: 800; font-size: .75rem; cursor: pointer; font-family: var(--font-main); }
+.esc-banner.visu button:hover { background: #c2410c; }
+.hist-vazio { text-align: center; color: var(--text-muted); padding: 34px 20px; }
+.hist-vazio b { color: #fff; }
+.hist-salvas { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 14px; }
+.hist-salvas button { background: rgba(99,102,241,.12); border: 1px solid rgba(99,102,241,.35); color: #c7d2fe; border-radius: 999px; padding: 6px 14px; font-weight: 700; font-size: .75rem; cursor: pointer; font-family: var(--font-main); }
+.hist-salvas button:hover { background: var(--primary); color: #fff; }
+#hist-todas-lugares.ativo, #hist-todas-dc.ativo { background: var(--primary); color: #fff; }
