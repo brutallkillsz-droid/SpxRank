@@ -541,3 +541,45 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .hist-grupo.pm td { color: #e2e8f0 !important; border-left: 3px solid #94a3b8 !important; }
 .hist-grupo.sem td { color: #f87171 !important; border-left: 3px solid #ef4444 !important; }
 .hist-grupo td span { color: var(--text-muted); font-weight: 600; }
+
+/* Faixa de turno no topo das escalas */
+.esc-banner { font-family: var(--font-main) !important; font-size: 12px; color: #1e293b; background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 10px; padding: 8px 12px; margin-bottom: 12px; }
+.esc-banner i { color: #4f46e5; margin-right: 6px; }
+.esc-banner.bad { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
+.esc-banner.bad i { color: #dc2626; }
+.esc-banner-alerta { color: #b45309; font-weight: 700; }
+
+/* =========================================================
+   7. DESEMPENHO (sem mudar o visual)
+   O desfoque (backdrop-filter) em dezenas de células/cartões deixava a rolagem pesada.
+   Troca por fundos sólidos quase idênticos sobre o fundo escuro.
+   ========================================================= */
+.nasa-board { backdrop-filter: none; background: rgba(17,17,24,.97); }
+.nasa-table th, .nasa-table td { transition: none; }
+.nasa-table th { backdrop-filter: none; background: #0c0c12; }
+.nasa-table td:first-child, .nasa-table th:first-child { backdrop-filter: none; background: #101017; }
+.nasa-table th:first-child { background: #0c0c12; }
+.stat-card { backdrop-filter: none; background: rgba(19,19,26,.94); }
+.esc-sidebar { backdrop-filter: none; }
+.dc-modal-content { backdrop-filter: none; background: #15151c; }
+#dc-modal-overlay, #shift-modal-overlay, .overlay-generico { backdrop-filter: none; background: rgba(0,0,0,.8); }
+.sl-kpi:hover, .stat-card:hover { will-change: transform; }
+
+/* Mesas fechadas / Sorting Ruas separado / Doblecheck por mesa */
+.mesa-lock { margin-left: 4px; border: none; background: rgba(0,0,0,.08); color: #475569; border-radius: 5px; width: 18px; height: 18px; font-size: 9px; cursor: pointer; vertical-align: middle; padding: 0; }
+.mesa-lock:hover { background: #002f6c; color: #fff; }
+.mesa-lock.fechada { background: #dc2626; color: #fff; }
+.mesa-fechada-th { background: #cbd5e1 !important; color: #64748b !important; }
+.mesa-tag { display: block; font-size: 7px; font-weight: 900; color: #dc2626; letter-spacing: .5px; }
+.mesa-fechada-td { background: repeating-linear-gradient(45deg, #e2e8f0, #e2e8f0 6px, #f1f5f9 6px, #f1f5f9 12px) !important; color: #94a3b8 !important; }
+.esc-ruas-tit { margin: 10px 0 3px; font-size: 10px; font-weight: 900; color: #002f6c; letter-spacing: 1px; }
+.esc-ruas th { font-size: 9px; }
+.dc-mesa-lbl { background: #002f6c; color: #fff !important; font-size: 9px; font-weight: 900; padding: 3px 4px; display: flex; align-items: center; justify-content: center; gap: 2px; }
+.dc-mesa-lbl .mesa-lock { background: rgba(255,255,255,.18); color: #fff; }
+.dc-mesa-lbl.fechada { background: #64748b; }
+.mesa-fechada-txt { font-size: 9px; font-weight: 900; color: #94a3b8; padding: 4px 0; }
+/* Presença: sem brilho (sombra) em cada bolinha — milhares de sombras deixavam a rolagem pesada */
+.badge-pres, .badge-P, .badge-F, .badge-AT, .badge-FG { box-shadow: none !important; text-shadow: none !important; }
+.nasa-table { contain: content; }
+.dc-mesa-lbl.especial { background: #b45309; }
+.dc-esp { font-size: 7px; font-weight: 900; background: rgba(255,255,255,.22); border-radius: 3px; padding: 1px 3px; margin-left: 3px; letter-spacing: .4px; }
