@@ -583,3 +583,20 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .nasa-table { contain: content; }
 .dc-mesa-lbl.especial { background: #b45309; }
 .dc-esp { font-size: 7px; font-weight: 900; background: rgba(255,255,255,.22); border-radius: 3px; padding: 1px 3px; margin-left: 3px; letter-spacing: .4px; }
+
+/* Ícones dentro das escalas e da produtividade: o original forçava Arial em tudo e os ícones viravam quadradinhos */
+.esc-board .fas, .esc-board .fa-solid, .esc-board i.fas, #view-prod .fas, #view-prod i.fas { font-family: "Font Awesome 6 Free" !important; font-weight: 900 !important; }
+.esc-board .far, #view-prod .far { font-family: "Font Awesome 6 Free" !important; font-weight: 400 !important; }
+.esc-board .fab, #view-prod .fab { font-family: "Font Awesome 6 Brands" !important; font-weight: 400 !important; }
+
+/* Interruptor de mesa aberta/fechada */
+.mesa-th { display: flex; align-items: center; justify-content: center; gap: 6px; }
+.mesa-sw { position: relative; flex-shrink: 0; width: 24px; height: 13px; border: none; padding: 0; border-radius: 999px; cursor: pointer; background: linear-gradient(90deg, #059669, #10b981); box-shadow: inset 0 0 0 1px rgba(0,0,0,.12), 0 0 6px rgba(16,185,129,.45); transition: background .2s, box-shadow .2s; }
+.mesa-sw span { position: absolute; top: 2px; left: 13px; width: 9px; height: 9px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.3); transition: left .2s; }
+.mesa-sw.off { background: linear-gradient(90deg, #b91c1c, #ef4444); box-shadow: inset 0 0 0 1px rgba(0,0,0,.12), 0 0 6px rgba(239,68,68,.5); }
+.mesa-sw.off span { left: 2px; }
+.mesa-sw:hover { filter: brightness(1.12); }
+.mesa-sw:focus-visible { outline: 2px solid #002f6c; outline-offset: 2px; }
+.dc-mesa-lbl .mesa-sw { box-shadow: inset 0 0 0 1px rgba(255,255,255,.25); }
+.mesa-tag { margin-top: 1px; }
+.esc-ruas td { height: 21px; }
